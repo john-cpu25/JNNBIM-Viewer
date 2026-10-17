@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Workspace, BimModel } from '../../types/bim';
+import jnnLogo from '../../assets/logo.png';
 
 interface ProjectHomeProps {
   availableModels: BimModel[];
@@ -44,7 +45,7 @@ export const ProjectHome: React.FC<ProjectHomeProps> = ({
             </div>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-xl overflow-hidden p-1 bg-cyan-950/80 border border-cyan-500/40 shadow-lg shadow-cyan-900/40 flex items-center justify-center shrink-0">
-                <img src="/logo.png" alt="JNN Logo" className="w-full h-full object-contain" />
+                <img src={jnnLogo} alt="JNN Logo" className="w-full h-full object-contain" />
               </div>
               <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
                 JNN BIM Viewer
@@ -82,7 +83,7 @@ export const ProjectHome: React.FC<ProjectHomeProps> = ({
           </div>
 
           <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-25 pointer-events-none hidden md:block">
-            <img src="/logo.png" alt="JNN Logo Watermark" className="w-64 h-64 object-contain filter drop-shadow-[0_0_35px_rgba(6,182,212,0.3)]" />
+            <img src={jnnLogo} alt="JNN Logo Watermark" className="w-64 h-64 object-contain filter drop-shadow-[0_0_35px_rgba(6,182,212,0.3)]" />
           </div>
         </div>
 
@@ -203,7 +204,7 @@ export const ProjectHome: React.FC<ProjectHomeProps> = ({
                     <tr key={item.id} className="hover:bg-[var(--bg-hover)]">
                       <td className="font-semibold text-[var(--text-primary)]">
                         <div className="flex items-center gap-2">
-                          <img src="/logo.png" alt="JNN" className="w-4 h-4 object-contain shrink-0" />
+                          <img src={jnnLogo} alt="JNN" className="w-4 h-4 object-contain shrink-0" />
                           <span className="truncate max-w-[240px]" title={item.name}>{item.name}</span>
                         </div>
                       </td>

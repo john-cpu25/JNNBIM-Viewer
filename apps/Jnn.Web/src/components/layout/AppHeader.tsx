@@ -15,6 +15,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Workspace, BimModel } from '../../types/bim';
+import jnnLogo from '../../assets/logo.png';
 
 interface AppHeaderProps {
   currentWorkspace: Workspace;
@@ -61,7 +62,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <div className="w-7 h-7 rounded-lg overflow-hidden p-0.5 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center shadow-md shadow-cyan-950/40">
-            <img src="/logo.png" alt="JNN Logo" className="w-full h-full object-contain" />
+            <img src={jnnLogo} alt="JNN Logo" className="w-full h-full object-contain" />
           </div>
           <span className="font-bold text-[14px] tracking-tight bg-gradient-to-r from-cyan-400 to-teal-300 bg-clip-text text-transparent">
             JNN BIM VIEWER
