@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JnnBimModel",
+  "type": "object",
+  "required": ["modelId", "modelRevisionId", "sourceFormat", "elements"],
+  "properties": {
+    "modelId": { "type": "string", "format": "uuid" },
+    "modelRevisionId": { "type": "string", "format": "uuid" },
+    "name": { "type": "string" },
+    "sourceFormat": {
+      "type": "string",
+      "enum": ["IFC2X3", "IFC4", "RVT2024", "RVT2025", "RVT2026", "RVT2027", "NWD", "NWC"]
+    },
+    "units": {
+      "type": "object",
+      "properties": {
+        "length": { "type": "string", "default": "MILLIMETER" },
+        "area": { "type": "string", "default": "SQUARE_METER" },
+        "volume": { "type": "string", "default": "CUBIC_METER" }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["elementId", "category", "storey"],
+        "properties": {
+          "elementId": { "type": "string" },
+          "globalId": { "type": "string" },
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "discipline": { "type": "string", "enum": ["Structural", "Architectural", "Mechanical", "Electrical", "Plumbing"] },
+          "storey": { "type": "string" },
+          "material": { "type": "string" },
+          "dimensions": {
+            "type": "object",
+            "properties": {
+              "length": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" },
+              "area": { "type": "number" },
+              "volume": { "type": "number" }
+            }
+          },
+          "properties": { "type": "object" },
+          "quantities": { "type": "object" }
+        }
+      }
+    }
+  }
+}

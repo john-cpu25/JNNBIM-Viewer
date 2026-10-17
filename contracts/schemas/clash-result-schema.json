@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JnnClashResult",
+  "type": "object",
+  "required": ["testId", "results"],
+  "properties": {
+    "testId": { "type": "string" },
+    "testName": { "type": "string" },
+    "tolerance": { "type": "number" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["clashId", "status", "elementA", "elementB"],
+        "properties": {
+          "clashId": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["New", "Active", "Reviewed", "Approved", "Resolved"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["Critical", "Major", "Minor", "Info"]
+          },
+          "elementA": {
+            "type": "object",
+            "required": ["id", "name", "category"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "category": { "type": "string" },
+              "storey": { "type": "string" }
+            }
+          },
+          "elementB": {
+            "type": "object",
+            "required": ["id", "name", "category"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "category": { "type": "string" },
+              "storey": { "type": "string" }
+            }
+          },
+          "intersectionDistance": { "type": "number" },
+          "gridLocation": { "type": "string" },
+          "assignedTo": { "type": "string" },
+          "createdDate": { "type": "string", "format": "date-time" },
+          "dueDate": { "type": "string", "format": "date" }
+        }
+      }
+    }
+  }
+}

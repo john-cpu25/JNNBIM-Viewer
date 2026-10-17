@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/apps/">
+    <Project Path="apps/Jnn.Desktop/Jnn.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/services/">
+    <Project Path="services/Jnn.Api/Jnn.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Jnn.Contracts/Jnn.Contracts.csproj" />
+  </Folder>
+</Solution>

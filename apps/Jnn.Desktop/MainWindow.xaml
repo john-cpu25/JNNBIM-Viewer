@@ -1,0 +1,32 @@
+<Window x:Class="Jnn.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="JNN BIM Viewer (Desktop Native Shell)" Height="900" Width="1440"
+        Icon="Logo_JNN.ico"
+        WindowStartupLocation="CenterScreen"
+        Background="#0B0F19">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Native Title Bar / Status -->
+        <Border Grid.Row="0" Background="#111827" BorderBrush="#1F293D" BorderThickness="0,0,0,1" Padding="10,6">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <TextBlock Text="JNN BIM VIEWER" Foreground="#06B6D4" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text=" | Desktop Shell (.NET 10 + WebView2)" Foreground="#64748B" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                    <Button Content="Open Local File" Click="OnOpenLocalFileClicked" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#334155" Padding="10,2" Margin="4,0" FontSize="11"/>
+                    <Button Content="Reload Engine" Click="OnReloadClicked" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#334155" Padding="10,2" Margin="4,0" FontSize="11"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- WebView2 Hosting Jnn.Web React Application -->
+        <wv2:WebView2 x:Name="ViewerWebView" Grid.Row="1" />
+    </Grid>
+</Window>

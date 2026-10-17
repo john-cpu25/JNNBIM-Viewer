@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand Tokens */
+  --jnn-primary: #0891b2;
+  --jnn-primary-hover: #0e7490;
+  --jnn-primary-light: #cffafe;
+  
+  /* Semantic Tokens */
+  --jnn-success: #10b981;
+  --jnn-warning: #f59e0b;
+  --jnn-danger: #ef4444;
+  --jnn-info: #3b82f6;
+
+  /* Clash Colors */
+  --clash-item-a: #ef4444;
+  --clash-item-b: #06b6d4;
+
+  /* Theme: Dark (Default) */
+  --bg-app: #0b0f19;
+  --bg-surface: #111827;
+  --bg-elevated: #1f2937;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --border-color: #1f293d;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --row-selected: rgba(8, 145, 178, 0.18);
+
+  /* Viewport canvas preset */
+  --viewport-bg: #0f172a;
+}
+
+.light {
+  /* Theme: Light */
+  --bg-app: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f8fafc;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --border-color: #cbd5e1;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --row-selected: rgba(8, 145, 178, 0.12);
+
+  --viewport-bg: #e2e8f0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--jnn-primary);
+}
+
+/* Engineering Table Density */
+.engineering-table th {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  white-space: nowrap;
+}
+
+.engineering-table td {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.engineering-table tr:hover {
+  background-color: var(--bg-hover);
+}
+
+.engineering-table tr.selected {
+  background-color: var(--row-selected);
+  border-left: 2px solid var(--jnn-primary);
+}
+
+/* Tooltip micro-animation */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1e293b;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Pulse animation for active clash */
+@keyframes clash-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+}
+
+.animate-clash {
+  animation: clash-pulse 2s infinite ease-in-out;
+}

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  jnn-db:
+    image: postgres:16-alpine
+    container_name: jnn-postgres
+    environment:
+      POSTGRES_DB: jnnbim
+      POSTGRES_USER: jnn_admin
+      POSTGRES_PASSWORD: jnn_secure_dev_password_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  jnn-api:
+    build:
+      context: .
+      dockerfile: services/Jnn.Api/Dockerfile
+    container_name: jnn-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=jnn-db;Database=jnnbim;Username=jnn_admin;Password=jnn_secure_dev_password_2026"
+    ports:
+      - "5000:8080"
+    depends_on:
+      - jnn-db
+    restart: unless-stopped
+
+  jnn-web:
+    build:
+      context: apps/Jnn.Web
+      dockerfile: Dockerfile
+    container_name: jnn-web
+    ports:
+      - "3000:80"
+    depends_on:
+      - jnn-api
+    restart: unless-stopped
+
+volumes:
+  pgdata:

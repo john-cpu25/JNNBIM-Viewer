@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JnnBcfViewpoint",
+  "type": "object",
+  "required": ["viewpointId", "camera"],
+  "properties": {
+    "viewpointId": { "type": "string" },
+    "camera": {
+      "type": "object",
+      "required": ["position", "target", "up", "projection"],
+      "properties": {
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "target": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "up": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "projection": { "type": "string", "enum": ["Perspective", "Orthographic"] },
+        "fieldOfView": { "type": "number" }
+      }
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "selection": { "type": "array", "items": { "type": "string" } },
+        "visibility": {
+          "type": "object",
+          "properties": {
+            "defaultVisibility": { "type": "boolean" },
+            "exceptions": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "coloring": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "color": { "type": "string" },
+              "elements": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "clippingPlanes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "array", "items": { "type": "number" } },
+          "direction": { "type": "array", "items": { "type": "number" } }
+        }
+      }
+    },
+    "snapshot": { "type": "string", "description": "Base64 data URL PNG thumbnail" }
+  }
+}
