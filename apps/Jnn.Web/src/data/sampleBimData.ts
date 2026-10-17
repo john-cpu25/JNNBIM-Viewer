@@ -1035,13 +1035,13 @@ export function createModelFromUploadedFile(file: File, textContent?: string): B
   };
 }
 
-// Realistic clash tests and results
+// Realistic clash tests and results aligned with Project2 9-Storey Structural Model
 export const sampleClashTests: ClashTest[] = [
   {
     id: 'TEST-001',
-    name: 'Test 01 — Structural Framing vs HVAC Ducts',
+    name: 'Test 01 — Primary Girders vs Columns & Slab Openings (Project2)',
     categoryA: 'IfcBeam',
-    categoryB: 'IfcDuct',
+    categoryB: 'IfcColumn / IfcSlab',
     tolerance: 10,
     clashType: 'Hard Clash',
     lastRunDate: '2026-10-17 14:32',
@@ -1054,21 +1054,21 @@ export const sampleClashTests: ClashTest[] = [
           id: 'BM-X-L2-2-2',
           name: 'Girder B400x700 (BM-X-L2-2-2)',
           category: 'IfcBeam',
-          storey: 'Level 02'
+          storey: 'T2'
         },
         elementB: {
-          id: 'MEP-DUCT-01',
-          name: 'Main Supply Air Duct 800x400',
-          category: 'IfcDuct',
-          storey: 'Level 02'
+          id: 'P2-BMY-T2-2-1',
+          name: 'Transverse Beam B300x550 (P2-BMY-T2-2-1)',
+          category: 'IfcBeam',
+          storey: 'T2'
         },
         intersectionDistance: 42.5,
-        intersectionPoint: [0, 3.4, -3],
-        gridLocation: 'Grid 2-B',
-        assignedTo: 'Nguyen Van A (MEP Lead)',
+        intersectionPoint: [-7.6, 2.6, 0],
+        gridLocation: 'Grid 2-B (T2)',
+        assignedTo: 'Nguyen Van A (Structural Lead)',
         createdDate: '2026-10-15',
         dueDate: '2026-10-25',
-        notes: 'Duct penetrates primary transfer girder without engineering sleeve. Relocate duct 350mm lower.'
+        notes: 'Top reinforcement layer of longitudinal girder B400x700 conflicts with transverse beam B300x550 at Grid 2-B node. Offset top rebar layer by 35mm.'
       },
       {
         id: 'CL-002',
@@ -1078,69 +1078,69 @@ export const sampleClashTests: ClashTest[] = [
           id: 'COL-L1-2C',
           name: 'Column C600x600 (COL-L1-2C)',
           category: 'IfcColumn',
-          storey: 'Level 01'
+          storey: 'T1'
         },
         elementB: {
-          id: 'MEP-PIPE-02',
-          name: 'Fire Protection Main Pipe DN150',
-          category: 'IfcDuct',
-          storey: 'Level 01'
+          id: 'P2-BMX-T1-2-C',
+          name: 'Beam B300x600 (P2-BMX-T1-2-C)',
+          category: 'IfcBeam',
+          storey: 'T1'
         },
         intersectionDistance: 58.0,
-        intersectionPoint: [3, 2.6, 3],
-        gridLocation: 'Grid 3-C',
-        assignedTo: 'Tran Minh T (Plumbing)',
+        intersectionPoint: [-3.8, -0.3, 5.5],
+        gridLocation: 'Grid 3-C (T1)',
+        assignedTo: 'Tran Minh T (Structural Checker)',
         createdDate: '2026-10-17',
         dueDate: '2026-10-22',
-        notes: 'Pipe passes through structural column reinforcement zone. Shift route into corridor drop ceiling.'
+        notes: 'Beam-column joint eccentricity at Grid 3-C exceeds 25mm cover allowance. Align beam outer face flush with column edge.'
       },
       {
         id: 'CL-003',
         status: 'Reviewed',
         severity: 'Major',
         elementA: {
-          id: 'SLAB-L2',
-          name: 'Two-Way Slab 200mm (SLAB-L2)',
+          id: 'P2-SLAB-T3-CTR-FRONT',
+          name: 'Center Slab Front (T3)',
           category: 'IfcSlab',
-          storey: 'Level 02'
+          storey: 'T3'
         },
         elementB: {
-          id: 'MEP-DUCT-01',
-          name: 'Main Supply Air Duct 800x400',
-          category: 'IfcDuct',
-          storey: 'Level 02'
+          id: 'P2-STAIR-FLIGHT-1',
+          name: 'Stair Flight Slab (T3)',
+          category: 'IfcBeam',
+          storey: 'T3'
         },
         intersectionDistance: 18.0,
-        intersectionPoint: [-2.5, 3.5, -3],
-        gridLocation: 'Grid 2-B (Opening Edge)',
+        intersectionPoint: [-1.9, 5.8, 1.5],
+        gridLocation: 'Grid 3-4 / B-C (T3)',
         assignedTo: 'Le Hoang K (BIM Coordinator)',
         createdDate: '2026-10-14',
         dueDate: '2026-10-28',
-        notes: 'Opening cutout in slab model is 700mm; duct requires 800mm + 50mm insulation. Expand opening.'
+        notes: 'Stair flight landing nosing overlaps center slab opening edge at Level T3 (+5.800). Adjust stair void edge beam trim.'
       },
       {
         id: 'CL-004',
         status: 'Resolved',
         severity: 'Minor',
         elementA: {
-          id: 'FTG-1A',
-          name: 'Footing F1 (FTG-1A)',
+          id: 'P2-FTG-1A',
+          name: 'Pile Cap F1 (1-A)',
           category: 'IfcFooting',
-          storey: 'Foundation'
+          storey: 'Base'
         },
         elementB: {
-          id: 'MEP-PIPE-02',
-          name: 'Ground Drainage Line',
-          category: 'IfcDuct',
-          storey: 'Foundation'
+          id: 'P2-GB-X-1-A',
+          name: 'Foundation Beam D400x700 (P2-GB-X-1-A)',
+          category: 'IfcBeam',
+          storey: 'Base'
         },
         intersectionDistance: 0.0,
-        intersectionPoint: [-9, -0.2, -9],
-        gridLocation: 'Grid 1-A',
+        intersectionPoint: [-11.4, -3.25, -5.5],
+        gridLocation: 'Grid 1-A (Base)',
         assignedTo: 'Pham Vu N (Civil)',
         createdDate: '2026-10-10',
         dueDate: '2026-10-18',
-        notes: 'Resolved by rerouting drainage around footing eccentric zone.'
+        notes: 'Resolved by trimming foundation tie-beam D400x700 to pile cap F1 face and deducting concrete overlap in QTO.'
       }
     ]
   }
@@ -1166,23 +1166,23 @@ export function generateSampleQuantities(elements: BimElement[]): QuantityRow[] 
   }));
 }
 
-// Pre-configured BCF issues
+// Pre-configured BCF issues aligned with Project2
 export const sampleBcfIssues: BcfIssue[] = [
   {
     id: 'ISSUE-001',
-    title: 'HVAC Duct clashes through Girder B400x700 on Level 02',
+    title: 'Primary Girder B400x700 rebar congestion at Grid 2-B (Level T2)',
     status: 'In Progress',
     priority: 'Critical',
-    discipline: 'Mechanical',
-    assignee: 'Nguyen Van A (MEP Lead)',
+    discipline: 'Structural',
+    assignee: 'Nguyen Van A (Structural Lead)',
     dueDate: '2026-10-25',
     viewpoint: {
       camera: {
-        position: [2.5, 5.0, -1.0],
-        target: [0, 3.4, -3],
+        position: [-2.5, 5.5, 4.5],
+        target: [-7.6, 2.6, 0],
         projection: 'Perspective'
       },
-      selectedElementIds: ['BM-X-L2-2-2', 'MEP-DUCT-01']
+      selectedElementIds: ['BM-X-L2-2-2', 'P2-BMY-T2-2-1']
     },
     comments: [
       {
@@ -1190,32 +1190,32 @@ export const sampleBcfIssues: BcfIssue[] = [
         author: 'Le Hoang K (BIM Manager)',
         avatar: 'LK',
         date: '2026-10-15 09:30',
-        text: 'This girder is primary transfer framing. No sleeves larger than 150mm permitted in middle third span.'
+        text: 'Girder BM-X-L2-2-2 (400x700) and transverse beam P2-BMY-T2-2-1 (300x550) top bars collide at Grid 2-B. Please verify cranked bar detail.'
       },
       {
         id: 'c2',
-        author: 'Nguyen Van A (MEP)',
+        author: 'Nguyen Van A (Structural)',
         avatar: 'NA',
         date: '2026-10-16 11:15',
-        text: 'Understood. Reviewing alternate route below soffit with false ceiling coordinator.'
+        text: 'Confirmed. Transverse beam top reinforcement lowered by 30mm below primary girder top layer.'
       }
     ]
   },
   {
     id: 'ISSUE-002',
-    title: 'Fire protection main pipe penetrates Column COL-L1-2C',
+    title: 'Beam-Column edge alignment check at Column COL-L1-2C (Grid 3-C, T1)',
     status: 'Open',
     priority: 'Critical',
-    discipline: 'Plumbing',
-    assignee: 'Tran Minh T (Plumbing)',
+    discipline: 'Structural',
+    assignee: 'Tran Minh T (Structural Checker)',
     dueDate: '2026-10-22',
     viewpoint: {
       camera: {
-        position: [5.0, 4.0, 5.0],
-        target: [3, 2.6, 3],
+        position: [1.5, 2.5, 10.5],
+        target: [-3.8, -0.3, 5.5],
         projection: 'Perspective'
       },
-      selectedElementIds: ['COL-L1-2C', 'MEP-PIPE-02']
+      selectedElementIds: ['COL-L1-2C', 'P2-BMX-T1-2-C']
     },
     comments: [
       {
@@ -1223,8 +1223,9 @@ export const sampleBcfIssues: BcfIssue[] = [
         author: 'Le Hoang K (BIM Manager)',
         avatar: 'LK',
         date: '2026-10-17 14:40',
-        text: 'Immediate rerouting required before upcoming shop drawing freeze on Friday.'
+        text: 'Verify flush alignment of exterior beam P2-BMX-T1-2-C against Column COL-L1-2C on Axis C before shop drawing freeze.'
       }
     ]
   }
 ];
+

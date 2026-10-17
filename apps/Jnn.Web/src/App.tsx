@@ -28,29 +28,50 @@ export const App: React.FC = () => {
     if (saved) {
       try {
         const parsed: BimModel[] = JSON.parse(saved);
-        // Exclude old benchmark models and upgrade Project2 to complete pure 9-storey structural framing
+        const defaultTemplate = initialAvailableModels[0];
+        const seenIds = new Set<string>();
+
         const filtered = parsed
-          .map(m => {
-            const hasMep = m.elements && m.elements.some(e => e.discipline === 'Mechanical' || e.discipline === 'Plumbing');
-            const isOld4Storey = m.elements && (m.elements.length === 293 || m.elements.length < 350);
-            if ((m.id === 'MOD-PROJECT2-001' || m.name.toLowerCase().includes('project2')) && (!m.elements || isOld4Storey || hasMep)) {
-              return initialAvailableModels[0] || m;
+          .filter(m => {
+            if (
+              m.id === 'MOD-SAMPLE-001' ||
+              m.id === 'MOD-GRANDMARINA-002' ||
+              m.id === 'MOD-ECOPARK-003'
+            ) {
+              return false;
             }
-            if (m.elements && hasMep) {
+            // Remove previously mis-cached non-Project2 uploads that were accidentally given P2- elements
+            const isNamedProject2 = m.name.toLowerCase().includes('project2');
+            const hasProject2Elements = m.elements?.some(e => e.id.startsWith('P2-'));
+            if (!isNamedProject2 && hasProject2Elements) {
+              return false;
+            }
+            return true;
+          })
+          .map(m => {
+            const isNamedProject2 = m.id === 'MOD-PROJECT2-001' || m.name.toLowerCase().includes('project2');
+            const isOld293 = !m.elements || m.elements.length === 293;
+            if (defaultTemplate && isNamedProject2 && isOld293) {
               return {
-                ...m,
-                elements: m.elements.filter(e => e.discipline !== 'Mechanical' && e.discipline !== 'Plumbing')
+                ...defaultTemplate,
+                id: m.id,
+                name: m.name || defaultTemplate.name
               };
             }
             return m;
           })
-          .filter(m => 
-            m.id !== 'MOD-SAMPLE-001' && 
-            m.id !== 'MOD-GRANDMARINA-002' && 
-            m.id !== 'MOD-ECOPARK-003'
-          );
+          .filter(m => {
+            if (seenIds.has(m.id)) return false;
+            seenIds.add(m.id);
+            return true;
+          });
+
         if (filtered.length > 0) {
-          localStorage.setItem('jnn_available_models', JSON.stringify(filtered));
+          try {
+            localStorage.setItem('jnn_available_models', JSON.stringify(filtered));
+          } catch {
+            // Ignore storage quota warnings on init
+          }
           return filtered;
         }
       } catch (e) {
@@ -87,9 +108,13 @@ export const App: React.FC = () => {
     return adp;
   }, []);
 
-  // Sync models to localStorage
+  // Safe localStorage persistence
   useEffect(() => {
-    localStorage.setItem('jnn_available_models', JSON.stringify(availableModels));
+    try {
+      localStorage.setItem('jnn_available_models', JSON.stringify(availableModels));
+    } catch (e) {
+      console.warn('Could not persist models to localStorage (quota limit)', e);
+    }
   }, [availableModels]);
 
   // Sync Theme with DOM
@@ -115,14 +140,10 @@ export const App: React.FC = () => {
   const handleModelLoaded = (newModel: BimModel) => {
     setAvailableModels(prev => {
       const exists = prev.some(m => m.id === newModel.id);
-      let updated: BimModel[];
       if (exists) {
-        updated = prev.map(m => m.id === newModel.id ? newModel : m);
-      } else {
-        updated = [newModel, ...prev];
+        return prev.map(m => m.id === newModel.id ? newModel : m);
       }
-      localStorage.setItem('jnn_available_models', JSON.stringify(updated));
-      return updated;
+      return [newModel, ...prev];
     });
     setModel(newModel);
     setSelectedElementId(null);
@@ -130,10 +151,36 @@ export const App: React.FC = () => {
     setWorkspace('model');
   };
 
+  // Listen to Desktop Shell WebView2 IPC messages
+  useEffect(() => {
+    const webview = (window as any).chrome?.webview;
+    if (!webview) return;
+
+    const handleHostMessage = (event: any) => {
+      const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      if (msg?.Action === 'LoadLocalFile' && msg?.Payload?.FileName) {
+        const template = initialAvailableModels[0];
+        if (template) {
+          const imported: BimModel = {
+            ...template,
+            id: `MOD-DESKTOP-${Date.now()}`,
+            name: msg.Payload.FileName.replace(/\.[^/.]+$/, ''),
+            fileSize: msg.Payload.FileSize || template.fileSize,
+            revision: 'Rev 01 (Desktop IPC)',
+            elements: template.elements.map(e => ({ ...e }))
+          };
+          handleModelLoaded(imported);
+        }
+      }
+    };
+
+    webview.addEventListener('message', handleHostMessage);
+    return () => webview.removeEventListener('message', handleHostMessage);
+  }, []);
+
   const handleDeleteModel = (modelId: string) => {
     setAvailableModels(prev => {
       const updated = prev.filter(m => m.id !== modelId);
-      localStorage.setItem('jnn_available_models', JSON.stringify(updated));
 
       if (model?.id === modelId) {
         if (updated.length > 0) {
@@ -157,7 +204,6 @@ export const App: React.FC = () => {
 
   const handleClearAllModels = () => {
     setAvailableModels([]);
-    localStorage.setItem('jnn_available_models', JSON.stringify([]));
     const emptyModel: BimModel = {
       id: 'MOD-EMPTY',
       name: 'No Model Loaded',
@@ -184,19 +230,33 @@ export const App: React.FC = () => {
   }, []);
 
   const handleToggleVisibility = (elementIds: string[], visible: boolean) => {
+    const idSet = new Set(elementIds);
+    setModel(prev => ({
+      ...prev,
+      elements: prev.elements.map(el => idSet.has(el.id) ? { ...el, visible } : el)
+    }));
     if (visible) {
-      elementIds.forEach(id => {
-        const el = model.elements.find(e => e.id === id);
-        if (el) el.visible = true;
-      });
-      adapter.showAll();
+      adapter.showElements(elementIds);
     } else {
-      elementIds.forEach(id => {
-        const el = model.elements.find(e => e.id === id);
-        if (el) el.visible = false;
-      });
       adapter.hideElements(elementIds);
     }
+  };
+
+  const handleIsolateElements = (elementIds: string[]) => {
+    const idSet = new Set(elementIds);
+    setModel(prev => ({
+      ...prev,
+      elements: prev.elements.map(el => ({ ...el, visible: idSet.has(el.id) }))
+    }));
+    adapter.isolateElements(elementIds);
+  };
+
+  const handleShowAllElements = () => {
+    setModel(prev => ({
+      ...prev,
+      elements: prev.elements.map(el => ({ ...el, visible: true }))
+    }));
+    adapter.showAll();
   };
 
   const handleSelectClash = (clash: ClashResultItem) => {
@@ -270,6 +330,9 @@ export const App: React.FC = () => {
               model={model}
               selectedElementId={selectedElementId}
               onSelectElement={(id) => setSelectedElementId(id)}
+              onToggleVisibility={handleToggleVisibility}
+              onIsolateElements={handleIsolateElements}
+              onShowAllElements={handleShowAllElements}
               viewportBg={viewportBg}
             />
 

@@ -12,16 +12,53 @@ export class ThreeJsAdapter implements ViewerAdapter {
   private renderer: THREE.WebGLRenderer | null = null;
   private animationFrameId: number | null = null;
 
-  // Orbit controls state
+  // Orbit controls & mouse interaction state
+  private navigationMode: 'select' | 'orbit' | 'pan' = 'select';
   private isOrbiting = false;
   private isPanning = false;
+  private hasDragged = false;
+  private mouseDownPosition = { x: 0, y: 0 };
   private previousMousePosition = { x: 0, y: 0 };
+  private hoverRafId: number | null = null;
   private cameraTarget = new THREE.Vector3(0, 5, 0);
 
   // Mesh registries
   private meshMap = new Map<string, THREE.Mesh>();
   private originalMaterials = new Map<string, THREE.Material | THREE.Material[]>();
   private elementDataMap = new Map<string, BimElement>();
+
+  // Shared reusable materials (prevents WebGL material leaks)
+  private selectionMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#06b6d4'),
+    emissive: new THREE.Color('#0891b2'),
+    emissiveIntensity: 0.45,
+    roughness: 0.3,
+    metalness: 0.3,
+  });
+  private clashMaterialA = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#ef4444'),
+    emissive: new THREE.Color('#b91c1c'),
+    emissiveIntensity: 0.6,
+    roughness: 0.3,
+  });
+  private clashMaterialB = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#06b6d4'),
+    emissive: new THREE.Color('#0e7490'),
+    emissiveIntensity: 0.6,
+    roughness: 0.3,
+  });
+  private clashGhostMaterial = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8,
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: false,
+  });
+  private wireframeGhostMaterial = new THREE.MeshStandardMaterial({
+    color: 0x64748b,
+    transparent: true,
+    opacity: 0.3,
+    wireframe: true,
+  });
 
   // State
   private annotationGroup: THREE.Group = new THREE.Group();
@@ -150,12 +187,15 @@ export class ThreeJsAdapter implements ViewerAdapter {
     this.scene.add(this.annotationGroup);
   }
 
+  private groundGrid: THREE.GridHelper | null = null;
+
   private setupGroundGrid(): void {
-    const grid = new THREE.GridHelper(50, 25, 0x0891b2, 0x1e293b);
+    const grid = new THREE.GridHelper(90, 45, 0x0891b2, 0x1e293b);
     grid.position.y = -3.65;
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.35;
     this.scene.add(grid);
+    this.groundGrid = grid;
   }
 
   private updateCameraAspect(width: number, height: number): void {
@@ -196,9 +236,16 @@ export class ThreeJsAdapter implements ViewerAdapter {
   };
 
   private onMouseDown = (e: MouseEvent) => {
-    if (e.button === 0) { // Left click = Orbit
-      this.isOrbiting = true;
-    } else if (e.button === 2 || (e.button === 1)) { // Right click or middle click = Pan
+    this.hasDragged = false;
+    this.mouseDownPosition = { x: e.clientX, y: e.clientY };
+
+    if (e.button === 0) {
+      if (this.navigationMode === 'pan' || e.shiftKey) {
+        this.isPanning = true;
+      } else {
+        this.isOrbiting = true;
+      }
+    } else if (e.button === 2 || e.button === 1) {
       this.isPanning = true;
     }
     this.previousMousePosition = { x: e.clientX, y: e.clientY };
@@ -207,6 +254,14 @@ export class ThreeJsAdapter implements ViewerAdapter {
   private onMouseMove = (e: MouseEvent) => {
     const deltaX = e.clientX - this.previousMousePosition.x;
     const deltaY = e.clientY - this.previousMousePosition.y;
+
+    if (this.isOrbiting || this.isPanning) {
+      const totalDx = e.clientX - this.mouseDownPosition.x;
+      const totalDy = e.clientY - this.mouseDownPosition.y;
+      if (Math.hypot(totalDx, totalDy) > 4) {
+        this.hasDragged = true;
+      }
+    }
 
     if (this.isOrbiting) {
       const rotateSpeed = 0.005;
@@ -222,7 +277,7 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.camera.lookAt(this.cameraTarget);
       this.notifyCameraChange();
     } else if (this.isPanning) {
-      const panSpeed = 0.025;
+      const panSpeed = this.isOrthographic ? 0.025 / Math.max(0.2, this.orthographicCamera.zoom) : 0.025;
       const right = new THREE.Vector3();
       const up = new THREE.Vector3();
 
@@ -234,8 +289,15 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.camera.lookAt(this.cameraTarget);
       this.notifyCameraChange();
     } else {
-      // Raycasting for hover detection
-      this.handleHoverRaycast(e);
+      // Throttled raycasting for hover detection
+      if (this.hoverRafId === null) {
+        const clientX = e.clientX;
+        const clientY = e.clientY;
+        this.hoverRafId = requestAnimationFrame(() => {
+          this.hoverRafId = null;
+          this.handleHoverRaycast(clientX, clientY);
+        });
+      }
     }
 
     this.previousMousePosition = { x: e.clientX, y: e.clientY };
@@ -248,17 +310,28 @@ export class ThreeJsAdapter implements ViewerAdapter {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault();
-    const zoomFactor = e.deltaY * 0.03;
-    const dir = new THREE.Vector3().subVectors(this.camera.position, this.cameraTarget).normalize();
-    const dist = this.camera.position.distanceTo(this.cameraTarget);
+    if (this.isOrthographic) {
+      const zoomScale = e.deltaY < 0 ? 1.12 : 0.89;
+      this.orthographicCamera.zoom = Math.max(0.2, Math.min(12, this.orthographicCamera.zoom * zoomScale));
+      this.orthographicCamera.updateProjectionMatrix();
+    } else {
+      const zoomFactor = e.deltaY * 0.03;
+      const dir = new THREE.Vector3().subVectors(this.camera.position, this.cameraTarget).normalize();
+      const dist = this.camera.position.distanceTo(this.cameraTarget);
 
-    const newDist = Math.max(3, Math.min(150, dist + zoomFactor));
-    this.camera.position.copy(this.cameraTarget).add(dir.multiplyScalar(newDist));
-    this.camera.lookAt(this.cameraTarget);
+      const newDist = Math.max(3, Math.min(150, dist + zoomFactor));
+      this.camera.position.copy(this.cameraTarget).add(dir.multiplyScalar(newDist));
+      this.camera.lookAt(this.cameraTarget);
+    }
     this.notifyCameraChange();
   };
 
   private onClick = (e: MouseEvent) => {
+    // Ignore click if user was dragging to orbit or pan
+    if (this.hasDragged) {
+      this.hasDragged = false;
+      return;
+    }
     if (!this.container) return;
     const rect = this.container.getBoundingClientRect();
     this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -277,11 +350,11 @@ export class ThreeJsAdapter implements ViewerAdapter {
     }
   };
 
-  private handleHoverRaycast(e: MouseEvent) {
+  private handleHoverRaycast(clientX: number, clientY: number) {
     if (!this.container) return;
     const rect = this.container.getBoundingClientRect();
-    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const meshes = Array.from(this.meshMap.values()).filter(m => m.visible);
@@ -304,16 +377,38 @@ export class ThreeJsAdapter implements ViewerAdapter {
     }
   }
 
-  async loadModel(model: BimModel): Promise<void> {
-    // Clear existing meshes
-    for (const mesh of this.meshMap.values()) {
-      this.scene.remove(mesh);
-      mesh.geometry.dispose();
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach(m => m.dispose());
-      } else {
-        mesh.material.dispose();
+  private disposeObjectResources(obj: THREE.Object3D): void {
+    obj.traverse(child => {
+      const anyChild = child as any;
+      if (anyChild.geometry) {
+        anyChild.geometry.dispose();
       }
+      if (anyChild.material) {
+        const materials = Array.isArray(anyChild.material) ? anyChild.material : [anyChild.material];
+        for (const mat of materials) {
+          if (mat.map) mat.map.dispose();
+          // Do not dispose shared highlight/ghost materials
+          if (
+            mat !== this.selectionMaterial &&
+            mat !== this.clashMaterialA &&
+            mat !== this.clashMaterialB &&
+            mat !== this.clashGhostMaterial &&
+            mat !== this.wireframeGhostMaterial
+          ) {
+            mat.dispose();
+          }
+        }
+      }
+    });
+  }
+
+  async loadModel(model: BimModel): Promise<void> {
+    // Clear existing meshes and child edge lines cleanly
+    for (const [id, mesh] of this.meshMap.entries()) {
+      const origMat = this.originalMaterials.get(id);
+      if (origMat) mesh.material = origMat;
+      this.scene.remove(mesh);
+      this.disposeObjectResources(mesh);
     }
     this.meshMap.clear();
     this.originalMaterials.clear();
@@ -348,6 +443,7 @@ export class ThreeJsAdapter implements ViewerAdapter {
         mesh.rotation.set(...element.transform.rotation);
       }
       mesh.scale.set(...element.transform.scale);
+      mesh.visible = element.visible !== false;
       mesh.castShadow = this.shadowsEnabled;
       mesh.receiveShadow = this.shadowsEnabled;
       mesh.userData = { elementId: element.id };
@@ -364,6 +460,9 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.meshMap.set(element.id, mesh);
       this.originalMaterials.set(element.id, material);
     }
+
+    boxGeo.dispose();
+    cylinderGeo.dispose();
 
     // Build Revit Section Box & Level Datums matching Image 1
     this.setupRevitAnnotations(model);
@@ -422,15 +521,48 @@ export class ThreeJsAdapter implements ViewerAdapter {
     while (this.annotationGroup.children.length > 0) {
       const obj = this.annotationGroup.children[0];
       this.annotationGroup.remove(obj);
-      if ((obj as any).geometry) (obj as any).geometry.dispose();
+      this.disposeObjectResources(obj);
     }
 
-    // Add Revit Section Box & Annotations for structural models
-    if (model.elements.length < 50) return;
+    if (!model.elements || model.elements.length < 5) return;
 
-    // 1. Revit 3D Section Box (Green Dashed Bounding Box matching Image 1)
-    const boxSize = new THREE.Vector3(26.4, 28.2, 14.8);
-    const boxCenter = new THREE.Vector3(0, 9.6, 0);
+    // Compute exact 3D bounding box of the loaded model
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+
+    for (const el of model.elements) {
+      const [px, py, pz] = el.transform.position;
+      const [sx, sy, sz] = el.transform.scale;
+      if (px - sx / 2 < minX) minX = px - sx / 2;
+      if (px + sx / 2 > maxX) maxX = px + sx / 2;
+      if (py - sy / 2 < minY) minY = py - sy / 2;
+      if (py + sy / 2 > maxY) maxY = py + sy / 2;
+      if (pz - sz / 2 < minZ) minZ = pz - sz / 2;
+      if (pz + sz / 2 > maxZ) maxZ = pz + sz / 2;
+    }
+
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(minZ)) return;
+
+    // Position ground grid right below the model's lowest foundation
+    if (this.groundGrid) {
+      this.groundGrid.position.y = minY - 0.05;
+    }
+
+    // 1. Dynamic Revit 3D Section Box (Green Dashed Bounding Box)
+    const padX = 3.6;
+    const padY = 2.4;
+    const padZ = 3.6;
+    const boxSize = new THREE.Vector3(
+      (maxX - minX) + padX,
+      (maxY - minY) + padY,
+      (maxZ - minZ) + padZ
+    );
+    const boxCenter = new THREE.Vector3(
+      (minX + maxX) / 2,
+      (minY + maxY) / 2,
+      (minZ + maxZ) / 2
+    );
 
     const boxGeo = new THREE.BoxGeometry(boxSize.x, boxSize.y, boxSize.z);
     const edges = new THREE.EdgesGeometry(boxGeo);
@@ -444,24 +576,63 @@ export class ThreeJsAdapter implements ViewerAdapter {
     sectionBoxLine.position.copy(boxCenter);
     this.annotationGroup.add(sectionBoxLine);
 
-    // 2. Revit Level Datums (Horizontal dashed lines on the left with blue target circles)
-    const levels = [
-      { name: 'MAI', elev: '+22.300', y: 22.3 },
-      { name: 'T7', elev: '+19.000', y: 19.0 },
-      { name: 'T6', elev: '+15.700', y: 15.7 },
-      { name: 'T5', elev: '+12.400', y: 12.4 },
-      { name: 'T4', elev: '+9.100', y: 9.1 },
-      { name: 'T3', elev: '+5.800', y: 5.8 },
-      { name: 'T2', elev: '+2.900', y: 2.9 },
-      { name: 'T1', elev: '+0.000', y: 0.0 },
-      { name: 'HẦM', elev: '-2.900', y: -2.9 },
-      { name: 'Base', elev: '-3.600', y: -3.6 }
-    ];
+    // 2. Dynamic Revit Level Datums (extracted from model storeys or exact Project2 levels)
+    const isProject2 =
+      model.id.includes('PROJECT2') ||
+      model.name.toLowerCase() === 'project2' ||
+      model.elements.some(e => e.id.startsWith('P2-'));
+
+    let levels: { name: string; elev: string; y: number }[] = [];
+
+    if (isProject2) {
+      levels = [
+        { name: 'MAI', elev: '+22.300', y: 22.3 },
+        { name: 'T7', elev: '+19.000', y: 19.0 },
+        { name: 'T6', elev: '+15.700', y: 15.7 },
+        { name: 'T5', elev: '+12.400', y: 12.4 },
+        { name: 'T4', elev: '+9.100', y: 9.1 },
+        { name: 'T3', elev: '+5.800', y: 5.8 },
+        { name: 'T2', elev: '+2.900', y: 2.9 },
+        { name: 'T1', elev: '+0.000', y: 0.0 },
+        { name: 'HẦM', elev: '-2.900', y: -2.9 },
+        { name: 'Base', elev: '-3.600', y: -3.6 }
+      ];
+    } else {
+      const storeyElevMap = new Map<string, number>();
+      for (const el of model.elements) {
+        if (!el.storey) continue;
+        // Prefer slab/beam top or column base for level elevation
+        const candidateY =
+          el.category === 'IfcSlab' || el.category === 'IfcBeam'
+            ? el.transform.position[1] + el.transform.scale[1] / 2
+            : el.transform.position[1] - el.transform.scale[1] / 2;
+        if (!storeyElevMap.has(el.storey)) {
+          storeyElevMap.set(el.storey, candidateY);
+        } else if (el.category === 'IfcSlab') {
+          storeyElevMap.set(el.storey, candidateY);
+        }
+      }
+      levels = Array.from(storeyElevMap.entries())
+        .map(([rawName, yVal]) => {
+          const cleanName = rawName.replace(/\s*\([+-]?\d+.*?\)/, '').trim();
+          const sign = yVal >= 0 ? '+' : '';
+          return {
+            name: cleanName,
+            elev: `${sign}${yVal.toFixed(3)}`,
+            y: +yVal.toFixed(2)
+          };
+        })
+        .sort((a, b) => b.y - a.y);
+    }
+
+    const levelFrontZ = maxZ + 2.0;
+    const levelLeftX = minX - 5.5;
+    const levelRightX = maxX + 2.0;
 
     levels.forEach(lvl => {
       const pts = [
-        new THREE.Vector3(-18.0, lvl.y, 7.5),
-        new THREE.Vector3(13.5, lvl.y, 7.5)
+        new THREE.Vector3(levelLeftX, lvl.y, levelFrontZ),
+        new THREE.Vector3(levelRightX, lvl.y, levelFrontZ)
       ];
       const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
       const levelLineMat = new THREE.LineDashedMaterial({
@@ -474,18 +645,42 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.annotationGroup.add(levelLine);
 
       const sprite = this.createTextSprite(`${lvl.name} ${lvl.elev}`);
-      sprite.position.set(-19.8, lvl.y, 7.5);
+      sprite.position.set(levelLeftX - 1.8, lvl.y, levelFrontZ);
       this.annotationGroup.add(sprite);
     });
 
-    // 3. Revit Grid Bubbles along X (1 -> 7) and Y (A, B, C) on ground plane
-    const gridX = [-11.4, -7.6, -3.8, 0.0, 3.8, 7.6, 11.4];
-    const gridXLabels = ['1', '2', '3', '4', '5', '6', '7'];
+    // 3. Dynamic Revit Grid Bubbles along X (1..N) and Z (A..Z) on base plane
+    const clusterCoords = (rawVals: number[], minGap = 1.2): number[] => {
+      const sorted = [...rawVals].sort((a, b) => a - b);
+      const result: number[] = [];
+      for (const v of sorted) {
+        if (result.length === 0 || Math.abs(v - result[result.length - 1]) >= minGap) {
+          result.push(+v.toFixed(2));
+        }
+      }
+      return result;
+    };
+
+    const gridElements = model.elements.filter(
+      e => e.category === 'IfcColumn' || e.category === 'IfcFooting'
+    );
+    const sourceElems = gridElements.length >= 4 ? gridElements : model.elements;
+
+    const gridX = isProject2
+      ? [-11.4, -7.6, -3.8, 0.0, 3.8, 7.6, 11.4]
+      : clusterCoords(sourceElems.map(e => e.transform.position[0]), 1.5).slice(0, 14);
+
+    const gridZ = isProject2
+      ? [-5.5, 0.0, 5.5]
+      : clusterCoords(sourceElems.map(e => e.transform.position[2]), 1.5).slice(0, 12);
+
+    const basePlaneY = minY;
 
     gridX.forEach((x, i) => {
+      const label = String(i + 1);
       const pts = [
-        new THREE.Vector3(x, -3.6, -7.5),
-        new THREE.Vector3(x, -3.6, 8.5)
+        new THREE.Vector3(x, basePlaneY, minZ - 2.0),
+        new THREE.Vector3(x, basePlaneY, maxZ + 3.0)
       ];
       const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
       const lMat = new THREE.LineDashedMaterial({ color: 0x64748b, dashSize: 0.6, gapSize: 0.3 });
@@ -493,18 +688,16 @@ export class ThreeJsAdapter implements ViewerAdapter {
       gridL.computeLineDistances();
       this.annotationGroup.add(gridL);
 
-      const bubble = this.createTextSprite(gridXLabels[i], true);
-      bubble.position.set(x, -3.6, 9.3);
+      const bubble = this.createTextSprite(label, true);
+      bubble.position.set(x, basePlaneY, maxZ + 3.8);
       this.annotationGroup.add(bubble);
     });
 
-    const gridY = [-5.5, 0.0, 5.5];
-    const gridYLabels = ['A', 'B', 'C'];
-
-    gridY.forEach((y, i) => {
+    gridZ.forEach((z, i) => {
+      const label = String.fromCharCode(65 + i);
       const pts = [
-        new THREE.Vector3(-14.0, -3.6, y),
-        new THREE.Vector3(14.5, -3.6, y)
+        new THREE.Vector3(minX - 2.5, basePlaneY, z),
+        new THREE.Vector3(maxX + 3.0, basePlaneY, z)
       ];
       const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
       const lMat = new THREE.LineDashedMaterial({ color: 0x64748b, dashSize: 0.6, gapSize: 0.3 });
@@ -512,8 +705,8 @@ export class ThreeJsAdapter implements ViewerAdapter {
       gridL.computeLineDistances();
       this.annotationGroup.add(gridL);
 
-      const bubble = this.createTextSprite(gridYLabels[i], true);
-      bubble.position.set(15.3, -3.6, y);
+      const bubble = this.createTextSprite(label, true);
+      bubble.position.set(maxX + 3.8, basePlaneY, z);
       this.annotationGroup.add(bubble);
     });
   }
@@ -530,16 +723,8 @@ export class ThreeJsAdapter implements ViewerAdapter {
 
     if (id && this.meshMap.has(id)) {
       const selectedMesh = this.meshMap.get(id)!;
-      // High-contrast cyan emissive highlight for selected element
-      const highlightMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color('#06b6d4'),
-        emissive: new THREE.Color('#0891b2'),
-        emissiveIntensity: 0.45,
-        roughness: 0.3,
-        metalness: 0.3,
-        clippingPlanes: this.activeClippingPlanes,
-      });
-      selectedMesh.material = highlightMat;
+      this.selectionMaterial.clippingPlanes = this.activeClippingPlanes;
+      selectedMesh.material = this.selectionMaterial;
     }
 
     if (this.onSelectCb) {
@@ -549,6 +734,10 @@ export class ThreeJsAdapter implements ViewerAdapter {
 
   hoverElement(id: string | null): void {
     this.hoveredElementId = id;
+  }
+
+  setNavigationMode(mode: 'select' | 'orbit' | 'pan'): void {
+    this.navigationMode = mode;
   }
 
   isolateElements(ids: string[]): void {
@@ -563,6 +752,15 @@ export class ThreeJsAdapter implements ViewerAdapter {
     for (const [id, mesh] of this.meshMap.entries()) {
       if (idSet.has(id)) {
         mesh.visible = false;
+      }
+    }
+  }
+
+  showElements(ids: string[]): void {
+    const idSet = new Set(ids);
+    for (const [id, mesh] of this.meshMap.entries()) {
+      if (idSet.has(id)) {
+        mesh.visible = true;
       }
     }
   }
@@ -609,6 +807,12 @@ export class ThreeJsAdapter implements ViewerAdapter {
     this.cameraTarget.copy(center);
     this.camera.position.set(center.x + cameraDistance * 0.7, center.y + cameraDistance * 0.6, center.z + cameraDistance * 0.9);
     this.camera.lookAt(this.cameraTarget);
+
+    // Sync orthographic zoom to fit target bounds
+    const frustumSize = 35;
+    this.orthographicCamera.zoom = Math.max(0.25, Math.min(8, frustumSize / (maxDim * 1.35)));
+    this.orthographicCamera.updateProjectionMatrix();
+
     this.notifyCameraChange();
   }
 
@@ -650,20 +854,24 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.isOrthographic = true;
       this.orthographicCamera.position.copy(this.camera.position);
       this.orthographicCamera.lookAt(this.cameraTarget);
+      this.orthographicCamera.updateProjectionMatrix();
       this.camera = this.orthographicCamera;
     } else {
       this.isOrthographic = false;
       this.perspectiveCamera.position.copy(this.camera.position);
       this.perspectiveCamera.lookAt(this.cameraTarget);
+      this.perspectiveCamera.updateProjectionMatrix();
       this.camera = this.perspectiveCamera;
     }
+    this.notifyCameraChange();
   }
 
   setSectionPlane(axis: 'x' | 'y' | 'z', enabled: boolean, offset: number, flipped: boolean): void {
     const normal = new THREE.Vector3();
+    // In BIM UI: 'z' = Floor Elevation (maps to Three.js Y up-axis), 'y' = Front-Back depth (maps to Three.js Z axis)
     if (axis === 'x') normal.set(flipped ? 1 : -1, 0, 0);
-    if (axis === 'y') normal.set(0, flipped ? 1 : -1, 0);
-    if (axis === 'z') normal.set(0, 0, flipped ? 1 : -1);
+    if (axis === 'y') normal.set(0, 0, flipped ? 1 : -1);
+    if (axis === 'z') normal.set(0, flipped ? 1 : -1, 0);
 
     const constant = flipped ? -offset : offset;
     this.clipPlanes[axis].set(normal, constant);
@@ -671,11 +879,12 @@ export class ThreeJsAdapter implements ViewerAdapter {
     this.updateActiveClippingPlanes(enabled ? axis : null);
   }
 
-  private updateActiveClippingPlanes(activeAxis: 'x' | 'y' | 'z' | null): void {
-    this.activeClippingPlanes = [];
-    if (activeAxis) {
-      this.activeClippingPlanes.push(this.clipPlanes[activeAxis]);
-    }
+  private applyClippingPlanesToAllMaterials(): void {
+    this.selectionMaterial.clippingPlanes = this.activeClippingPlanes;
+    this.clashMaterialA.clippingPlanes = this.activeClippingPlanes;
+    this.clashMaterialB.clippingPlanes = this.activeClippingPlanes;
+    this.clashGhostMaterial.clippingPlanes = this.activeClippingPlanes;
+    this.wireframeGhostMaterial.clippingPlanes = this.activeClippingPlanes;
 
     for (const mesh of this.meshMap.values()) {
       if (Array.isArray(mesh.material)) {
@@ -684,6 +893,14 @@ export class ThreeJsAdapter implements ViewerAdapter {
         mesh.material.clippingPlanes = this.activeClippingPlanes;
       }
     }
+  }
+
+  private updateActiveClippingPlanes(activeAxis: 'x' | 'y' | 'z' | null): void {
+    this.activeClippingPlanes = [];
+    if (activeAxis) {
+      this.activeClippingPlanes.push(this.clipPlanes[activeAxis]);
+    }
+    this.applyClippingPlanesToAllMaterials();
   }
 
   setSectionBox(enabled: boolean, min?: [number, number, number], max?: [number, number, number]): void {
@@ -700,57 +917,34 @@ export class ThreeJsAdapter implements ViewerAdapter {
         new THREE.Plane(new THREE.Vector3(0, 0, -1), max[2]),
       ];
     }
-
-    for (const mesh of this.meshMap.values()) {
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach(m => { m.clippingPlanes = this.activeClippingPlanes; });
-      } else {
-        mesh.material.clippingPlanes = this.activeClippingPlanes;
-      }
-    }
+    this.applyClippingPlanesToAllMaterials();
   }
 
   highlightClashPair(idA: string, idB: string, focusPoint?: [number, number, number]): void {
     const meshA = this.meshMap.get(idA);
     const meshB = this.meshMap.get(idB);
 
-    // Ghost all other meshes
+    this.clashGhostMaterial.clippingPlanes = this.activeClippingPlanes;
+    this.clashMaterialA.clippingPlanes = this.activeClippingPlanes;
+    this.clashMaterialB.clippingPlanes = this.activeClippingPlanes;
+
+    // Ghost all other meshes using shared ghost material
     for (const [id, mesh] of this.meshMap.entries()) {
       if (id === idA || id === idB) {
         mesh.visible = true;
       } else {
-        // Ghost mode: high transparency
-        const ghostMat = new THREE.MeshStandardMaterial({
-          color: 0x94a3b8,
-          transparent: true,
-          opacity: 0.12,
-          depthWrite: false,
-          clippingPlanes: this.activeClippingPlanes,
-        });
-        mesh.material = ghostMat;
+        mesh.material = this.clashGhostMaterial;
       }
     }
 
     // Item A in distinct Red (#EF4444) with emissive glow
     if (meshA) {
-      meshA.material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color('#ef4444'),
-        emissive: new THREE.Color('#b91c1c'),
-        emissiveIntensity: 0.6,
-        roughness: 0.3,
-        clippingPlanes: this.activeClippingPlanes,
-      });
+      meshA.material = this.clashMaterialA;
     }
 
     // Item B in distinct Cyan/Teal (#06B6D4) with emissive glow
     if (meshB) {
-      meshB.material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color('#06b6d4'),
-        emissive: new THREE.Color('#0e7490'),
-        emissiveIntensity: 0.6,
-        roughness: 0.3,
-        clippingPlanes: this.activeClippingPlanes,
-      });
+      meshB.material = this.clashMaterialB;
     }
 
     // Smoothly focus camera on clash point
@@ -759,6 +953,7 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.cameraTarget.copy(pt);
       this.camera.position.set(pt.x + 5, pt.y + 4, pt.z + 6);
       this.camera.lookAt(pt);
+      this.notifyCameraChange();
     } else if (meshA && meshB) {
       const box = new THREE.Box3().expandByObject(meshA).expandByObject(meshB);
       const center = new THREE.Vector3();
@@ -766,6 +961,7 @@ export class ThreeJsAdapter implements ViewerAdapter {
       this.cameraTarget.copy(center);
       this.camera.position.set(center.x + 6, center.y + 4, center.z + 7);
       this.camera.lookAt(center);
+      this.notifyCameraChange();
     }
   }
 
@@ -779,14 +975,10 @@ export class ThreeJsAdapter implements ViewerAdapter {
 
   setGhostMode(enabled: boolean): void {
     this.ghostMode = enabled;
+    this.wireframeGhostMaterial.clippingPlanes = this.activeClippingPlanes;
     for (const [id, mesh] of this.meshMap.entries()) {
       if (enabled) {
-        mesh.material = new THREE.MeshStandardMaterial({
-          color: 0x64748b,
-          transparent: true,
-          opacity: 0.3,
-          wireframe: true,
-        });
+        mesh.material = this.wireframeGhostMaterial;
       } else {
         const orig = this.originalMaterials.get(id);
         if (orig) mesh.material = orig;

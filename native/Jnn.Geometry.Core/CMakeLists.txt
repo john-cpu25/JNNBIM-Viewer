@@ -19,6 +19,8 @@ set(HEADERS
 
 add_library(JnnGeometryCore SHARED ${SOURCES} ${HEADERS})
 
+target_compile_definitions(JnnGeometryCore PRIVATE JNN_GEO_EXPORTS)
+
 target_include_directories(JnnGeometryCore PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>

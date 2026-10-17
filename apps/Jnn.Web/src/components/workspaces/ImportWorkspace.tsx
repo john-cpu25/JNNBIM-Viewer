@@ -12,12 +12,19 @@ import {
   Check
 } from 'lucide-react';
 import { Workspace, BimModel } from '../../types/bim';
-import { initialAvailableModels, createModelFromUploadedFile } from '../../data/sampleBimData';
+import { initialAvailableModels, grandMarinaModel, ecoparkWarehouseModel } from '../../data/sampleBimData';
+import { parseUploadedBimFileAsync } from '../../utils/bimFileParser';
 
 interface ImportWorkspaceProps {
   onModelLoaded: (newModel: BimModel) => void;
   setWorkspace: (ws: Workspace) => void;
 }
+
+const benchmarkPresets: BimModel[] = [
+  ...initialAvailableModels,
+  grandMarinaModel,
+  ecoparkWarehouseModel
+];
 
 export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
   onModelLoaded,
@@ -27,20 +34,19 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
   
   // State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileContentText, setFileContentText] = useState<string>('');
   const [selectedPresetIndex, setSelectedPresetIndex] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progressStage, setProgressStage] = useState<number>(0);
   const [logs, setLogs] = useState<string[]>([
-    '[INFO] Ingestion Pipeline ready. Select a local file or choose a benchmark model below.'
+    '[INFO] Ingestion Pipeline ready. Select a local file (.rvt, .ifc, .nwd, .json) or choose a benchmark model below.'
   ]);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
-  const [preparedModel, setPreparedModel] = useState<BimModel | null>(initialAvailableModels[0]);
+  const [preparedModel, setPreparedModel] = useState<BimModel | null>(benchmarkPresets[0]);
 
   const stages = [
     'Stage 1: Ingesting file headers and verifying checksum...',
     'Stage 2: Parsing spatial containment (Storeys, Building, Site)...',
-    'Stage 3: Extracting IFC Property Sets (Psets) and Native Quantities...',
+    'Stage 3: Extracting IFC/Revit Property Sets (Psets) and Native Quantities...',
     'Stage 4: Tessellating triangular B-rep meshes & building BVH spatial index...',
     'Stage 5: Generating JNN Binary Geometry Cache (.jgc) — Model Ready!'
   ];
@@ -52,34 +58,33 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
     }
   };
 
-  const processSelectedFile = (file: File) => {
+  const processSelectedFile = async (file: File) => {
     setSelectedFile(file);
     setSelectedPresetIndex(-1);
-    setProgressStage(0);
+    setIsProcessing(true);
+    setProgressStage(1);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string || '';
-      setFileContentText(text);
-      const parsed = createModelFromUploadedFile(file, text);
-      setPreparedModel(parsed);
-      setLogs([
-        `[INFO] Loaded local file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`,
-        `[INFO] Format detected: ${parsed.sourceFormat}`,
-        `[INFO] Extracted ${parsed.elements.length} structural elements. Ready to run conversion pipeline.`
-      ]);
-    };
+    const newLogs: string[] = [
+      `[INFO] Selected local file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`
+    ];
+    setLogs([...newLogs]);
 
-    // If file is smaller than 25MB, read as text to parse IFC headers/entities
-    if (file.size < 25 * 1024 * 1024) {
-      reader.readAsText(file);
-    } else {
-      const parsed = createModelFromUploadedFile(file);
+    try {
+      const parsed = await parseUploadedBimFileAsync(file, (msg) => {
+        newLogs.push(msg);
+        setLogs([...newLogs]);
+      });
+
       setPreparedModel(parsed);
-      setLogs([
-        `[INFO] Loaded large local file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`,
-        `[INFO] Stream chunking allocated. Ready to run conversion pipeline.`
-      ]);
+      setIsProcessing(false);
+      setProgressStage(5);
+      newLogs.push(
+        `[SUCCESS] Model '${parsed.name}' ready (${parsed.elements.length} 3D structural elements). Click 'Open in 3D Viewport' or 'Run Ingestion Pipeline'.`
+      );
+      setLogs([...newLogs]);
+    } catch (err) {
+      setIsProcessing(false);
+      setLogs(prev => [...prev, `[ERROR] Failed to parse file ${file.name}: ${String(err)}`]);
     }
   };
 
@@ -104,8 +109,8 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
   const handleSelectPreset = (idx: number) => {
     setSelectedPresetIndex(idx);
     setSelectedFile(null);
-    setProgressStage(0);
-    const model = initialAvailableModels[idx];
+    setProgressStage(5);
+    const model = benchmarkPresets[idx];
     setPreparedModel(model);
     setLogs([
       `[INFO] Selected Benchmark Model: ${model.name}`,
@@ -118,7 +123,7 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
 
     setIsProcessing(true);
     setProgressStage(0);
-    setLogs(prev => [...prev, '[INFO] Starting JNN Conversion Pipeline...']);
+    setLogs(prev => [...prev, `[INFO] Running JNN Conversion Pipeline for '${preparedModel.name}'...`]);
 
     let current = 0;
     const interval = setInterval(() => {
@@ -134,10 +139,15 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
         setIsProcessing(false);
         setLogs(prev => [
           ...prev, 
-          `[SUCCESS] Model '${preparedModel.name}' successfully parsed and cached! ${preparedModel.elements.length} elements ready.`
+          `[SUCCESS] Model '${preparedModel.name}' ingested! Opening in 3D Viewport...`
         ]);
+        // Automatically load and switch to 3D Viewport so user immediately sees their imported model
+        setTimeout(() => {
+          onModelLoaded(preparedModel);
+          setWorkspace('model');
+        }, 250);
       }
-    }, 450);
+    }, 300);
   };
 
   const handleOpenInViewport = () => {
@@ -148,8 +158,8 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
   };
 
   const activeFormat = preparedModel?.sourceFormat || 'IFC4';
-  const activeFileName = selectedFile ? selectedFile.name : (preparedModel?.name || 'Metropole_Structural_Coordination.ifc');
-  const activeSize = selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : (preparedModel?.fileSize || '48.5 MB');
+  const activeFileName = selectedFile ? selectedFile.name : (preparedModel?.name || 'Project2.rvt');
+  const activeSize = selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : (preparedModel?.fileSize || '53.4 MB');
 
   return (
     <div className="absolute inset-0 z-30 bg-[var(--bg-app)]/90 backdrop-blur-lg flex items-center justify-center p-6 select-none overflow-y-auto">
@@ -216,7 +226,7 @@ export const ImportWorkspace: React.FC<ImportWorkspaceProps> = ({
               Or Select a Predefined Benchmark BIM Model:
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              {initialAvailableModels.map((m, idx) => {
+              {benchmarkPresets.map((m, idx) => {
                 const isSelected = selectedPresetIndex === idx && !selectedFile;
                 return (
                   <button

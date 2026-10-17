@@ -40,9 +40,19 @@ export const ModelExplorer: React.FC<ModelExplorerProps> = ({
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     'root': true,
     'disc_Structural': true,
+    'storey_T1': true,
+    'storey_T2': true,
     'storey_Level 02': true
   });
-  const [hiddenElements, setHiddenElements] = useState<Set<string>>(new Set());
+
+  // Derive hidden elements directly from model state so Viewport shortcuts (I, H, A) stay in sync
+  const hiddenElements = useMemo(() => {
+    const set = new Set<string>();
+    (model?.elements || []).forEach(el => {
+      if (el.visible === false) set.add(el.id);
+    });
+    return set;
+  }, [model]);
 
   // Storey list
   const storeys = useMemo(() => {
@@ -53,11 +63,13 @@ export const ModelExplorer: React.FC<ModelExplorerProps> = ({
 
   // Filter elements
   const filteredElements = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
     return (model?.elements || []).filter(el => {
-      const matchSearch = searchTerm === '' || 
-        el.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        el.mark.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        el.category.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = q === '' || 
+        el.name.toLowerCase().includes(q) ||
+        el.mark.toLowerCase().includes(q) ||
+        el.globalId.toLowerCase().includes(q) ||
+        el.category.toLowerCase().includes(q);
       
       const matchDiscipline = selectedDiscipline === 'All' || el.discipline === selectedDiscipline;
       const matchStorey = selectedStorey === 'All' || el.storey === selectedStorey;
@@ -91,29 +103,13 @@ export const ModelExplorer: React.FC<ModelExplorerProps> = ({
 
   const toggleElementVisibility = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextHidden = new Set(hiddenElements);
-    const isNowHidden = !nextHidden.has(id);
-    if (isNowHidden) {
-      nextHidden.add(id);
-    } else {
-      nextHidden.delete(id);
-    }
-    setHiddenElements(nextHidden);
-    onToggleVisibility([id], !isNowHidden);
+    const isCurrentlyHidden = hiddenElements.has(id);
+    onToggleVisibility([id], isCurrentlyHidden);
   };
 
   const toggleGroupVisibility = (ids: string[], e: React.MouseEvent) => {
     e.stopPropagation();
     const allHidden = ids.every(id => hiddenElements.has(id));
-    const nextHidden = new Set(hiddenElements);
-    ids.forEach(id => {
-      if (allHidden) {
-        nextHidden.delete(id);
-      } else {
-        nextHidden.add(id);
-      }
-    });
-    setHiddenElements(nextHidden);
     onToggleVisibility(ids, allHidden);
   };
 

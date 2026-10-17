@@ -42,7 +42,11 @@ public partial class MainWindow : Window
         try
         {
             var json = e.WebMessageAsJson;
-            // Handle IPC messages from React UI
+            var message = JsonSerializer.Deserialize<BridgeMessage<JsonElement>>(json);
+            if (message != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[IPC Received] Action={message.Action}");
+            }
         }
         catch (Exception ex)
         {
@@ -60,7 +64,22 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog() == true)
         {
-            MessageBox.Show($"Selected model: {dialog.FileName}\nForwarding path to Ingestion Pipeline.", "JNN Model Ingestion", MessageBoxButton.OK, MessageBoxImage.Information);
+            var fileInfo = new FileInfo(dialog.FileName);
+            if (ViewerWebView.CoreWebView2 != null)
+            {
+                var payload = new
+                {
+                    filePath = fileInfo.FullName,
+                    fileName = fileInfo.Name,
+                    fileSize = fileInfo.Exists ? fileInfo.Length : 0L
+                };
+                var bridgeMsg = new BridgeMessage<object>("LoadLocalFile", payload);
+                ViewerWebView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(bridgeMsg));
+            }
+            else
+            {
+                MessageBox.Show($"Selected model: {dialog.FileName}\nForwarding path to Ingestion Pipeline.", "JNN Model Ingestion", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
     }
 

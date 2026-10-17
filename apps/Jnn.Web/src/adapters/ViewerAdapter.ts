@@ -8,8 +8,10 @@ export interface ViewerAdapter {
   hoverElement(id: string | null): void;
   isolateElements(ids: string[]): void;
   hideElements(ids: string[]): void;
+  showElements(ids: string[]): void;
   showAll(): void;
   fitToView(ids?: string[]): void;
+  setNavigationMode?(mode: 'select' | 'orbit' | 'pan'): void;
   setCameraPreset(preset: CameraPreset): void;
   setCameraProjection(projection: 'Perspective' | 'Orthographic'): void;
   setSectionPlane(axis: 'x' | 'y' | 'z', enabled: boolean, offset: number, flipped: boolean): void;

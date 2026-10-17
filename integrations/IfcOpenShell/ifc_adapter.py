@@ -45,18 +45,33 @@ def parse_ifc_to_jnn_schema(file_path: str) -> Dict[str, Any]:
         if not product.is_a("IfcElement"):
             continue
 
-        psets = ifcopenshell.util.element.get_psets(product)
-        
+        psets = ifcopenshell.util.element.get_psets(product, psets_only=True)
+        qtos = ifcopenshell.util.element.get_psets(product, qtos_only=True)
+
+        container = ifcopenshell.util.element.get_container(product)
+        storey_name = getattr(container, "Name", None) or "Unassigned"
+
+        mat = ifcopenshell.util.element.get_material(product, should_inherit=True)
+        material_name = getattr(mat, "Name", None) or "Unspecified"
+
+        ifc_class = product.is_a()
+        if ifc_class in ("IfcColumn", "IfcBeam", "IfcSlab", "IfcFooting", "IfcPile", "IfcMember", "IfcReinforcingBar"):
+            discipline = "Structural"
+        elif ifc_class.startswith("IfcDuct") or ifc_class.startswith("IfcPipe") or ifc_class.startswith("IfcFlow"):
+            discipline = "MEP"
+        else:
+            discipline = "Architectural"
+
         element_data = {
             "elementId": str(product.id()),
             "globalId": product.GlobalId,
-            "name": product.Name or f"{product.is_a()}_{product.id()}",
-            "category": product.is_a(),
-            "discipline": "Structural",
-            "storey": "Unknown",
-            "material": "Concrete",
+            "name": product.Name or f"{ifc_class}_{product.id()}",
+            "category": ifc_class,
+            "discipline": discipline,
+            "storey": storey_name,
+            "material": material_name,
             "properties": psets,
-            "quantities": {}
+            "quantities": qtos
         }
         result["elements"].append(element_data)
 

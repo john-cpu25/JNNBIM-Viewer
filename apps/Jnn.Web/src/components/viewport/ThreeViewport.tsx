@@ -24,6 +24,9 @@ interface ThreeViewportProps {
   model: BimModel;
   selectedElementId: string | null;
   onSelectElement: (id: string | null) => void;
+  onToggleVisibility?: (elementIds: string[], visible: boolean) => void;
+  onIsolateElements?: (elementIds: string[]) => void;
+  onShowAllElements?: () => void;
   viewportBg: string;
 }
 
@@ -32,6 +35,9 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
   model,
   selectedElementId,
   onSelectElement,
+  onToggleVisibility,
+  onIsolateElements,
+  onShowAllElements,
   viewportBg
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,10 +64,13 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
     };
   }, [adapter]);
 
-  // 2. Load / Reload Model whenever `model` changes
+  // 2. Load / Reload 3D Meshes only when the active model identity or element count changes
   useEffect(() => {
     adapter.loadModel(model);
+  }, [adapter, model.id, model.elements.length]);
 
+  // Keep hover lookup synchronized with current model elements
+  useEffect(() => {
     adapter.onElementHovered(id => {
       if (id) {
         const found = model.elements.find(e => e.id === id);
@@ -70,7 +79,12 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
         setHoveredElement(null);
       }
     });
-  }, [adapter, model]);
+  }, [adapter, model.elements]);
+
+  // Sync navigation tool mode with adapter
+  useEffect(() => {
+    adapter.setNavigationMode?.(activeTool);
+  }, [adapter, activeTool]);
 
   // Update Viewport Background
   useEffect(() => {
@@ -82,6 +96,32 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
     adapter.selectElement(selectedElementId);
   }, [adapter, selectedElementId]);
 
+  const handleIsolateSelection = () => {
+    if (!selectedElementId) return;
+    if (onIsolateElements) {
+      onIsolateElements([selectedElementId]);
+    } else {
+      adapter.isolateElements([selectedElementId]);
+    }
+  };
+
+  const handleHideSelection = () => {
+    if (!selectedElementId) return;
+    if (onToggleVisibility) {
+      onToggleVisibility([selectedElementId], false);
+    } else {
+      adapter.hideElements([selectedElementId]);
+    }
+  };
+
+  const handleShowAll = () => {
+    if (onShowAllElements) {
+      onShowAllElements();
+    } else {
+      adapter.showAll();
+    }
+  };
+
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,23 +130,25 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
       if (e.key === 'f' || e.key === 'F') {
         adapter.fitToView(selectedElementId ? [selectedElementId] : undefined);
       } else if (e.key === 'i' || e.key === 'I') {
-        if (selectedElementId) adapter.isolateElements([selectedElementId]);
+        handleIsolateSelection();
       } else if (e.key === 'h' || e.key === 'H') {
-        if (selectedElementId) adapter.hideElements([selectedElementId]);
+        handleHideSelection();
       } else if (e.key === 'a' || e.key === 'A') {
-        adapter.showAll();
+        handleShowAll();
       } else if (e.key === 'g' || e.key === 'G') {
         toggleGhost();
       } else if (e.key === 's' || e.key === 'S') {
         toggleShadows();
       } else if (e.key === 'l' || e.key === 'L') {
         toggleAnnotations();
+      } else if (e.key === 'o' || e.key === 'O' || e.key === 'p' || e.key === 'P') {
+        toggleProjection();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [adapter, selectedElementId, isGhost, isShadows, isAnnotations]);
+  }, [adapter, selectedElementId, isGhost, isShadows, isAnnotations, isOrtho, model]);
 
   const toggleProjection = () => {
     const nextOrtho = !isOrtho;
@@ -235,9 +277,7 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
 
           {/* Visibility Tools Group */}
           <button
-            onClick={() => {
-              if (selectedElementId) adapter.isolateElements([selectedElementId]);
-            }}
+            onClick={handleIsolateSelection}
             disabled={!selectedElementId}
             data-tooltip="Isolate Selection (I)"
             className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-cyan-400 hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
@@ -246,9 +286,7 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
           </button>
 
           <button
-            onClick={() => {
-              if (selectedElementId) adapter.hideElements([selectedElementId]);
-            }}
+            onClick={handleHideSelection}
             disabled={!selectedElementId}
             data-tooltip="Hide Selection (H)"
             className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-rose-400 hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
@@ -257,7 +295,7 @@ export const ThreeViewport: React.FC<ThreeViewportProps> = ({
           </button>
 
           <button
-            onClick={() => adapter.showAll()}
+            onClick={handleShowAll}
             data-tooltip="Show All Elements (A)"
             className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-emerald-400 hover:bg-[var(--bg-hover)] transition-colors"
           >

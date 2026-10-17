@@ -18,7 +18,7 @@ interface SectionWorkspaceProps {
 
 export const SectionWorkspace: React.FC<SectionWorkspaceProps> = ({ adapter }) => {
   const [activeAxis, setActiveAxis] = useState<'x' | 'y' | 'z' | 'box'>('z');
-  const [offset, setOffset] = useState<number>(3.6);
+  const [offset, setOffset] = useState<number>(9.1);
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [isSectionActive, setIsSectionActive] = useState<boolean>(true);
 
@@ -29,7 +29,7 @@ export const SectionWorkspace: React.FC<SectionWorkspaceProps> = ({ adapter }) =
   const handleAxisChange = (axis: 'x' | 'y' | 'z' | 'box') => {
     setActiveAxis(axis);
     if (axis === 'box') {
-      adapter.setSectionBox(true, [-6, 0, -6], [6, 7.5, 6]);
+      adapter.setSectionBox(true, [-8.0, -3.6, -6.0], [8.0, 15.8, 6.0]);
     } else {
       adapter.setSectionBox(false);
       applySection(axis, offset, isFlipped, isSectionActive);
@@ -147,8 +147,8 @@ export const SectionWorkspace: React.FC<SectionWorkspaceProps> = ({ adapter }) =
 
             <input
               type="range"
-              min={-2}
-              max={15}
+              min={-4}
+              max={24}
               step={0.1}
               value={offset}
               onChange={(e) => handleOffsetChange(parseFloat(e.target.value))}
@@ -192,12 +192,12 @@ export const SectionWorkspace: React.FC<SectionWorkspaceProps> = ({ adapter }) =
           </label>
           <div className="space-y-1.5">
             <button
-              onClick={() => handleApplyPreset('z', 3.6, false)}
+              onClick={() => handleApplyPreset('z', 9.2, false)}
               className="w-full flex items-center justify-between p-2 rounded bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-left text-[11px]"
             >
               <div>
-                <div className="font-semibold text-[var(--text-primary)]">Level 02 Typical Soffit Cut</div>
-                <div className="text-[10px] text-[var(--text-muted)]">Z = +3,600 mm (Inspection of beam/slab soffits)</div>
+                <div className="font-semibold text-[var(--text-primary)]">Level T4 Typical Floor Plan Cut</div>
+                <div className="text-[10px] text-[var(--text-muted)]">Z = +9,200 mm (Inspection of T4 beams, slab & stair void)</div>
               </div>
               <Scissors className="w-3.5 h-3.5 text-cyan-400" />
             </button>
@@ -207,19 +207,19 @@ export const SectionWorkspace: React.FC<SectionWorkspaceProps> = ({ adapter }) =
               className="w-full flex items-center justify-between p-2 rounded bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-left text-[11px]"
             >
               <div>
-                <div className="font-semibold text-[var(--text-primary)]">Central Core Shear Wall Cut</div>
-                <div className="text-[10px] text-[var(--text-muted)]">X = 0.00 mm (Elevator shaft vertical section)</div>
+                <div className="font-semibold text-[var(--text-primary)]">Grid 4 Central Staircase Vertical Cut</div>
+                <div className="text-[10px] text-[var(--text-muted)]">X = 0.00 mm (Full 9-storey vertical section along Grid 4)</div>
               </div>
               <Scissors className="w-3.5 h-3.5 text-cyan-400" />
             </button>
 
             <button
-              onClick={() => handleApplyPreset('z', 0.2, false)}
+              onClick={() => handleApplyPreset('z', -2.5, false)}
               className="w-full flex items-center justify-between p-2 rounded bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-left text-[11px]"
             >
               <div>
-                <div className="font-semibold text-[var(--text-primary)]">Ground Foundation Mat Cut</div>
-                <div className="text-[10px] text-[var(--text-muted)]">Z = +200 mm (Pad footings & tie-beams)</div>
+                <div className="font-semibold text-[var(--text-primary)]">Basement & Foundation Pile Cap Cut</div>
+                <div className="text-[10px] text-[var(--text-muted)]">Z = -2,500 mm (Pile caps F1 & foundation tie-beams)</div>
               </div>
               <Scissors className="w-3.5 h-3.5 text-cyan-400" />
             </button>
