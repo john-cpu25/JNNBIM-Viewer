@@ -28,11 +28,12 @@ export const App: React.FC = () => {
     if (saved) {
       try {
         const parsed: BimModel[] = JSON.parse(saved);
-        // Exclude old benchmark models and upgrade Project2 to complete pure structural framing (no mock MEP)
+        // Exclude old benchmark models and upgrade Project2 to complete pure 9-storey structural framing
         const filtered = parsed
           .map(m => {
             const hasMep = m.elements && m.elements.some(e => e.discipline === 'Mechanical' || e.discipline === 'Plumbing');
-            if (m.id === 'MOD-PROJECT2-001' && (!m.elements || m.elements.length < 300 || hasMep)) {
+            const isOld4Storey = m.elements && (m.elements.length === 293 || m.elements.length < 350);
+            if ((m.id === 'MOD-PROJECT2-001' || m.name.toLowerCase().includes('project2')) && (!m.elements || isOld4Storey || hasMep)) {
               return initialAvailableModels[0] || m;
             }
             if (m.elements && hasMep) {

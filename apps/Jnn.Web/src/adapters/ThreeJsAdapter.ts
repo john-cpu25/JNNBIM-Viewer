@@ -425,8 +425,8 @@ export class ThreeJsAdapter implements ViewerAdapter {
       if ((obj as any).geometry) (obj as any).geometry.dispose();
     }
 
-    // Only add Revit Section Box & Annotations for Project2 / multi-level models
-    if (!model.name.toLowerCase().includes('project2') && model.elements.length < 150) return;
+    // Add Revit Section Box & Annotations for structural models
+    if (model.elements.length < 50) return;
 
     // 1. Revit 3D Section Box (Green Dashed Bounding Box matching Image 1)
     const boxSize = new THREE.Vector3(26.4, 28.2, 14.8);
