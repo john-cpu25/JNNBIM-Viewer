@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jnn.local/schemas/jnn-element/0.1.0",
+  "title": "JNN Element (metadata)",
+  "description": "Common element contract every source adapter (IFC, RVT/APS, Navisworks) maps to. Geometry is referenced via meshRefs and stored in binary cache chunks, never inline. Mirrors apps/Jnn.Web/src/domain/model.ts.",
+  "type": "object",
+  "required": ["modelId", "modelRevisionId", "sourceFormat", "sourceElementId", "globalId", "id", "name", "category", "type", "material", "storey", "transform", "properties", "quantities", "meshRefs", "geometryStatus", "importWarnings"],
+  "additionalProperties": false,
+  "properties": {
+    "modelId": { "type": "string", "minLength": 1 },
+    "modelRevisionId": { "type": "string", "minLength": 1 },
+    "sourceFormat": { "enum": ["IFC", "RVT", "NWC", "NWD", "SAMPLE"] },
+    "sourceElementId": { "type": "string", "description": "Native id in the source (IFC STEP id / Revit ElementId / Navisworks instance GUID) for traceability back to the original model." },
+    "globalId": { "type": ["string", "null"], "description": "IFC GlobalId (22-char compressed GUID) or Revit UniqueId when available." },
+    "id": { "type": "string", "description": "Unique within a revision. Convention: <modelRevisionId>:<sourceElementId>." },
+    "name": { "type": "string" },
+    "category": { "type": "string" },
+    "type": { "type": "string" },
+    "material": { "type": ["string", "null"] },
+    "storey": { "type": ["string", "null"] },
+    "transform": { "type": "array", "items": { "type": "number" }, "minItems": 16, "maxItems": 16, "description": "Column-major 4x4 placement matrix in model units, +Z up." },
+    "properties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "properties"],
+        "properties": {
+          "name": { "type": "string" },
+          "properties": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null"] } }
+        }
+      }
+    },
+    "quantities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "unit", "origin"],
+        "properties": {
+          "name": { "type": "string" },
+          "value": { "type": "number" },
+          "unit": { "type": "string" },
+          "origin": { "enum": ["native", "computed"] }
+        }
+      }
+    },
+    "meshRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["bundleId", "chunk"],
+        "properties": {
+          "bundleId": { "type": "string" },
+          "chunk": { "type": "integer", "minimum": 0 },
+          "primitive": { "type": "object", "description": "Sample model only: procedural box primitive." }
+        }
+      }
+    },
+    "geometryStatus": { "enum": ["ok", "missing", "failed", "simplified"] },
+    "importWarnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "message", "severity"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "severity": { "enum": ["info", "warning", "error"] }
+        }
+      }
+    }
+  }
+}

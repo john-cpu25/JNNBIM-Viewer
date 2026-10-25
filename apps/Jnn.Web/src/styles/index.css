@@ -1,0 +1,65 @@
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* Map design tokens into Tailwind utilities: bg-surface, text-muted, border-line … */
+@theme inline {
+  --color-app: var(--jnn-bg);
+  --color-surface: var(--jnn-surface);
+  --color-surface-2: var(--jnn-surface-2);
+  --color-surface-3: var(--jnn-surface-3);
+  --color-line: var(--jnn-border);
+  --color-line-strong: var(--jnn-border-strong);
+  --color-ink: var(--jnn-text);
+  --color-muted: var(--jnn-text-muted);
+  --color-faint: var(--jnn-text-faint);
+  --color-accent: var(--jnn-accent);
+  --color-accent-soft: var(--jnn-accent-soft);
+  --color-accent-ink: var(--jnn-accent-text);
+  --color-ok: var(--jnn-ok);
+  --color-warn: var(--jnn-warn);
+  --color-danger: var(--jnn-danger);
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --shadow-float: var(--jnn-shadow-float);
+}
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--jnn-bg);
+  color: var(--jnn-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--jnn-accent);
+  outline-offset: 1px;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--jnn-border-strong) transparent;
+}
+
+input[type='range'].jnn-range {
+  accent-color: var(--jnn-accent);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

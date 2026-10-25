@@ -1,0 +1,45 @@
+/*
+ * JNN design tokens. All UI colour comes from here; components reference the
+ * Tailwind aliases defined in index.css (bg-surface, text-muted, …).
+ * Theme is set with <html data-theme="light|dark">.
+ */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --jnn-bg: #e7e9ec;
+  --jnn-surface: #f9fafb;
+  --jnn-surface-2: #f1f3f5;
+  --jnn-surface-3: #e4e7eb;
+  --jnn-border: #d7dbe0;
+  --jnn-border-strong: #bcc2c9;
+  --jnn-text: #1a1e23;
+  --jnn-text-muted: #59626d;
+  --jnn-text-faint: #8a929c;
+  --jnn-accent: #e8590c;
+  --jnn-accent-soft: rgb(232 89 12 / 0.11);
+  --jnn-accent-text: #b5450a;
+  --jnn-ok: #2f9e44;
+  --jnn-warn: #c47f00;
+  --jnn-danger: #d6336c;
+  --jnn-shadow-float: 0 1px 2px rgb(16 20 24 / 0.08), 0 6px 20px rgb(16 20 24 / 0.1);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --jnn-bg: #0e1013;
+  --jnn-surface: #171a1f;
+  --jnn-surface-2: #1d2127;
+  --jnn-surface-3: #262b32;
+  --jnn-border: #2a2f36;
+  --jnn-border-strong: #3a414a;
+  --jnn-text: #e5e8eb;
+  --jnn-text-muted: #9ba4ae;
+  --jnn-text-faint: #6a727c;
+  --jnn-accent: #f08c2e;
+  --jnn-accent-soft: rgb(240 140 46 / 0.15);
+  --jnn-accent-text: #f7a65a;
+  --jnn-ok: #51cf66;
+  --jnn-warn: #fcc419;
+  --jnn-danger: #f06595;
+  --jnn-shadow-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.45);
+}
