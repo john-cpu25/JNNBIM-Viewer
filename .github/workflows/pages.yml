@@ -2,12 +2,11 @@
 # Repo setting required once: Settings → Pages → Source = "GitHub Actions".
 name: Deploy web viewer to GitHub Pages
 
+# Runs on every push to main (a path filter skipped the first force-push
+# deploy), and can be started by hand from the Actions tab.
 on:
   push:
     branches: [main]
-    paths:
-      - 'apps/Jnn.Web/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
