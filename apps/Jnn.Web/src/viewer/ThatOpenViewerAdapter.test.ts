@@ -134,4 +134,60 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('applies section planes and boxes in model coordinates (+Z up)', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    for (const cap of ['sectionPlane', 'sectionBox'] as const) {
+      expect(adapter.capabilities.has(cap)).toBe(true);
+    }
+
+    const model = createMockJnnModel(10);
+    (adapter as any).modelsMap.set(model.modelId, {
+      model: {
+        modelId: model.modelId,
+        object: { visible: true },
+        box: null,
+        useClippingPlanes: () => {},
+        setVisible: async () => {},
+        dispose: () => {},
+      },
+      jnnModel: model,
+    });
+    (adapter as any).modelBounds = { min: [0, 0, 0], max: [10, 10, 10] };
+
+    // Plan cut along Z
+    const planeRes = adapter.setSection({ kind: 'plane', axis: 'z', offset: 1.25, flipped: false });
+    expect(planeRes.ok).toBe(true);
+    expect(adapter.debugState().clipPlaneCount).toBe(1);
+    expect(adapter.isPointClipped([5, 5, 0.5])).toBe(false);
+    expect(adapter.isPointClipped([5, 5, 2.0])).toBe(true);
+
+    // Flipped Z cut
+    adapter.setSection({ kind: 'plane', axis: 'z', offset: 1.25, flipped: true });
+    expect(adapter.isPointClipped([5, 5, 2.0])).toBe(false);
+    expect(adapter.isPointClipped([5, 5, 0.5])).toBe(true);
+
+    // Cut along Y
+    adapter.setSection({ kind: 'plane', axis: 'y', offset: 7, flipped: false });
+    expect(adapter.isPointClipped([0, 6, 0])).toBe(false);
+    expect(adapter.isPointClipped([0, 8, 0])).toBe(true);
+
+    // Section box
+    const boxRes = adapter.setSection({ kind: 'box', min: [0, 0, 0], max: [6, 5, 3.6] });
+    expect(boxRes.ok).toBe(true);
+    expect(adapter.debugState().clipPlaneCount).toBe(6);
+    expect(adapter.isPointClipped([3, 2, 1])).toBe(false);
+    expect(adapter.isPointClipped([7, 2, 1])).toBe(true);
+    expect(adapter.isPointClipped([3, -1, 1])).toBe(true);
+
+    // Invalid section box
+    const badBox = adapter.setSection({ kind: 'box', min: [1, 0, 0], max: [0, 1, 1] });
+    expect(badBox.ok).toBe(false);
+
+    // Remove section
+    adapter.setSection(null);
+    expect(adapter.debugState().clipPlaneCount).toBe(0);
+
+    adapter.dispose();
+  });
 });

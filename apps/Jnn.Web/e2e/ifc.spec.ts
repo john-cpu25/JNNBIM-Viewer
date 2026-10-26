@@ -249,4 +249,87 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     expect(pageErrors).toEqual([]);
   });
+
+  test('T08: section plane (S), storey plan cut, flip, slider, and section box (B)', async ({ page }) => {
+    test.setTimeout(75_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    // Open architecture sample
+    await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+
+    // Initial state: 0 clip planes
+    const initial = await page.evaluate(() => window.__jnn!.viewer.debugState());
+    expect(initial.clipPlaneCount).toBe(0);
+
+    // 1. Activate Section Plane with shortcut 'S'
+    await page.keyboard.press('s');
+    const sectionPanel = page.getByTestId('section-panel');
+    await expect(sectionPanel).toBeVisible();
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).clipPlaneCount).toBe(1);
+
+    // 2. Click groundfloor storey button (elev 0 + 1.2m = 1.20 m)
+    const storeyBtn = sectionPanel.getByRole('button', { name: '00 groundfloor', exact: true });
+    await expect(storeyBtn).toBeVisible();
+    await storeyBtn.click();
+
+    // Verify offset displays 1.20 m
+    await expect(page.getByTestId('section-offset')).toHaveText('1.20 m');
+
+    // Verify geometric clipping: roof (z > 1.2) is clipped; floor (z < 1.2) is kept
+    const roofClipped = await page.evaluate(() => (window.__jnn!.viewer as any).isPointClipped([0, 0, 3.5]));
+    const floorClipped = await page.evaluate(() => (window.__jnn!.viewer as any).isPointClipped([0, 0, 0.5]));
+    expect(roofClipped).toBe(true);
+    expect(floorClipped).toBe(false);
+
+    // 3. Switch to top view preset and capture plan screenshot
+    await page.evaluate(() => (window.__jnn!.viewer as any).setViewPreset('top', false));
+    await page.waitForTimeout(500);
+
+    // Save Level 1 plan cut screenshot
+    await page.screenshot({ path: '../../TODO/2_Review/T08_mat-bang-tang-1.png' });
+
+    // 4. Test Flip direction
+    const flipBtn = page.getByLabel('Flip section direction');
+    await expect(flipBtn).toBeVisible();
+    await flipBtn.click();
+
+    // Now roof (z > 1.2) is kept, floor (z < 1.2) is clipped
+    const roofFlipped = await page.evaluate(() => (window.__jnn!.viewer as any).isPointClipped([0, 0, 3.5]));
+    const floorFlipped = await page.evaluate(() => (window.__jnn!.viewer as any).isPointClipped([0, 0, 0.5]));
+    expect(roofFlipped).toBe(false);
+    expect(floorFlipped).toBe(true);
+
+    // Flip back
+    await flipBtn.click();
+
+    // 5. Test slider offset change (drag / step)
+    const rangeInput = page.getByLabel('Section offset');
+    await expect(rangeInput).toBeVisible();
+    await rangeInput.fill('2.5');
+    await expect(page.getByTestId('section-offset')).toHaveText('2.50 m');
+    await rangeInput.blur();
+
+    // 6. Turn off Section Plane with 'S'
+    await page.keyboard.press('s');
+    await expect(sectionPanel).not.toBeVisible();
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).clipPlaneCount).toBe(0);
+
+    // 7. Test Section Box with shortcut 'B'
+    await page.keyboard.press('b');
+    await expect(sectionPanel).toBeVisible();
+    await expect(sectionPanel.getByText('Section box')).toBeVisible();
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).clipPlaneCount).toBe(6);
+
+    // Turn off Section Box with 'B'
+    await page.keyboard.press('b');
+    await expect(sectionPanel).not.toBeVisible();
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).clipPlaneCount).toBe(0);
+
+    expect(pageErrors).toEqual([]);
+  });
 });

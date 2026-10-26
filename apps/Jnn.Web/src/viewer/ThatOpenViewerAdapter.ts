@@ -14,7 +14,9 @@ import * as OBC from '@thatopen/components';
 import * as OBCF from '@thatopen/components-front';
 import * as WebIFC from 'web-ifc';
 import type { FragmentsModel } from '@thatopen/fragments';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
+import { center as boundsCenter, size as boundsSize } from '../domain/bounds';
 import { isVisible, type VisibilityState } from '../domain/visibility';
 import {
   mapIfcToJnnModel,
@@ -90,6 +92,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     'isolate',
     'highlight',
     'xray',
+    'sectionPlane',
+    'sectionBox',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -116,6 +120,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private lastHoverAt = 0;
   private hovered: string | null = null;
   private boundCanvas: HTMLCanvasElement | null = null;
+
+  private clipPlanes: THREE.Plane[] = [];
+  private sectionHelper: THREE.Object3D | null = null;
+  private clipStyler: OBCF.ClipStyler | null = null;
+  private activeClipEdges: any | null = null;
 
   mount(container: HTMLElement): void {
     patchWebIfcOnce();
@@ -224,6 +233,22 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       transparent: true,
     });
 
+    // ClipStyler setup for section edges and filled caps
+    try {
+      const clipStyler = this.components.get(OBCF.ClipStyler);
+      this.clipStyler = clipStyler;
+      clipStyler.world = this.world;
+      clipStyler.styles.set('default', {
+        linesMaterial: new LineMaterial({ color: 0x11161d, linewidth: 2 }),
+        fillsMaterial: new THREE.MeshBasicMaterial({
+          color: 0x4a5568,
+          side: THREE.DoubleSide,
+        }),
+      });
+    } catch (err) {
+      console.warn('ClipStyler setup skipped or failed:', err);
+    }
+
     if (this.selection.size > 0) {
       const modelIdMap = this.toModelIdMap([...this.selection]);
       highlighter.highlightByID('select', modelIdMap, true, false).catch(() => {});
@@ -259,6 +284,26 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   dispose(): void {
     this.disposed = true;
+    if (this.sectionHelper) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.sectionHelper);
+      }
+      this.sectionHelper.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose?.();
+      });
+      this.sectionHelper = null;
+    }
+    if (this.activeClipEdges) {
+      try {
+        this.activeClipEdges.dispose();
+      } catch (err) {
+        console.warn('ClipEdges dispose failed:', err);
+      }
+      this.activeClipEdges = null;
+    }
+    this.clipPlanes = [];
     if (this.boundCanvas) {
       this.boundCanvas.removeEventListener('pointerdown', this.onPointerDown);
       this.boundCanvas.removeEventListener('pointerup', this.onPointerUp);
@@ -331,6 +376,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       });
 
       this.activeModel = model;
+      if (this.clipPlanes.length > 0) {
+        model.useClippingPlanes(this.clipPlanes);
+      }
       this.world.scene.three.add(model.object);
       this.fragments.core.update(true);
 
@@ -450,7 +498,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   getModelBounds(): AdapterResult<Bounds> {
-    return this.modelBounds ? ok(this.modelBounds) : fail('not-loaded', 'No IFC model loaded.');
+    if (this.modelBounds) return ok(this.modelBounds);
+    const updated = this.updateCombinedBoundsAndFit(false);
+    if (updated) return ok(updated);
+    return fail('not-loaded', 'No IFC model loaded.');
   }
 
   renderNow(): void {
@@ -697,8 +748,170 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
-  setSection(_spec: SectionSpec | null): AdapterResult {
-    return fail('unsupported', 'Section clipper will be available in T08.');
+  setSection(spec: SectionSpec | null): AdapterResult {
+    if (this.sectionHelper) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.sectionHelper);
+      }
+      this.sectionHelper.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose?.();
+      });
+      this.sectionHelper = null;
+    }
+
+    if (this.activeClipEdges) {
+      try {
+        this.activeClipEdges.dispose();
+      } catch (err) {
+        console.warn('ClipEdges dispose failed:', err);
+      }
+      this.activeClipEdges = null;
+    }
+
+    if (!spec) {
+      this.clipPlanes = [];
+      if (this.world?.renderer?.three) {
+        this.world.renderer.three.clippingPlanes = [];
+      }
+      for (const entry of this.modelsMap.values()) {
+        entry.model.useClippingPlanes([]);
+      }
+      if (this.fragments) {
+        this.fragments.core.update(true);
+      }
+      return okVoid;
+    }
+
+    if (!this.modelBounds) return fail('not-loaded', 'No model loaded.');
+
+    let threePlanes: THREE.Plane[] = [];
+    if (spec.kind === 'plane') {
+      const modelNormal = spec.axis === 'x'
+        ? (spec.flipped ? [1, 0, 0] : [-1, 0, 0])
+        : spec.axis === 'y'
+          ? (spec.flipped ? [0, 1, 0] : [0, -1, 0])
+          : (spec.flipped ? [0, 0, 1] : [0, 0, -1]);
+      const modelOffset = spec.flipped ? -spec.offset : spec.offset;
+      const normalThree = toThree(modelNormal as Vec3);
+      threePlanes = [new THREE.Plane(normalThree, modelOffset)];
+    } else {
+      for (let i = 0; i < 3; i++) {
+        if (spec.min[i]! >= spec.max[i]!) return fail('invalid-argument', 'Section box min must be < max.');
+      }
+      // X axis
+      threePlanes.push(
+        new THREE.Plane(toThree([1, 0, 0]), -spec.min[0]!),
+        new THREE.Plane(toThree([-1, 0, 0]), spec.max[0]!),
+      );
+      // Y axis
+      threePlanes.push(
+        new THREE.Plane(toThree([0, 1, 0]), -spec.min[1]!),
+        new THREE.Plane(toThree([0, -1, 0]), spec.max[1]!),
+      );
+      // Z axis
+      threePlanes.push(
+        new THREE.Plane(toThree([0, 0, 1]), -spec.min[2]!),
+        new THREE.Plane(toThree([0, 0, -1]), spec.max[2]!),
+      );
+    }
+
+    this.clipPlanes = threePlanes;
+
+    if (this.world?.renderer?.three) {
+      this.world.renderer.three.clippingPlanes = this.clipPlanes;
+    }
+    for (const entry of this.modelsMap.values()) {
+      entry.model.useClippingPlanes(this.clipPlanes);
+    }
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+
+    this.sectionHelper = this.buildSectionHelper(spec, this.modelBounds);
+    if (this.world?.scene?.three) {
+      this.world.scene.three.add(this.sectionHelper);
+    }
+
+    // Generate section caps and edges for plane cuts
+    if (spec.kind === 'plane' && this.clipStyler && this.world && threePlanes[0]) {
+      try {
+        const clipEdges = this.clipStyler.create(threePlanes[0], {
+          world: this.world,
+          link: false,
+        });
+        clipEdges.items.set('default', { style: 'default' });
+        clipEdges.visible = true;
+        clipEdges.update().catch((err) => console.warn('ClipEdges update failed:', err));
+        this.activeClipEdges = clipEdges;
+      } catch (err) {
+        console.warn('ClipStyler create failed:', err);
+      }
+    }
+
+    return okVoid;
+  }
+
+  isPointClipped(p: Vec3): boolean {
+    const v = toThree(p);
+    return this.clipPlanes.some((pl) => pl.distanceToPoint(v) < -1e-6);
+  }
+
+  private buildSectionHelper(spec: SectionSpec, b: Bounds): THREE.Object3D {
+    const color = 0xf08c2e;
+    const group = new THREE.Group();
+    if (spec.kind === 'box') {
+      const sizeX = spec.max[0] - spec.min[0];
+      const sizeY = spec.max[1] - spec.min[1];
+      const sizeZ = spec.max[2] - spec.min[2];
+      const box = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(sizeX, sizeZ, sizeY)),
+        new THREE.LineBasicMaterial({ color }),
+      );
+      box.raycast = () => {};
+      const centerModel: Vec3 = [
+        (spec.min[0] + spec.max[0]) / 2,
+        (spec.min[1] + spec.max[1]) / 2,
+        (spec.min[2] + spec.max[2]) / 2,
+      ];
+      box.position.copy(toThree(centerModel));
+      group.add(box);
+      return group;
+    }
+
+    const s = boundsSize(b);
+    const c = boundsCenter(b);
+    const m = 1.5;
+    let w: number, h: number;
+    const obj = new THREE.Group();
+    if (spec.axis === 'x') {
+      [w, h] = [s[1] + m * 2, s[2] + m * 2];
+      obj.position.set(spec.offset, c[2], -c[1]);
+      obj.rotation.set(0, Math.PI / 2, 0);
+    } else if (spec.axis === 'y') {
+      [w, h] = [s[0] + m * 2, s[2] + m * 2];
+      obj.position.set(c[0], c[2], -spec.offset);
+      obj.rotation.set(0, 0, 0);
+    } else {
+      [w, h] = [s[0] + m * 2, s[1] + m * 2];
+      obj.position.set(c[0], spec.offset, -c[1]);
+      obj.rotation.set(Math.PI / 2, 0, 0);
+    }
+    const geom = new THREE.PlaneGeometry(w, h);
+    const fill = new THREE.Mesh(
+      geom,
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    fill.raycast = () => {};
+    const outline = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geom),
+      new THREE.LineBasicMaterial({ color }),
+    );
+    outline.raycast = () => {};
+    obj.add(fill, outline);
+    group.add(obj);
+    return group;
   }
 
   highlight(ids: readonly string[] | null, color = '#2f9e44'): AdapterResult {
@@ -757,7 +970,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       elementCount: totalElements,
       visibleCount,
       selected: [...this.selection],
-      clipPlaneCount: 0,
+      clipPlaneCount: this.clipPlanes.length,
       projection: this.currentProjection,
       xray: this.xray,
     };
@@ -879,6 +1092,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
       const hit = (await raycaster.castRay({ position })) as any;
       if (!hit || hit.localId === undefined || hit.localId === null) return null;
+
+      // Ignore points clipped by active section planes
+      if (hit.point && this.clipPlanes.some((p) => p.distanceToPoint(hit.point) < -1e-6)) {
+        return null;
+      }
 
       let matchedEntry: { model: FragmentsModel; jnnModel: JnnModel } | undefined;
       for (const entry of this.modelsMap.values()) {
