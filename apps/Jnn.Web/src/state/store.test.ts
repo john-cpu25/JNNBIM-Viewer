@@ -1,6 +1,7 @@
 import { createSampleModel } from '../domain/sampleModel';
 import { createInitialState, defaultPlane, reducer } from './store';
 import { elementNodeId } from '../domain/tree';
+import type { Vec3 } from '../viewer/ViewerAdapter';
 
 const model = createSampleModel();
 const init = () => createInitialState(model, 'light');

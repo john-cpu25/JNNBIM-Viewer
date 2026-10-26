@@ -367,6 +367,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     try {
+      if (typeof performance !== 'undefined' && performance.mark) {
+        performance.mark('jnn-load-start');
+      }
       const buffer = file instanceof Uint8Array ? file : new Uint8Array(file);
       const sha256 = await computeSha256(buffer).catch(() => '');
 
@@ -434,6 +437,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
             this.applyXray();
           }
           onProgress?.(100, 'Đã mở mô hình từ cache.');
+
+          if (typeof performance !== 'undefined' && performance.mark) {
+            performance.mark('jnn-load-end');
+            try {
+              performance.measure('jnn-load-duration', 'jnn-load-start', 'jnn-load-end');
+            } catch {
+              // ignore
+            }
+          }
 
           return ok({
             elementCount: jnnModel.elements.length,
@@ -571,6 +583,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
 
       onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
+
+      if (typeof performance !== 'undefined' && performance.mark) {
+        performance.mark('jnn-load-end');
+        try {
+          performance.measure('jnn-load-duration', 'jnn-load-start', 'jnn-load-end');
+        } catch {
+          // ignore
+        }
+      }
 
       return ok({
         elementCount: jnnModel.elements.length,
