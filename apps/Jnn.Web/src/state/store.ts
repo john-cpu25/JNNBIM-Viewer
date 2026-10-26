@@ -62,7 +62,8 @@ export type Action =
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
-  | { type: 'dismissNotice'; id: number };
+  | { type: 'dismissNotice'; id: number }
+  | { type: 'setModel'; model: JnnModel };
 
 let noticeSeq = 1;
 
@@ -164,6 +165,16 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, notices: [...state.notices.slice(-3), { id: noticeSeq++, tone: action.tone, text: action.text }] };
     case 'dismissNotice':
       return { ...state, notices: state.notices.filter((n) => n.id !== action.id) };
+    case 'setModel': {
+      const initial = createInitialState(action.model, state.theme);
+      return {
+        ...initial,
+        theme: state.theme,
+        explorerOpen: state.explorerOpen,
+        propertiesOpen: state.propertiesOpen,
+        mobilePane: state.mobilePane,
+      };
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 export async function openViewer(page: Page) {
-  await page.goto('/?debug=1');
+  await page.goto('/?debug=1&sample=1');
   await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
   // let the initial camera settle
   await page.waitForTimeout(300);

@@ -104,6 +104,23 @@ export const IDENTITY_TRANSFORM: Transform = Object.freeze([
   1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
 ]);
 
+export function createEmptyModel(): JnnModel {
+  return {
+    schemaVersion: JNN_SCHEMA_VERSION,
+    modelId: 'empty',
+    modelRevisionId: 'rev-0',
+    name: 'Chưa có mô hình',
+    projectName: 'Dự án mới',
+    siteName: '',
+    buildingName: '',
+    sourceFormat: 'IFC',
+    units: 'm',
+    upAxis: 'Z',
+    storeys: [],
+    elements: [],
+  };
+}
+
 export function indexElements(model: JnnModel): Map<string, JnnElement> {
   return new Map(model.elements.map((e) => [e.id, e]));
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { createSampleModel } from './domain/sampleModel';
+import { createEmptyModel } from './domain/model';
 import { AppContext } from './state/AppContext';
 import { createInitialState, reducer } from './state/store';
 import { applyTheme, initialTheme } from './lib/theme';
@@ -9,17 +10,18 @@ import type { ViewerAdapter } from './viewer/ViewerAdapter';
 import { TopBar } from './components/TopBar';
 import { Explorer } from './components/Explorer';
 import { Properties } from './components/Properties';
-import { Viewport } from './components/Viewport';
+import { isSampleMode, Viewport } from './components/Viewport';
 import { StatusBar } from './components/StatusBar';
 import { MobileNav } from './components/MobileNav';
 import { Notices } from './components/Notices';
 import { cn } from './lib/cn';
 
 export default function App() {
-  const model = useMemo(() => createSampleModel(), []);
+  const sample = isSampleMode();
+  const initialModel = useMemo(() => (sample ? createSampleModel() : createEmptyModel()), [sample]);
   const layout = useLayout();
   const [state, dispatch] = useReducer(reducer, undefined, () => {
-    const s = createInitialState(model, initialTheme());
+    const s = createInitialState(initialModel, initialTheme());
     // Side panels start closed on tablets so the model is visible first.
     return readLayout() === 'wide' ? s : { ...s, explorerOpen: false, propertiesOpen: false };
   });
@@ -61,7 +63,7 @@ export default function App() {
             </aside>
           )}
           <section className="relative min-w-0 flex-1" aria-label="3D viewer">
-            <Viewport model={model} onViewer={setViewer} compact={isNarrow} />
+            <Viewport model={state.model} onViewer={setViewer} compact={isNarrow} />
           </section>
           {showProperties && (
             <aside className={panelClass('right')} aria-label="Properties" data-testid="properties-panel">

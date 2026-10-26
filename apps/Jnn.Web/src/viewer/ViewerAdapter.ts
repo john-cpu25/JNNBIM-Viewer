@@ -22,6 +22,7 @@ export const fail = (code: AdapterErrorCode, message: string): AdapterResult<nev
 
 export type ViewerCapability =
   | 'loadModel'
+  | 'loadIfc'
   | 'select'
   | 'getProperties'
   | 'visibility'
@@ -83,6 +84,11 @@ export interface ViewerAdapter {
   dispose(): void;
 
   loadModel(model: JnnModel): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>>;
+  loadIfc?(
+    file: ArrayBuffer | Uint8Array,
+    name: string,
+    onProgress?: (percent: number, status?: string) => void,
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>>;
   getModelBounds(): AdapterResult<Bounds>;
 
   select(ids: readonly string[]): AdapterResult;
