@@ -126,6 +126,13 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private sectionHelper: THREE.Object3D | null = null;
   private clipStyler: OBCF.ClipStyler | null = null;
   private activeClipEdges: any | null = null;
+  private lastCachePromise: Promise<void> | null = null;
+
+  async waitForCache(): Promise<void> {
+    if (this.lastCachePromise) {
+      await this.lastCachePromise;
+    }
+  }
 
   mount(container: HTMLElement): void {
     patchWebIfcOnce();
@@ -543,11 +550,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
       // 3. Save converted .frag binary & jnnModel into IndexedDB cache asynchronously
       if (sha256) {
-        model
-          .getBuffer(false)
-          .then((fragBuffer) => {
+        this.lastCachePromise = (async () => {
+          try {
+            const fragBuffer = await model.getBuffer(false);
             if (fragBuffer && fragBuffer.byteLength > 0) {
-              saveCachedIfcModel({
+              await saveCachedIfcModel({
                 sha256,
                 filename: name,
                 fileSize: buffer.byteLength,
@@ -555,10 +562,12 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
                 jnnModel,
                 createdAt: Date.now(),
                 lastAccessedAt: Date.now(),
-              }).catch((err) => console.warn('[ThatOpenViewerAdapter] Cache save error:', err));
+              });
             }
-          })
-          .catch((err) => console.warn('[ThatOpenViewerAdapter] Export frag buffer error:', err));
+          } catch (err) {
+            console.warn('[ThatOpenViewerAdapter] Export/save frag buffer error:', err);
+          }
+        })();
       }
 
       onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
