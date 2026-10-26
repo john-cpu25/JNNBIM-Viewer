@@ -60,6 +60,7 @@ const IFC_CLASS_MAP: Record<string, string> = {
   IFCPIPESEGMENT: 'IfcPipeSegment',
   IFCFLOWTERMINAL: 'IfcFlowTerminal',
   IFCDISTRIBUTIONELEMENT: 'IfcDistributionElement',
+  IFCCURTAINWALL: 'IfcCurtainWall',
   IFCBUILDINGSTOREY: 'IfcBuildingStorey',
   IFCBUILDING: 'IfcBuilding',
   IFCSITE: 'IfcSite',
@@ -70,6 +71,7 @@ const IFC_CLASS_MAP: Record<string, string> = {
 export const IFC_ENGLISH_CATEGORIES: Record<string, string> = {
   IfcWall: 'Walls',
   IfcWallStandardCase: 'Walls',
+  IfcCurtainWall: 'Curtain Walls',
   IfcSlab: 'Slabs',
   IfcRoof: 'Roofs',
   IfcColumn: 'Columns',

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "node scripts/copy-thatopen-assets.mjs",
+    "predev": "node scripts/copy-thatopen-assets.mjs",
     "prebuild": "node scripts/copy-thatopen-assets.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",

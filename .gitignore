@@ -10,3 +10,4 @@ build/
 *.user
 .env
 samples-local/
+apps/Jnn.Web/public/thatopen/
