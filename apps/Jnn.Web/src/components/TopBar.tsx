@@ -1,12 +1,14 @@
-import { useRef } from 'react';
-import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Sparkles, Sun } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Settings, Sparkles, Sun } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import type { Layout } from '../lib/useLayout';
 import { IconButton } from './ui';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
+import { SettingsModal } from './SettingsModal';
 
 export function TopBar({ layout }: { layout: Layout }) {
   const { state, dispatch, viewer } = useApp();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appendFileInputRef = useRef<HTMLInputElement>(null);
   const m = state.model;
@@ -123,6 +125,12 @@ export function TopBar({ layout }: { layout: Layout }) {
         </button>
 
         <IconButton
+          icon={Settings}
+          label="Cài đặt & Quản lý Cache"
+          onClick={() => setSettingsOpen(true)}
+          data-testid="settings-btn"
+        />
+        <IconButton
           icon={state.theme === 'dark' ? Sun : Moon}
           label={state.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           onClick={() => dispatch({ type: 'setTheme', theme: state.theme === 'dark' ? 'light' : 'dark' })}
@@ -137,6 +145,7 @@ export function TopBar({ layout }: { layout: Layout }) {
           />
         )}
       </div>
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }

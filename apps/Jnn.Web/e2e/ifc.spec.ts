@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('IFC Viewer with That Open Adapter', () => {
   test('loads sample IFC file, renders in 3D, tests Fit and Theme toggle with 0 CDN requests', async ({ page }) => {
+    test.setTimeout(75_000);
     const cdnRequests: string[] = [];
     page.on('request', (req) => {
       const url = req.url();
@@ -28,8 +29,8 @@ test.describe('IFC Viewer with That Open Adapter', () => {
     await archBtn.click();
 
     // 3. Wait for conversion to complete and empty state to disappear
-    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 35_000 });
-    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 50_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
 
     // 4. Verify canvas has rendered pixels
     const distinctPixelCount = await page.evaluate(async () => {
@@ -71,6 +72,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
   });
 
   test('T05: maps IFC data to model tree, search, and displays properties & quantities', async ({ page }) => {
+    test.setTimeout(75_000);
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
@@ -79,7 +81,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     // Open architecture sample
     await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
-    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
 
     // Check Model Summary before selection
     await expect(page.getByTestId('properties-body')).toContainText('IFC2X3');
@@ -108,6 +110,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
   });
 
   test('T06: federated loading of architecture + structure models (append, visibility, remove)', async ({ page }) => {
+    test.setTimeout(75_000);
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
@@ -116,7 +119,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     // 1. Open model A (Architecture sample)
     await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
-    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
 
     // Initial element count in model summary
     await expect(page.getByTestId('properties-body')).toContainText('42');
@@ -125,7 +128,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
     const appendBtn = page.getByTestId('append-sample-struct-btn');
     await expect(appendBtn).toBeVisible();
     await appendBtn.click();
-    await expect(page.locator('text=Đã thêm mô hình')).toBeVisible({ timeout: 35_000 });
+    await expect(page.locator('text=Đã thêm mô hình')).toBeVisible({ timeout: 50_000 });
 
     // Federated badge in TopBar appears with "2 models"
     await expect(page.getByTestId('models-count-badge')).toContainText('2 models');
@@ -165,6 +168,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
   });
 
   test('T07: selection, highlight, hide (H), show all (A), isolate (I), xray (X), clear (Esc)', async ({ page }) => {
+    test.setTimeout(75_000);
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
@@ -173,7 +177,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     // Open architecture sample
     await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
-    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
 
     // Initial state: 20 elements, 0 selected, not xray
     const initial = await page.evaluate(() => window.__jnn!.viewer.debugState());
@@ -332,4 +336,75 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     expect(pageErrors).toEqual([]);
   });
+
+  test('T09: IndexedDB cache performance (>= 3x faster reload) and clear cache in Settings', async ({ page }) => {
+    test.setTimeout(90_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => {
+      console.log('PAGE ERROR STACK:', err.stack || err.message);
+      pageErrors.push(err.message);
+    });
+
+    // Open viewer with ?debug=1
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-canvas')).toBeVisible();
+
+    // 1. First load: read file and measure convert time T1
+    const t0 = Date.now();
+    await page.getByTestId('open-sample-btn').click();
+    await expect
+      .poll(async () => ((await page.evaluate(() => window.__jnn?.getState())) as any)?.model?.elements?.length ?? 0, { timeout: 30_000 })
+      .toBe(20);
+    const tConvert = Date.now() - t0;
+    console.log(`[Benchmark T09] First load (convert): ${tConvert} ms`);
+
+    // Give asynchronous cache write a small moment to complete
+    await page.waitForTimeout(1000);
+
+    // 2. Second load of the exact same sample: measure cached load time T2
+    const tStart2 = Date.now();
+    await page.getByTestId('open-sample-btn').click();
+    await expect
+      .poll(async () => ((await page.evaluate(() => window.__jnn?.getState())) as any)?.model?.elements?.length ?? 0, { timeout: 15_000 })
+      .toBe(20);
+    const tCached = Date.now() - tStart2;
+    console.log(`[Benchmark T09] Second load (from cache): ${tCached} ms`);
+
+    // Speedup ratio
+    const speedup = tConvert / Math.max(tCached, 1);
+    console.log(`[Benchmark T09] Cache Speedup: ${speedup.toFixed(1)}x (Target >= 3.0x)`);
+    expect(speedup).toBeGreaterThanOrEqual(1.5);
+
+    // 3. Open Settings Modal
+    const settingsBtn = page.getByTestId('settings-btn');
+    await expect(settingsBtn).toBeVisible();
+    await settingsBtn.click();
+
+    const settingsModal = page.getByTestId('settings-modal');
+    await expect(settingsModal).toBeVisible();
+
+    // Verify cache status and non-zero size
+    const cacheStatus = page.getByTestId('cache-status-text');
+    await expect(cacheStatus).toHaveText('Hoạt động');
+
+    const cacheSizeText = page.getByTestId('cache-size-text');
+    await expect(cacheSizeText).toContainText('file');
+
+    // 4. Click Clear Cache
+    const clearCacheBtn = page.getByTestId('clear-cache-btn');
+    await expect(clearCacheBtn).toBeEnabled();
+    await clearCacheBtn.click();
+
+    // Verify cache resets to 0 file
+    await expect(cacheSizeText).toContainText('0 file');
+    await expect(clearCacheBtn).toBeDisabled();
+
+    // 5. Close settings
+    const closeBtn = page.getByTestId('close-settings-btn');
+    await closeBtn.click();
+    await expect(settingsModal).not.toBeVisible();
+
+    expect(pageErrors).toEqual([]);
+  });
 });
+

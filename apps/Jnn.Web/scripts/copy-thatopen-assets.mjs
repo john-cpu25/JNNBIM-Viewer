@@ -32,6 +32,14 @@ for (const { src, dest } of filesToCopy) {
     process.exit(1);
   }
   fs.copyFileSync(src, dest);
+
+  // Patch worker.mjs to guard against unhandled requestId (e.g. from disposed or aborted thread requests)
+  if (path.basename(dest) === 'worker.mjs') {
+    let content = fs.readFileSync(dest, 'utf8');
+    content = content.replace('handler(data);', 'if (handler) handler(data);');
+    fs.writeFileSync(dest, content);
+  }
+
   const size = fs.statSync(dest).size;
   console.log(`Copied ${path.basename(dest)} (${size} bytes) -> public/thatopen/`);
 }

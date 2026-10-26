@@ -24,6 +24,7 @@ import {
   parseSpatialStructure,
   type SpatialNode,
 } from '../ifc/mapToJnn';
+import { computeSha256, getCachedIfcModel, saveCachedIfcModel } from '../lib/ifcCache';
 import {
   Emitter,
   fail,
@@ -342,8 +343,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     file: ArrayBuffer | Uint8Array,
     name: string,
     onProgress?: (percent: number, status?: string) => void,
-    options?: { append?: boolean },
-  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel }>> {
+    options?: { append?: boolean; bypassCache?: boolean },
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel; fromCache?: boolean }>> {
     if (this.disposed) return fail('failed', 'Adapter has been disposed.');
     if (this.initializedPromise) {
       await this.initializedPromise;
@@ -353,6 +354,67 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     try {
+      const buffer = file instanceof Uint8Array ? file : new Uint8Array(file);
+      const sha256 = await computeSha256(buffer).catch(() => '');
+
+      // 1. Check IndexedDB cache if not bypassed
+      if (sha256 && !options?.bypassCache) {
+        let cached = null;
+        try {
+          cached = await getCachedIfcModel(sha256);
+        } catch (e) {
+          console.warn('[ThatOpenViewerAdapter] Error reading cache:', e);
+        }
+
+        if (cached && cached.fragBuffer) {
+          onProgress?.(25, 'Đang nạp nhanh từ bộ nhớ đệm (IndexedDB)...');
+          if (!options?.append) {
+            for (const [, entry] of this.modelsMap) {
+              this.world.scene.three.remove(entry.model.object);
+              entry.model.dispose();
+            }
+            this.modelsMap.clear();
+            this.propertiesCache.clear();
+          }
+
+          const model = await this.fragments.core.load(new Uint8Array(cached.fragBuffer), {
+            modelId: name,
+            camera: this.world.camera.three,
+          });
+
+          this.activeModel = model;
+          if (this.clipPlanes.length > 0) {
+            model.useClippingPlanes(this.clipPlanes);
+          }
+          this.world.scene.three.add(model.object);
+          this.fragments.core.update(true);
+
+          const jnnModel = cached.jnnModel;
+          this.modelsMap.set(name, { model, jnnModel });
+          this.parsedModel = jnnModel;
+          this.updateCombinedBoundsAndFit(true);
+
+          if (this.selection.size > 0) {
+            this.select([...this.selection]);
+          }
+          if (this.visibility.hidden.size > 0 || this.visibility.isolated.size > 0) {
+            this.applyVisibility();
+          }
+          if (this.xray) {
+            this.applyXray();
+          }
+          onProgress?.(100, 'Đã mở mô hình từ cache.');
+
+          return ok({
+            elementCount: jnnModel.elements.length,
+            bounds: this.modelBounds ?? { min: [-10, -10, 0], max: [10, 10, 10] },
+            model: jnnModel,
+            fromCache: true,
+          });
+        }
+      }
+
+      // 2. Cache miss or bypassed: full parse via That Open IFC loader
       if (!options?.append) {
         // Clear old models if not in append mode
         for (const [, entry] of this.modelsMap) {
@@ -362,8 +424,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         this.modelsMap.clear();
         this.propertiesCache.clear();
       }
-
-      const buffer = file instanceof Uint8Array ? file : new Uint8Array(file);
 
       const model = await this.ifcLoader.load(buffer, false, name, {
         processData: {
@@ -434,12 +494,34 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       if (this.xray) {
         this.applyXray();
       }
+
+      // 3. Save converted .frag binary & jnnModel into IndexedDB cache asynchronously
+      if (sha256) {
+        model
+          .getBuffer(false)
+          .then((fragBuffer) => {
+            if (fragBuffer && fragBuffer.byteLength > 0) {
+              saveCachedIfcModel({
+                sha256,
+                filename: name,
+                fileSize: buffer.byteLength,
+                fragBuffer,
+                jnnModel,
+                createdAt: Date.now(),
+                lastAccessedAt: Date.now(),
+              }).catch((err) => console.warn('[ThatOpenViewerAdapter] Cache save error:', err));
+            }
+          })
+          .catch((err) => console.warn('[ThatOpenViewerAdapter] Export frag buffer error:', err));
+      }
+
       onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
 
       return ok({
         elementCount: jnnModel.elements.length,
         bounds: this.modelBounds ?? { min: [-10, -10, 0], max: [10, 10, 10] },
         model: jnnModel,
+        fromCache: false,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

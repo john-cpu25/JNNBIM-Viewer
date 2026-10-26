@@ -83,19 +83,20 @@ export async function loadIfcFile(
       elements: [],
     };
 
+    const fromCacheNote = result.value.fromCache ? ' [từ cache IndexedDB]' : '';
     if (options?.append) {
       dispatch({ type: 'appendModel', model: ifcModel });
       dispatch({
         type: 'notify',
         tone: 'info',
-        text: `Đã thêm mô hình "${filename}" với ${result.value.elementCount} cấu kiện.`,
+        text: `Đã thêm mô hình "${filename}" với ${result.value.elementCount} cấu kiện${fromCacheNote}.`,
       });
     } else {
       dispatch({ type: 'setModel', model: ifcModel });
       dispatch({
         type: 'notify',
         tone: 'info',
-        text: `Mở thành công "${filename}" với ${result.value.elementCount} cấu kiện.`,
+        text: `Mở thành công "${filename}" với ${result.value.elementCount} cấu kiện${fromCacheNote}.`,
       });
     }
     return true;

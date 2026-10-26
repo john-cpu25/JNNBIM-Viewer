@@ -12,7 +12,7 @@ class ConnectionHandlers {
   run(data) {
     const handler = this._list.get(data.requestId);
     this._list.delete(data.requestId);
-    handler(data);
+    if (handler) handler(data);
   }
   newHandler(reject, resolve) {
     return (response) => {
