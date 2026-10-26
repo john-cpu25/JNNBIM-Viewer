@@ -131,6 +131,18 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               </button>
             </div>
           </div>
+
+          {/* Attribution Section */}
+          <div className="rounded-lg border border-line bg-surface-2 p-3">
+            <span className="font-semibold text-ink">Bản quyền dữ liệu mẫu (Attribution)</span>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">
+              Mô hình mẫu mặc định (<span className="font-mono text-ink">Building-Architecture.ifc</span>,{' '}
+              <span className="font-mono text-ink">Building-Structural.ifc</span>) thuộc bộ dữ liệu{' '}
+              <strong className="text-ink">Simple-Scene</strong> của{' '}
+              <strong className="text-ink">buildingSMART International</strong>, phát hành theo giấy phép{' '}
+              <strong className="text-ink">Creative Commons Attribution 4.0 International (CC BY 4.0)</strong>.
+            </p>
+          </div>
         </div>
 
         {/* Footer */}

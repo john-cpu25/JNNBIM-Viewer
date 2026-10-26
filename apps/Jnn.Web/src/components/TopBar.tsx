@@ -106,7 +106,7 @@ export function TopBar({ layout }: { layout: Layout }) {
         <button
           type="button"
           onClick={onLoadSample}
-          title="Mở mô hình IFC mẫu kiến trúc (Building-Architecture)"
+          title="Mở mô hình IFC mẫu kiến trúc (Building-Architecture) — Bản quyền buildingSMART Simple-Scene (CC BY 4.0)"
           data-testid="open-sample-btn"
           className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-muted transition-colors hover:border-accent hover:text-ink"
         >
@@ -116,7 +116,7 @@ export function TopBar({ layout }: { layout: Layout }) {
         <button
           type="button"
           onClick={onAppendSampleStruct}
-          title="Thêm mô hình IFC mẫu kết cấu (Building-Structure federated)"
+          title="Thêm mô hình IFC mẫu kết cấu (Building-Structure federated) — Bản quyền buildingSMART Simple-Scene (CC BY 4.0)"
           data-testid="append-sample-struct-btn"
           className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:border-accent hover:text-emerald-500"
         >
