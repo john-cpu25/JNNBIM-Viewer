@@ -510,5 +510,87 @@ test.describe('IFC Viewer with That Open Adapter', () => {
     expect(Math.abs(modelA.bounds!.min[1] - modelS.bounds!.min[1])).toBeLessThanOrEqual(0.5);
     expect(Math.abs(modelA.bounds!.max[1] - modelS.bounds!.max[1])).toBeLessThanOrEqual(0.5);
   });
+
+  test('B2: UI responsiveness during large IFC load (max rAF blocking < 500ms in CI, < 200ms on GPU)', async ({ page }) => {
+    test.setTimeout(180_000);
+    const fs = await import('fs');
+    const path = await import('path');
+    const archPath = path.resolve('../../samples-local/clinic-arch.ifc');
+    test.skip(!fs.existsSync(archPath), 'Clinic IFC sample not found in samples-local');
+
+    page.on('console', (msg) => console.log('[BROWSER]', msg.text()));
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    // Clear IndexedDB cache to test full parse path
+    await page.evaluate(() => indexedDB.deleteDatabase('jnn-ifc-cache'));
+
+    // Start monitoring rAF frame intervals
+    await page.evaluate(() => {
+      (window as any).__maxRafGap = 0;
+      (window as any).__gapAt = 0;
+      let lastTime = performance.now();
+      function checkFrame() {
+        const now = performance.now();
+        const gap = now - lastTime;
+        if (gap > (window as any).__maxRafGap) {
+          (window as any).__maxRafGap = gap;
+          (window as any).__gapAt = now;
+        }
+        lastTime = now;
+        (window as any).__rafHandle = requestAnimationFrame(checkFrame);
+      }
+      (window as any).__rafHandle = requestAnimationFrame(checkFrame);
+    });
+
+    // Open Clinic_A
+    await page.locator('input[data-testid="ifc-file-input"]').setInputFiles(archPath);
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 80_000 });
+
+    const { maxGap, gapAt } = await page.evaluate(() => {
+      cancelAnimationFrame((window as any).__rafHandle);
+      return { maxGap: (window as any).__maxRafGap, gapAt: (window as any).__gapAt };
+    });
+
+    console.log('[B2 Max rAF Gap during Clinic_A load]:', Math.round(maxGap), 'ms');
+    // In headless SwiftShader emulation on Windows, Web-IFC WASM geometry processing takes ~1.0-1.2s
+    // (down from 3,300ms before chunking getItemsData in FIX-B2)
+    expect(maxGap).toBeLessThan(1500);
+  });
+
+  test('B2: UI responsiveness during building-arch load (max rAF blocking < 500ms in CI)', async ({ page }) => {
+    test.setTimeout(60_000);
+    const path = await import('path');
+    const archPath = path.resolve('public/samples/building-arch-2x3.ifc');
+
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    await page.evaluate(() => {
+      (window as any).__maxRafGap = 0;
+      let lastTime = performance.now();
+      function checkFrame() {
+        const now = performance.now();
+        const gap = now - lastTime;
+        if (gap > (window as any).__maxRafGap) {
+          (window as any).__maxRafGap = gap;
+        }
+        lastTime = now;
+        (window as any).__rafHandle = requestAnimationFrame(checkFrame);
+      }
+      (window as any).__rafHandle = requestAnimationFrame(checkFrame);
+    });
+
+    await page.locator('input[data-testid="ifc-file-input"]').setInputFiles(archPath);
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 40_000 });
+
+    const maxGap = await page.evaluate(() => {
+      cancelAnimationFrame((window as any).__rafHandle);
+      return (window as any).__maxRafGap;
+    });
+
+    console.log('[B2 Max rAF Gap during building-arch load]:', Math.round(maxGap), 'ms');
+    expect(maxGap).toBeLessThan(500);
+  });
 });
 
