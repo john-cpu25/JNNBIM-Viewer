@@ -13,7 +13,13 @@ import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 import * as WebIFC from 'web-ifc';
 import type { FragmentsModel } from '@thatopen/fragments';
-import type { JnnElement, JnnModel, PropertySet } from '../domain/model';
+import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
+import {
+  mapIfcToJnnModel,
+  parseItemPropertiesAndQuantities,
+  parseSpatialStructure,
+  type SpatialNode,
+} from '../ifc/mapToJnn';
 import {
   Emitter,
   fail,
@@ -75,6 +81,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     'loadIfc',
     'fitToView',
     'camera',
+    'getProperties',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -84,6 +91,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private ifcLoader: OBC.IfcLoader | null = null;
   private activeModel: FragmentsModel | null = null;
   private modelBounds: Bounds | null = null;
+  private parsedModel: JnnModel | null = null;
+  private propertiesCache = new Map<string, { element: JnnElement; propertySets: PropertySet[] }>();
   private disposed = false;
   private initializedPromise: Promise<void> | null = null;
   private currentProjection: CameraState['projection'] = 'perspective';
@@ -194,7 +203,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     file: ArrayBuffer | Uint8Array,
     name: string,
     onProgress?: (percent: number, status?: string) => void,
-  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>> {
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel }>> {
     if (this.disposed) return fail('failed', 'Adapter has been disposed.');
     if (this.initializedPromise) {
       await this.initializedPromise;
@@ -217,7 +226,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         processData: {
           progressCallback: (p: any) => {
             if (onProgress && p?.progress !== undefined) {
-              onProgress(p.progress * 100, p.currentProcess);
+              onProgress(p.progress * 80, p.currentProcess);
             }
           },
         },
@@ -238,8 +247,55 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         this.modelBounds = { min: [-10, -10, 0], max: [10, 10, 10] };
       }
 
-      const localIds = await model.getLocalIds();
-      return ok({ elementCount: localIds.length, bounds: this.modelBounds });
+      onProgress?.(85, 'Đang phân tích cây không gian...');
+      const metadata = await model.getMetadata().catch(() => ({}));
+      const spatial = (await model.getSpatialStructure().catch(() => null)) as SpatialNode | null;
+      const geomIds = new Set(await model.getItemsIdsWithGeometry().catch(() => []));
+
+      let headerData: any[] = [];
+      let elementLocalIds: number[] = [];
+
+      if (spatial) {
+        const parsed = parseSpatialStructure(spatial);
+        const headerIds = [
+          ...(parsed.projectLocalId ? [parsed.projectLocalId] : []),
+          ...(parsed.siteLocalId ? [parsed.siteLocalId] : []),
+          ...(parsed.buildingLocalId ? [parsed.buildingLocalId] : []),
+          ...parsed.storeyLocalIds,
+        ];
+        if (headerIds.length > 0) {
+          headerData = await model.getItemsData(headerIds, { attributesDefault: true }).catch(() => []);
+        }
+        elementLocalIds = parsed.allElementLocalIds;
+      }
+
+      if (elementLocalIds.length === 0) {
+        elementLocalIds = await model.getLocalIds();
+      }
+
+      onProgress?.(92, 'Đang đọc thuộc tính các cấu kiện...');
+      const itemsBasicData = await model.getItemsData(elementLocalIds, { attributesDefault: true }).catch(() => []);
+
+      const jnnModel = mapIfcToJnnModel({
+        modelId: name,
+        filename: name,
+        metadata,
+        spatialRoot: spatial ?? undefined,
+        spatialHeadersData: headerData,
+        itemsBasicData,
+        geometryLocalIds: geomIds,
+        fileSize: buffer.byteLength,
+      });
+
+      this.parsedModel = jnnModel;
+      this.propertiesCache.clear();
+      onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
+
+      return ok({
+        elementCount: jnnModel.elements.length,
+        bounds: this.modelBounds,
+        model: jnnModel,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return fail('failed', `Failed to load IFC file "${name}": ${message}`);
@@ -351,8 +407,71 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return fail('unsupported', 'Element selection will be available in T07.');
   }
 
-  getProperties(_id: string): AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }> {
-    return fail('unsupported', 'Element properties mapping will be available in T05.');
+  async getProperties(id: string): Promise<AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>> {
+    if (this.propertiesCache.has(id)) {
+      return ok(this.propertiesCache.get(id)!);
+    }
+    if (!this.activeModel) return fail('not-loaded', 'No active IFC model.');
+
+    try {
+      const parts = id.split(':');
+      const localId = Number(parts[parts.length - 1]);
+      if (isNaN(localId)) {
+        return fail('invalid-argument', `Invalid element ID format: ${id}`);
+      }
+
+      const items = await (this.activeModel as any).getItemsData([localId], {
+        attributesDefault: true,
+        relations: {
+          IsDefinedBy: {
+            attributes: true,
+            relations: {
+              HasProperties: { attributes: true, relations: false },
+              Quantities: { attributes: true, relations: false },
+            },
+          },
+        },
+      });
+
+      const rawItem = items?.[0] as any;
+      const parsed = parseItemPropertiesAndQuantities(rawItem);
+      const baseEl: JnnElement | undefined = this.parsedModel?.elements.find((e) => e.id === id);
+
+      const element: JnnElement = baseEl
+        ? {
+            ...baseEl,
+            type: parsed.type || baseEl.type,
+            material: parsed.material ?? baseEl.material,
+            properties: parsed.properties,
+            quantities: parsed.quantities,
+          }
+        : {
+            modelId: this.parsedModel?.modelId || '',
+            modelRevisionId: 'rev-001',
+            sourceFormat: 'IFC',
+            sourceElementId: String(localId),
+            globalId: rawItem?._guid?.value ?? null,
+            id,
+            name: rawItem?.Name?.value || `Element #${localId}`,
+            category: baseEl ? (baseEl as JnnElement).category : 'IfcElement',
+            type: parsed.type || 'IfcElement',
+            material: parsed.material ?? null,
+            storey: baseEl ? (baseEl as JnnElement).storey : null,
+            transform: IDENTITY_TRANSFORM,
+            properties: parsed.properties,
+            quantities: parsed.quantities,
+            meshRefs: [],
+            geometryStatus: 'ok',
+            importWarnings: [],
+          };
+
+      const result = { element, propertySets: parsed.properties };
+      this.propertiesCache.set(id, result);
+      return ok(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return fail('failed', `Failed to load properties for "${id}": ${message}`);
+    }
   }
 
   setHidden(_ids: readonly string[]): AdapterResult {

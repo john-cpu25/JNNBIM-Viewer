@@ -58,7 +58,7 @@ export async function loadIfcFile(
       return false;
     }
 
-    const ifcModel: JnnModel = {
+    const ifcModel: JnnModel = result.value.model ?? {
       schemaVersion: JNN_SCHEMA_VERSION,
       modelId: filename,
       name: filename,
@@ -70,7 +70,7 @@ export async function loadIfcFile(
       units: 'm',
       upAxis: 'Z',
       storeys: [],
-      elements: [], // Will be mapped in T05
+      elements: [],
     };
 
     dispatch({ type: 'setModel', model: ifcModel });

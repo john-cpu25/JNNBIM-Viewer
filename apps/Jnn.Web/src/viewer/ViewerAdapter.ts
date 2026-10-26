@@ -88,11 +88,13 @@ export interface ViewerAdapter {
     file: ArrayBuffer | Uint8Array,
     name: string,
     onProgress?: (percent: number, status?: string) => void,
-  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>>;
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel }>>;
   getModelBounds(): AdapterResult<Bounds>;
 
   select(ids: readonly string[]): AdapterResult;
-  getProperties(id: string): AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>;
+  getProperties(
+    id: string,
+  ): AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }> | Promise<AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>>;
 
   setHidden(ids: readonly string[]): AdapterResult;
   /** Empty array clears isolation. */

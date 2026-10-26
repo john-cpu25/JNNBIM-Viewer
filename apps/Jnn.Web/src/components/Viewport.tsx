@@ -93,7 +93,14 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       adapter.dispose();
       if (window.__jnn?.viewer === adapter) delete window.__jnn;
     };
-  }, [sample, model, dispatch, onViewer]);
+  }, [sample, dispatch, onViewer]);
+
+  // In sample mode, reload if model changes without remounting the adapter
+  useEffect(() => {
+    if (sample && viewer && model.modelId !== 'empty') {
+      viewer.loadModel(model);
+    }
+  }, [sample, viewer, model]);
 
   // State → viewer synchronisation. Each effect reports adapter failures.
   const report = (r: AdapterResult | undefined) => {

@@ -1,7 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronRight, Copy, Crosshair, EyeOff, Focus, Info, MousePointerClick } from 'lucide-react';
 import { useApp } from '../state/AppContext';
-import type { JnnElement } from '../domain/model';
+import type { JnnElement, PropertySet, PropertyValue } from '../domain/model';
 import { categoryStyle } from '../viewer/categoryStyle';
 import { aggregateQuantities, formatNumber, formatValue } from '../lib/format';
 import { IconButton, SectionLabel } from './ui';
@@ -43,11 +43,23 @@ function ModelSummary() {
       <Block title="Model">
         <KV k="Name" v={m.name} />
         <KV k="Source format" v={<Badge>{m.sourceFormat}</Badge>} />
+        {m.ifcSchema && <KV k="IFC Schema" v={<Mono>{m.ifcSchema}</Mono>} />}
         <KV k="Revision" v={<Mono>{m.modelRevisionId}</Mono>} />
         <KV k="Units" v={m.units} />
         <KV k="Schema" v={<Mono>v{m.schemaVersion}</Mono>} />
         <KV k="Elements" v={formatNumber(m.elements.length)} />
         <KV k="Storeys" v={m.storeys.length} />
+        {m.application && <KV k="Application" v={m.application} />}
+        {m.fileSize !== undefined && (
+          <KV
+            k="File size"
+            v={
+              m.fileSize > 1024 * 1024
+                ? `${(m.fileSize / (1024 * 1024)).toFixed(2)} MB`
+                : `${(m.fileSize / 1024).toFixed(1)} KB`
+            }
+          />
+        )}
       </Block>
       <div>
         <SectionLabel>Elements by category</SectionLabel>
@@ -67,7 +79,9 @@ function ModelSummary() {
         </ul>
       </div>
       <p className="text-[11px] leading-relaxed text-faint">
-        This is a procedurally generated sample building for UI development. IFC loading arrives with the IfcOpenShell adapter (Milestone 4).
+        {m.sourceFormat === 'IFC'
+          ? 'Mô hình IFC nạp từ tệp qua That Open Engine (WASM offline).'
+          : 'This is a procedurally generated sample building for UI development. IFC loading arrives with the That Open adapter (Milestone 1).'}
       </p>
     </div>
   );
@@ -84,7 +98,39 @@ function ElementActions({ ids }: { ids: string[] }) {
   );
 }
 
-function ElementProperties({ element: e }: { element: JnnElement }) {
+function ElementProperties({ element: initialElement }: { element: JnnElement }) {
+  const { viewer } = useApp();
+  const [lazyData, setLazyData] = useState<{ element: JnnElement; propertySets: PropertySet[] } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLazyData(null);
+
+    if (viewer && initialElement && initialElement.properties.length === 0) {
+      const res = viewer.getProperties(initialElement.id);
+      if (res instanceof Promise) {
+        res.then((r) => {
+          if (!cancelled && r.ok) {
+            setLazyData(r.value);
+          }
+        });
+      } else if (res.ok) {
+        setLazyData(res.value);
+      }
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [viewer, initialElement.id]);
+
+  const e = lazyData?.element
+    ? {
+        ...initialElement,
+        ...lazyData.element,
+        properties: lazyData.propertySets && lazyData.propertySets.length > 0 ? lazyData.propertySets : initialElement.properties,
+        quantities: lazyData.element.quantities && lazyData.element.quantities.length > 0 ? lazyData.element.quantities : initialElement.quantities,
+      }
+    : initialElement;
   const style = categoryStyle(e.category);
   return (
     <div className="pb-6" data-testid="element-properties">
@@ -136,7 +182,7 @@ function ElementProperties({ element: e }: { element: JnnElement }) {
       {e.properties.map((ps) => (
         <Group key={ps.name} title={ps.name} defaultOpen={ps.name.startsWith('Pset_')}>
           {Object.entries(ps.properties).map(([k, v]) => (
-            <KV key={k} k={k} v={formatValue(v)} />
+            <KV key={k} k={k} v={formatValue(v as PropertyValue)} />
           ))}
         </Group>
       ))}

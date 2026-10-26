@@ -12,10 +12,9 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => {
-      console.log('PAGE ERROR:', err.message, err.stack);
+      console.log('PAGE ERROR:', err.message);
       pageErrors.push(err.message);
     });
-    page.on('console', (msg) => console.log('PAGE CONSOLE:', msg.type(), msg.text()));
 
     await page.goto('/?debug=1');
 
@@ -68,6 +67,43 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     // 7. Assert 0 external requests & 0 uncaught errors
     expect(cdnRequests).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('T05: maps IFC data to model tree, search, and displays properties & quantities', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    // Open architecture sample
+    await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 20_000 });
+
+    // Check Model Summary before selection
+    await expect(page.getByTestId('properties-body')).toContainText('IFC2X3');
+    await expect(page.getByTestId('properties-body')).toContainText('Sketchup-IFC-manager');
+
+    // Search and select an element in the tree
+    const searchInput = page.getByLabel('Search elements');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('right front');
+
+    // Click matching element in tree
+    const treeEl = page.getByTestId('tree-element').first();
+    await expect(treeEl).toBeVisible();
+    await treeEl.click();
+
+    // Verify Properties panel displays correct element attributes
+    await expect(page.getByTestId('element-name')).toContainText('house - outer wall - house right front');
+    // Expected GlobalId of wall 319 in building-arch-2x3.ifc
+    await expect(page.getByTestId('element-properties')).toContainText('1AQAupaRP1txwK1AGiN61V');
+
+    // Verify Quantities appear
+    await expect(page.getByTestId('element-properties')).toContainText('NetVolume');
+    await expect(page.getByTestId('element-properties')).toContainText('1.269');
+
     expect(pageErrors).toEqual([]);
   });
 });

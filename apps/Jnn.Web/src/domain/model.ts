@@ -98,6 +98,9 @@ export interface JnnModel {
   upAxis: 'Z';
   storeys: Storey[];
   elements: JnnElement[];
+  application?: string;
+  fileSize?: number;
+  ifcSchema?: string;
 }
 
 export const IDENTITY_TRANSFORM: Transform = Object.freeze([
