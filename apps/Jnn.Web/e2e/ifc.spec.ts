@@ -106,4 +106,61 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     expect(pageErrors).toEqual([]);
   });
+
+  test('T06: federated loading of architecture + structure models (append, visibility, remove)', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    // 1. Open model A (Architecture sample)
+    await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+
+    // Initial element count in model summary
+    await expect(page.getByTestId('properties-body')).toContainText('42');
+
+    // 2. Append model B (Structure sample)
+    const appendBtn = page.getByTestId('append-sample-struct-btn');
+    await expect(appendBtn).toBeVisible();
+    await appendBtn.click();
+    await expect(page.locator('text=Đã thêm mô hình')).toBeVisible({ timeout: 35_000 });
+
+    // Federated badge in TopBar appears with "2 models"
+    await expect(page.getByTestId('models-count-badge')).toContainText('2 models');
+
+    // Total elements combined in Properties summary is > 42
+    await expect(page.getByTestId('properties-body')).toContainText('Models (Federated)');
+
+    // 3. Switch tree to Models tab
+    await page.getByRole('radio', { name: /Models/i }).click();
+    await expect(page.getByTestId('models-panel')).toBeVisible();
+
+    // Verify both models are listed
+    await expect(page.getByTestId('model-card-building-arch-2x3.ifc')).toBeVisible();
+    await expect(page.getByTestId('model-card-building-struct-2x3.ifc')).toBeVisible();
+
+    // 4. Toggle visibility of model B (Structure)
+    const toggleStructVisBtn = page.getByTestId('toggle-visible-model-building-struct-2x3.ifc');
+    await toggleStructVisBtn.click();
+    await expect(page.getByTestId('model-card-building-struct-2x3.ifc')).toHaveClass(/opacity-60/);
+
+    // 5. Remove model B (Structure)
+    const removeStructBtn = page.getByTestId('remove-model-building-struct-2x3.ifc');
+    await removeStructBtn.click();
+    await expect(page.locator('text=Đã gỡ mô hình')).toBeVisible();
+
+    // Verify model B is gone from Models panel
+    await expect(page.getByTestId('model-card-building-struct-2x3.ifc')).not.toBeVisible();
+    await expect(page.getByTestId('model-card-building-arch-2x3.ifc')).toBeVisible();
+
+    // Models count badge in TopBar disappears since only 1 model left
+    await expect(page.getByTestId('models-count-badge')).not.toBeVisible();
+
+    // Element count returns to original 42
+    await expect(page.getByTestId('properties-body')).toContainText('42');
+
+    expect(pageErrors).toEqual([]);
+  });
 });

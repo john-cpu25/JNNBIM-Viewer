@@ -55,6 +55,48 @@ describe('reducer', () => {
     for (let i = 0; i < 6; i++) s = reducer(s, { type: 'notify', tone: 'info', text: String(i) });
     expect(s.notices.map((n) => n.text)).toEqual(['2', '3', '4', '5']);
   });
+
+  it('supports federated models: append, toggle visibility, and remove', () => {
+    let s = init();
+    expect(s.models.length).toBe(1);
+    const initialCount = s.model.elements.length;
+
+    const secondModel = {
+      ...createSampleModel(),
+      modelId: 'struct-002',
+      name: 'Structure Model',
+      elements: [
+        {
+          ...model.elements[0]!,
+          id: 'struct-002:beam-1',
+          sourceElementId: 'beam-1',
+          name: 'Steel Beam W12x26',
+          category: 'IfcBeam',
+        },
+      ],
+    };
+
+    s = reducer(s, { type: 'appendModel', model: secondModel });
+    expect(s.models.length).toBe(2);
+    expect(s.model.elements.length).toBe(initialCount + 1);
+    expect(s.byId.has('struct-002:beam-1')).toBe(true);
+
+    // Hide second model
+    s = reducer(s, { type: 'toggleModelVisibility', modelId: 'struct-002' });
+    expect(s.models[1]?.visible).toBe(false);
+    expect(s.visibility.hidden.has('struct-002:beam-1')).toBe(true);
+
+    // Show second model
+    s = reducer(s, { type: 'toggleModelVisibility', modelId: 'struct-002' });
+    expect(s.models[1]?.visible).toBe(true);
+    expect(s.visibility.hidden.has('struct-002:beam-1')).toBe(false);
+
+    // Remove second model
+    s = reducer(s, { type: 'removeModel', modelId: 'struct-002' });
+    expect(s.models.length).toBe(1);
+    expect(s.model.elements.length).toBe(initialCount);
+    expect(s.byId.has('struct-002:beam-1')).toBe(false);
+  });
 });
 
 describe('defaultPlane', () => {

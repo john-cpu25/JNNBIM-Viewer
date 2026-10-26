@@ -90,6 +90,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private fragments: OBC.FragmentsManager | null = null;
   private ifcLoader: OBC.IfcLoader | null = null;
   private activeModel: FragmentsModel | null = null;
+  private modelsMap = new Map<string, { model: FragmentsModel; jnnModel: JnnModel }>();
   private modelBounds: Bounds | null = null;
   private parsedModel: JnnModel | null = null;
   private propertiesCache = new Map<string, { element: JnnElement; propertySets: PropertySet[] }>();
@@ -175,14 +176,36 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     });
   }
 
+  private updateCombinedBoundsAndFit(fitCamera = false): Bounds | null {
+    if (!this.world) return null;
+    const combined = new THREE.Box3();
+    for (const entry of this.modelsMap.values()) {
+      if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
+        combined.union(entry.model.box);
+      }
+    }
+    if (!combined.isEmpty()) {
+      this.modelBounds = {
+        min: [combined.min.x, -combined.max.z, combined.min.y],
+        max: [combined.max.x, -combined.min.z, combined.max.y],
+      };
+      if (fitCamera) {
+        this.world.camera.controls.fitToBox(combined, true);
+      }
+      return this.modelBounds;
+    }
+    return null;
+  }
+
   dispose(): void {
     this.disposed = true;
-    if (this.fragments && this.world) {
-      for (const [, model] of this.fragments.list) {
-        this.world.scene.three.remove(model.object);
-        model.dispose();
+    if (this.world) {
+      for (const [, entry] of this.modelsMap) {
+        this.world.scene.three.remove(entry.model.object);
+        entry.model.dispose();
       }
-      this.fragments.list.clear();
+      this.modelsMap.clear();
+      this.propertiesCache.clear();
     }
     if (this.components) {
       this.components.dispose();
@@ -203,6 +226,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     file: ArrayBuffer | Uint8Array,
     name: string,
     onProgress?: (percent: number, status?: string) => void,
+    options?: { append?: boolean },
   ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel }>> {
     if (this.disposed) return fail('failed', 'Adapter has been disposed.');
     if (this.initializedPromise) {
@@ -213,12 +237,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     try {
-      // Clear old models
-      for (const [, oldModel] of this.fragments.list) {
-        this.world.scene.three.remove(oldModel.object);
-        oldModel.dispose();
+      if (!options?.append) {
+        // Clear old models if not in append mode
+        for (const [, entry] of this.modelsMap) {
+          this.world.scene.three.remove(entry.model.object);
+          entry.model.dispose();
+        }
+        this.modelsMap.clear();
+        this.propertiesCache.clear();
       }
-      this.fragments.list.clear();
 
       const buffer = file instanceof Uint8Array ? file : new Uint8Array(file);
 
@@ -235,17 +262,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.activeModel = model;
       this.world.scene.three.add(model.object);
       this.fragments.core.update(true);
-
-      const bbox = model.box;
-      if (bbox && !bbox.isEmpty()) {
-        this.world.camera.controls.fitToBox(bbox, true);
-        this.modelBounds = {
-          min: [bbox.min.x, -bbox.max.z, bbox.min.y],
-          max: [bbox.max.x, -bbox.min.z, bbox.max.y],
-        };
-      } else {
-        this.modelBounds = { min: [-10, -10, 0], max: [10, 10, 10] };
-      }
 
       onProgress?.(85, 'Đang phân tích cây không gian...');
       const metadata = await model.getMetadata().catch(() => ({}));
@@ -287,19 +303,70 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         fileSize: buffer.byteLength,
       });
 
+      this.modelsMap.set(name, { model, jnnModel });
       this.parsedModel = jnnModel;
-      this.propertiesCache.clear();
+      this.updateCombinedBoundsAndFit(true);
       onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
 
       return ok({
         elementCount: jnnModel.elements.length,
-        bounds: this.modelBounds,
+        bounds: this.modelBounds ?? { min: [-10, -10, 0], max: [10, 10, 10] },
         model: jnnModel,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return fail('failed', `Failed to load IFC file "${name}": ${message}`);
     }
+  }
+
+  removeModel(modelId: string): AdapterResult {
+    const entry = this.modelsMap.get(modelId);
+    if (!entry) {
+      return fail('not-found', `Model with ID "${modelId}" not found.`);
+    }
+    if (this.world) {
+      this.world.scene.three.remove(entry.model.object);
+    }
+    entry.model.dispose();
+    this.modelsMap.delete(modelId);
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+    for (const key of [...this.propertiesCache.keys()]) {
+      if (key.startsWith(`${modelId}:`)) {
+        this.propertiesCache.delete(key);
+      }
+    }
+    if (this.activeModel === entry.model) {
+      this.activeModel = this.modelsMap.values().next().value?.model ?? null;
+    }
+    this.updateCombinedBoundsAndFit(false);
+    return okVoid;
+  }
+
+  setModelVisibility(modelId: string, visible: boolean): AdapterResult {
+    const entry = this.modelsMap.get(modelId);
+    if (!entry) {
+      return fail('not-found', `Model with ID "${modelId}" not found.`);
+    }
+    entry.model.object.visible = visible;
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+    return okVoid;
+  }
+
+  fitToModel(modelId: string): AdapterResult {
+    const entry = this.modelsMap.get(modelId);
+    if (!entry || !this.world) {
+      return fail('not-found', `Model with ID "${modelId}" not found.`);
+    }
+    const box = entry.model.box;
+    if (box && !box.isEmpty()) {
+      this.world.camera.controls.fitToBox(box, true);
+      return okVoid;
+    }
+    return fail('failed', 'Model has empty bounding box.');
   }
 
   getModelBounds(): AdapterResult<Bounds> {
@@ -313,13 +380,18 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   fitToView(_ids?: readonly string[]): AdapterResult {
-    if (!this.world || !this.activeModel) return fail('not-loaded', 'No active model to fit.');
-    const bbox = this.activeModel.box;
-    if (bbox && !bbox.isEmpty()) {
-      this.world.camera.controls.fitToBox(bbox, true);
+    if (!this.world || this.modelsMap.size === 0) return fail('not-loaded', 'No active model to fit.');
+    const combined = new THREE.Box3();
+    for (const entry of this.modelsMap.values()) {
+      if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
+        combined.union(entry.model.box);
+      }
+    }
+    if (!combined.isEmpty()) {
+      this.world.camera.controls.fitToBox(combined, true);
       return okVoid;
     }
-    return fail('failed', 'Model has empty bounding box.');
+    return fail('failed', 'Models have empty bounding box.');
   }
 
   setViewPreset(preset: ViewPreset): AdapterResult {
@@ -411,16 +483,19 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.propertiesCache.has(id)) {
       return ok(this.propertiesCache.get(id)!);
     }
-    if (!this.activeModel) return fail('not-loaded', 'No active IFC model.');
+    const parts = id.split(':');
+    const localId = Number(parts[parts.length - 1]);
+    const modelId = parts.slice(0, parts.length - 1).join(':');
+    if (isNaN(localId)) {
+      return fail('invalid-argument', `Invalid element ID format: ${id}`);
+    }
+
+    const entry = this.modelsMap.get(modelId) ?? this.modelsMap.values().next().value;
+    const targetModel = entry?.model ?? this.activeModel;
+    if (!targetModel) return fail('not-loaded', 'No active IFC model.');
 
     try {
-      const parts = id.split(':');
-      const localId = Number(parts[parts.length - 1]);
-      if (isNaN(localId)) {
-        return fail('invalid-argument', `Invalid element ID format: ${id}`);
-      }
-
-      const items = await (this.activeModel as any).getItemsData([localId], {
+      const items = await (targetModel as any).getItemsData([localId], {
         attributesDefault: true,
         relations: {
           IsDefinedBy: {
@@ -435,7 +510,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
       const rawItem = items?.[0] as any;
       const parsed = parseItemPropertiesAndQuantities(rawItem);
-      const baseEl: JnnElement | undefined = this.parsedModel?.elements.find((e) => e.id === id);
+      const baseEl: JnnElement | undefined = entry?.jnnModel.elements.find((e) => e.id === id) ?? this.parsedModel?.elements.find((e) => e.id === id);
 
       const element: JnnElement = baseEl
         ? {

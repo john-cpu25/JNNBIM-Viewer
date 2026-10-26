@@ -1,5 +1,5 @@
-import type { JnnElement, JnnModel } from '../domain/model';
-import { indexElements } from '../domain/model';
+import type { FederatedModel, JnnElement, JnnModel } from '../domain/model';
+import { createFederatedModel, indexElements } from '../domain/model';
 import {
   allBranchIds,
   ancestorIds,
@@ -22,10 +22,11 @@ export interface Notice {
 
 export interface AppState {
   model: JnnModel;
+  models: FederatedModel[];
   byId: Map<string, JnnElement>;
-  trees: Record<TreeMode, TreeNode>;
+  trees: Record<'spatial' | 'category', TreeNode>;
   treeMode: TreeMode;
-  expanded: Record<TreeMode, Set<string>>;
+  expanded: Record<'spatial' | 'category', Set<string>>;
   search: string;
   /** Ordered; last item is the "primary" selection shown in Properties. */
   selection: string[];
@@ -63,14 +64,28 @@ export type Action =
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
   | { type: 'dismissNotice'; id: number }
-  | { type: 'setModel'; model: JnnModel };
+  | { type: 'setModel'; model: JnnModel }
+  | { type: 'appendModel'; model: JnnModel }
+  | { type: 'removeModel'; modelId: string }
+  | { type: 'toggleModelVisibility'; modelId: string; visible?: boolean };
 
 let noticeSeq = 1;
 
 export function createInitialState(model: JnnModel, theme: Theme): AppState {
-  const trees = { spatial: buildTree(model, 'spatial'), category: buildTree(model, 'category') };
+  const fed: FederatedModel = {
+    modelId: model.modelId,
+    name: model.name,
+    fileName: model.name,
+    schema: model.ifcSchema,
+    elementCount: model.elements.length,
+    visible: true,
+    jnnModel: model,
+  };
+  const models = [fed];
+  const trees = { spatial: buildTree(model, 'spatial', models), category: buildTree(model, 'category', models) };
   return {
     model,
+    models,
     byId: indexElements(model),
     trees,
     treeMode: 'spatial',
@@ -136,15 +151,20 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'setTreeMode':
       return { ...state, treeMode: action.mode };
     case 'toggleExpanded': {
+      if (state.treeMode === 'models') return state;
       const s = new Set(state.expanded[state.treeMode]);
       if (s.has(action.nodeId)) s.delete(action.nodeId);
       else s.add(action.nodeId);
       return { ...state, expanded: { ...state.expanded, [state.treeMode]: s } };
     }
-    case 'expandAll':
+    case 'expandAll': {
+      if (state.treeMode === 'models') return state;
       return { ...state, expanded: { ...state.expanded, [state.treeMode]: new Set(allBranchIds(state.trees[state.treeMode])) } };
-    case 'collapseAll':
+    }
+    case 'collapseAll': {
+      if (state.treeMode === 'models') return state;
       return { ...state, expanded: { ...state.expanded, [state.treeMode]: defaultExpanded(state.trees[state.treeMode]) } };
+    }
     case 'setSearch':
       return { ...state, search: action.query };
     case 'setSection':
@@ -173,6 +193,67 @@ export function reducer(state: AppState, action: Action): AppState {
         explorerOpen: state.explorerOpen,
         propertiesOpen: state.propertiesOpen,
         mobilePane: state.mobilePane,
+      };
+    }
+    case 'appendModel': {
+      const fed: FederatedModel = {
+        modelId: action.model.modelId,
+        name: action.model.name,
+        fileName: action.model.name,
+        schema: action.model.ifcSchema,
+        elementCount: action.model.elements.length,
+        visible: true,
+        jnnModel: action.model,
+      };
+      const existing = state.models.findIndex((m) => m.modelId === action.model.modelId);
+      const nextModels = existing >= 0
+        ? state.models.map((m, i) => (i === existing ? fed : m))
+        : [...state.models.filter((m) => m.modelId !== 'empty'), fed];
+      const combined = createFederatedModel(nextModels);
+      const byId = indexElements(combined);
+      const trees = {
+        spatial: buildTree(combined, 'spatial', nextModels),
+        category: buildTree(combined, 'category', nextModels),
+      };
+      return {
+        ...state,
+        model: combined,
+        models: nextModels,
+        byId,
+        trees,
+        expanded: { spatial: defaultExpanded(trees.spatial), category: defaultExpanded(trees.category) },
+      };
+    }
+    case 'removeModel': {
+      const nextModels = state.models.filter((m) => m.modelId !== action.modelId);
+      const combined = createFederatedModel(nextModels);
+      const byId = indexElements(combined);
+      const trees = {
+        spatial: buildTree(combined, 'spatial', nextModels),
+        category: buildTree(combined, 'category', nextModels),
+      };
+      return {
+        ...state,
+        model: combined,
+        models: nextModels,
+        byId,
+        trees,
+        selection: state.selection.filter((id) => byId.has(id)),
+        expanded: { spatial: defaultExpanded(trees.spatial), category: defaultExpanded(trees.category) },
+      };
+    }
+    case 'toggleModelVisibility': {
+      const target = state.models.find((m) => m.modelId === action.modelId);
+      if (!target) return state;
+      const isNowVisible = action.visible !== undefined ? action.visible : !target.visible;
+      const nextModels = state.models.map((m) => (m.modelId === action.modelId ? { ...m, visible: isNowVisible } : m));
+      const targetIds = target.jnnModel.elements.map((e) => e.id);
+      const visibility = isNowVisible ? show(state.visibility, targetIds) : hide(state.visibility, targetIds);
+      return {
+        ...state,
+        models: nextModels,
+        visibility,
+        selection: isNowVisible ? state.selection : state.selection.filter((id) => !targetIds.includes(id)),
       };
     }
   }

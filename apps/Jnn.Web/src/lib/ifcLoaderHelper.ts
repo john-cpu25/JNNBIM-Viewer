@@ -5,6 +5,7 @@ import { JNN_SCHEMA_VERSION, type JnnModel } from '../domain/model';
 
 export interface LoadIfcOptions {
   onProgress?: (percent: number, status?: string) => void;
+  append?: boolean;
 }
 
 export async function loadIfcFile(
@@ -47,11 +48,20 @@ export async function loadIfcFile(
       return false;
     }
 
-    dispatch({ type: 'notify', tone: 'info', text: `Đang phân tích và chuyển đổi mô hình IFC: ${filename}...` });
-
-    const result = await viewer.loadIfc(buffer, filename, (percent, status) => {
-      options?.onProgress?.(percent, status);
+    dispatch({
+      type: 'notify',
+      tone: 'info',
+      text: `${options?.append ? 'Đang thêm' : 'Đang nạp'} mô hình IFC: ${filename}...`,
     });
+
+    const result = await viewer.loadIfc(
+      buffer,
+      filename,
+      (percent, status) => {
+        options?.onProgress?.(percent, status);
+      },
+      { append: options?.append },
+    );
 
     if (!result.ok) {
       dispatch({ type: 'notify', tone: 'error', text: result.message });
@@ -73,12 +83,21 @@ export async function loadIfcFile(
       elements: [],
     };
 
-    dispatch({ type: 'setModel', model: ifcModel });
-    dispatch({
-      type: 'notify',
-      tone: 'info',
-      text: `Mở thành công "${filename}" với ${result.value.elementCount} cấu kiện.`,
-    });
+    if (options?.append) {
+      dispatch({ type: 'appendModel', model: ifcModel });
+      dispatch({
+        type: 'notify',
+        tone: 'info',
+        text: `Đã thêm mô hình "${filename}" với ${result.value.elementCount} cấu kiện.`,
+      });
+    } else {
+      dispatch({ type: 'setModel', model: ifcModel });
+      dispatch({
+        type: 'notify',
+        tone: 'info',
+        text: `Mở thành công "${filename}" với ${result.value.elementCount} cấu kiện.`,
+      });
+    }
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

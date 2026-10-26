@@ -88,7 +88,11 @@ export interface ViewerAdapter {
     file: ArrayBuffer | Uint8Array,
     name: string,
     onProgress?: (percent: number, status?: string) => void,
+    options?: { append?: boolean },
   ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel }>>;
+  removeModel?(modelId: string): AdapterResult;
+  setModelVisibility?(modelId: string, visible: boolean): AdapterResult;
+  fitToModel?(modelId: string): AdapterResult;
   getModelBounds(): AdapterResult<Bounds>;
 
   select(ids: readonly string[]): AdapterResult;

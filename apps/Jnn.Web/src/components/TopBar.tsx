@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { FolderOpen, Moon, PanelLeft, PanelRight, Sparkles, Sun } from 'lucide-react';
+import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Sparkles, Sun } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import type { Layout } from '../lib/useLayout';
 import { IconButton } from './ui';
@@ -8,20 +8,26 @@ import { loadIfcFile } from '../lib/ifcLoaderHelper';
 export function TopBar({ layout }: { layout: Layout }) {
   const { state, dispatch, viewer } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const appendFileInputRef = useRef<HTMLInputElement>(null);
   const m = state.model;
   const narrow = layout === 'narrow';
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, append = false) => {
     const file = e.target.files?.[0];
     if (file) {
-      loadIfcFile(file, viewer, dispatch);
+      loadIfcFile(file, viewer, dispatch, { append });
       e.target.value = '';
     }
   };
 
   const onLoadSample = () => {
     const url = new URL('./samples/building-arch-2x3.ifc', window.location.href).href;
-    loadIfcFile(url, viewer, dispatch);
+    loadIfcFile(url, viewer, dispatch, { append: false });
+  };
+
+  const onAppendSampleStruct = () => {
+    const url = new URL('./samples/building-struct-2x3.ifc', window.location.href).href;
+    loadIfcFile(url, viewer, dispatch, { append: true });
   };
 
   return (
@@ -42,6 +48,11 @@ export function TopBar({ layout }: { layout: Layout }) {
         <span className="hidden truncate md:inline">{m.projectName}</span>
         <span className="hidden text-faint md:inline">/</span>
         <span className="truncate font-medium text-ink">{m.name}</span>
+        {state.models.length > 1 && (
+          <span className="rounded bg-accent/20 px-1.5 font-mono text-[10.5px] font-medium text-accent-ink" data-testid="models-count-badge">
+            {state.models.length} models
+          </span>
+        )}
         {m.modelRevisionId && (
           <span className="hidden rounded border border-line px-1.5 font-mono text-[10.5px] sm:inline">{m.modelRevisionId}</span>
         )}
@@ -59,13 +70,21 @@ export function TopBar({ layout }: { layout: Layout }) {
           type="file"
           accept=".ifc"
           className="hidden"
-          onChange={onFileChange}
+          onChange={(e) => onFileChange(e, false)}
           data-testid="ifc-file-input"
+        />
+        <input
+          ref={appendFileInputRef}
+          type="file"
+          accept=".ifc"
+          className="hidden"
+          onChange={(e) => onFileChange(e, true)}
+          data-testid="append-ifc-input"
         />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          title="Mở file IFC từ máy tính"
+          title="Mở file IFC mới (thay thế cảnh hiện tại)"
           data-testid="open-ifc-btn"
           className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
         >
@@ -74,13 +93,33 @@ export function TopBar({ layout }: { layout: Layout }) {
         </button>
         <button
           type="button"
+          onClick={() => appendFileInputRef.current?.click()}
+          title="Thêm mô hình IFC vào cảnh hiện tại (Append federated)"
+          data-testid="append-ifc-btn"
+          className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+        >
+          <FolderPlus size={13} className="text-emerald-500" />
+          <span className="hidden sm:inline">Thêm model</span>
+        </button>
+        <button
+          type="button"
           onClick={onLoadSample}
-          title="Mở mô hình IFC mẫu kiến trúc"
+          title="Mở mô hình IFC mẫu kiến trúc (Building-Architecture)"
           data-testid="open-sample-btn"
           className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-muted transition-colors hover:border-accent hover:text-ink"
         >
           <Sparkles size={13} className="text-accent-ink" />
-          <span className="hidden md:inline">Mẫu IFC</span>
+          <span className="hidden md:inline">Mẫu KT</span>
+        </button>
+        <button
+          type="button"
+          onClick={onAppendSampleStruct}
+          title="Thêm mô hình IFC mẫu kết cấu (Building-Structure federated)"
+          data-testid="append-sample-struct-btn"
+          className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:border-accent hover:text-emerald-500"
+        >
+          <Sparkles size={13} className="text-emerald-500" />
+          <span className="hidden lg:inline">+ Mẫu KC</span>
         </button>
 
         <IconButton

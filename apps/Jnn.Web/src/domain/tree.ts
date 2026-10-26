@@ -13,7 +13,7 @@ export interface TreeNode {
   elementId?: string;
 }
 
-export type TreeMode = 'spatial' | 'category';
+export type TreeMode = 'spatial' | 'category' | 'models';
 
 export const elementNodeId = (elementId: string) => `el:${elementId}`;
 
@@ -41,8 +41,8 @@ function branch(id: string, label: string, kind: TreeNodeKind, children: TreeNod
   return { id, label, kind, children, elementIds: children.flatMap((c) => c.elementIds) };
 }
 
-/** Project › Site › Building › Storey › Category › Element */
-export function buildSpatialTree(model: JnnModel): TreeNode {
+function buildSingleSpatialTree(model: JnnModel, prefix = ''): TreeNode {
+  const pfx = prefix ? `${prefix}:` : '';
   const byStorey = groupBy(model.elements, (e) => e.storey ?? '(Unassigned)');
   const storeyOrder = [...model.storeys.map((s) => s.name), '(Unassigned)'];
   const storeyNodes = storeyOrder
@@ -51,15 +51,27 @@ export function buildSpatialTree(model: JnnModel): TreeNode {
       const els = byStorey.get(name)!;
       const cats = [...groupBy(els, (e) => e.category)].sort(([a], [b]) => a.localeCompare(b));
       return branch(
-        `storey:${si}:${name}`,
+        `${pfx}storey:${si}:${name}`,
         name,
         'storey',
-        cats.map(([cat, ce]) => branch(`storey:${si}:cat:${cat}`, cat, 'category', ce.map(leaf))),
+        cats.map(([cat, ce]) => branch(`${pfx}storey:${si}:cat:${cat}`, cat, 'category', ce.map(leaf))),
       );
     });
-  const building = branch('building', model.buildingName, 'building', storeyNodes);
-  const site = branch('site', model.siteName, 'site', [building]);
-  return branch('project', model.projectName, 'project', [site]);
+  const building = branch(`${pfx}building`, model.buildingName || 'Building', 'building', storeyNodes);
+  const site = branch(`${pfx}site`, model.siteName || 'Site', 'site', [building]);
+  return branch(`${pfx}project`, model.projectName || 'Project', 'project', [site]);
+}
+
+/** Project › Site › Building › Storey › Category › Element (or Federated Models › Model › ...) */
+export function buildSpatialTree(model: JnnModel, models?: Array<{ modelId: string; name: string; jnnModel: JnnModel }>): TreeNode {
+  if (models && models.length > 1) {
+    const modelNodes = models.map((m) => {
+      const single = buildSingleSpatialTree(m.jnnModel, m.modelId);
+      return branch(`model:${m.modelId}`, m.name, 'project', single.children);
+    });
+    return branch('federated:root', 'Federated Models', 'project', modelNodes);
+  }
+  return buildSingleSpatialTree(model);
 }
 
 /** Model › Category › Type › Element */
@@ -81,8 +93,8 @@ export function buildCategoryTree(model: JnnModel): TreeNode {
   );
 }
 
-export function buildTree(model: JnnModel, mode: TreeMode): TreeNode {
-  return mode === 'spatial' ? buildSpatialTree(model) : buildCategoryTree(model);
+export function buildTree(model: JnnModel, mode: TreeMode, models?: Array<{ modelId: string; name: string; jnnModel: JnnModel }>): TreeNode {
+  return mode === 'spatial' ? buildSpatialTree(model, models) : buildCategoryTree(model);
 }
 
 /** Text an element can be found by in the explorer search box. */
