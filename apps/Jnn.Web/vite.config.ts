@@ -10,6 +10,13 @@ import path from 'node:path';
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      'three/examples/jsm/loaders/TTFLoader.js': path.resolve(import.meta.dirname, 'src/lib/emptyLoader.ts'),
+      'three/examples/jsm/loaders/TTFLoader': path.resolve(import.meta.dirname, 'src/lib/emptyLoader.ts'),
+      'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/+esm': path.resolve(import.meta.dirname, 'src/lib/emptyLoader.ts'),
+    },
+  },
   build: {
     target: 'es2022',
     sourcemap: true,

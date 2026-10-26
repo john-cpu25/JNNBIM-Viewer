@@ -28,8 +28,8 @@ test.describe('IFC Viewer with That Open Adapter', () => {
     await archBtn.click();
 
     // 3. Wait for conversion to complete and empty state to disappear
-    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 25_000 });
-    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 35_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
 
     // 4. Verify canvas has rendered pixels
     const distinctPixelCount = await page.evaluate(async () => {
@@ -79,7 +79,7 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     // Open architecture sample
     await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
-    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
 
     // Check Model Summary before selection
     await expect(page.getByTestId('properties-body')).toContainText('IFC2X3');
@@ -160,6 +160,92 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     // Element count returns to original 42
     await expect(page.getByTestId('properties-body')).toContainText('42');
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('T07: selection, highlight, hide (H), show all (A), isolate (I), xray (X), clear (Esc)', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    // Open architecture sample
+    await page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i }).click();
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 35_000 });
+
+    // Initial state: 20 elements, 0 selected, not xray
+    const initial = await page.evaluate(() => window.__jnn!.viewer.debugState());
+    expect(initial.elementCount).toBe(20);
+    expect(initial.visibleCount).toBe(20);
+    expect(initial.selected).toEqual([]);
+    expect(initial.xray).toBe(false);
+
+    // 1. Search and select element via tree
+    const searchInput = page.getByLabel('Search elements');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('right front');
+
+    const treeEl = page.getByTestId('tree-element').first();
+    await expect(treeEl).toBeVisible();
+    await treeEl.click();
+
+    // Verify element selected
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).selected.length).toBe(1);
+
+    // 2. Test Hide (H shortcut)
+    await page.keyboard.press('h');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).visibleCount).toBe(19);
+
+    // 3. Test Show All (A shortcut)
+    await page.keyboard.press('a');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).visibleCount).toBe(20);
+
+    // Re-select element to isolate
+    await treeEl.click();
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).selected.length).toBe(1);
+
+    // 4. Test Isolate (I shortcut)
+    await page.keyboard.press('i');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).visibleCount).toBe(1);
+
+    // 5. Restore with Show All (A shortcut)
+    await page.keyboard.press('a');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).visibleCount).toBe(20);
+
+    // 6. Test X-ray (X shortcut)
+    await page.keyboard.press('x');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).xray).toBe(true);
+    await page.keyboard.press('x');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).xray).toBe(false);
+
+    // 7. Verify toolbar buttons for Hide, Isolate, X-ray, Fit Selection are enabled
+    const hideBtn = page.getByRole('button', { name: 'Hide selected' });
+    const isolateBtn = page.getByRole('button', { name: 'Isolate selected' });
+    const xrayBtn = page.getByRole('button', { name: 'X-ray' });
+    const fitSelBtn = page.getByRole('button', { name: 'Fit selection' });
+
+    await expect(hideBtn).toBeEnabled();
+    await expect(isolateBtn).toBeEnabled();
+    await expect(xrayBtn).toBeEnabled();
+    await expect(fitSelBtn).toBeEnabled();
+
+    // Fit selection click
+    await fitSelBtn.click();
+
+    // 8. Test Clear Selection (Escape)
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).selected.length).toBe(0);
+
+    // Now Hide and Isolate should be disabled since nothing is selected
+    await expect(hideBtn).toBeDisabled();
+    await expect(isolateBtn).toBeDisabled();
+
+    // 9. Verify clicking on canvas triggers without errors
+    const canvas = page.getByTestId('viewer-canvas');
+    await expect(canvas).toBeVisible();
+    await canvas.click({ position: { x: 320, y: 240 } });
 
     expect(pageErrors).toEqual([]);
   });

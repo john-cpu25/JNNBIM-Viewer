@@ -11,9 +11,11 @@
  */
 import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
+import * as OBCF from '@thatopen/components-front';
 import * as WebIFC from 'web-ifc';
 import type { FragmentsModel } from '@thatopen/fragments';
 import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
+import { isVisible, type VisibilityState } from '../domain/visibility';
 import {
   mapIfcToJnnModel,
   parseItemPropertiesAndQuantities,
@@ -28,6 +30,7 @@ import {
   type AdapterResult,
   type Bounds,
   type CameraState,
+  type PickResult,
   type SectionSpec,
   type Vec3,
   type ViewerAdapter,
@@ -82,6 +85,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     'fitToView',
     'camera',
     'getProperties',
+    'select',
+    'visibility',
+    'isolate',
+    'highlight',
+    'xray',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -98,6 +106,16 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private initializedPromise: Promise<void> | null = null;
   private currentProjection: CameraState['projection'] = 'perspective';
   private currentTheme: 'light' | 'dark' = 'dark';
+
+  private selection = new Set<string>();
+  private visibility: VisibilityState = { hidden: new Set(), isolated: new Set() };
+  private activeHighlightStyles = new Set<string>();
+  private xray = false;
+  private highlighter: OBCF.Highlighter | null = null;
+  private pointerDown: { x: number; y: number } | null = null;
+  private lastHoverAt = 0;
+  private hovered: string | null = null;
+  private boundCanvas: HTMLCanvasElement | null = null;
 
   mount(container: HTMLElement): void {
     patchWebIfcOnce();
@@ -132,6 +150,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
     // Setup local worker & wasm
     this.initializedPromise = this.initEngine();
+
+    // Canvas pointer event listeners (≤ 5px drag threshold separation)
+    const canvas = world.renderer.three.domElement;
+    this.boundCanvas = canvas;
+    canvas.setAttribute('data-testid', 'viewer-canvas');
+    canvas.addEventListener('pointerdown', this.onPointerDown);
+    canvas.addEventListener('pointerup', this.onPointerUp);
+    canvas.addEventListener('pointermove', this.onPointerMove);
+    canvas.addEventListener('pointerleave', this.onPointerLeave);
 
     // Camera change event listener
     world.camera.controls.addEventListener('update', () => {
@@ -174,6 +201,39 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         absolute: true,
       },
     });
+
+    // Highlighter setup with accent orange selection and lighter hover
+    const highlighter = this.components.get(OBCF.Highlighter);
+    this.highlighter = highlighter;
+    await highlighter.setup({
+      world: this.world,
+      selectName: 'select',
+      selectMaterialDefinition: {
+        color: new THREE.Color(0xf08c2e),
+        renderedFaces: 0,
+        opacity: 1,
+        transparent: false,
+      },
+    });
+    (highlighter as any).setupEvents(false);
+
+    highlighter.styles.set('hover', {
+      color: new THREE.Color(0xf59f00),
+      renderedFaces: 0,
+      opacity: 0.8,
+      transparent: true,
+    });
+
+    if (this.selection.size > 0) {
+      const modelIdMap = this.toModelIdMap([...this.selection]);
+      highlighter.highlightByID('select', modelIdMap, true, false).catch(() => {});
+    }
+    if (this.visibility.hidden.size > 0 || this.visibility.isolated.size > 0) {
+      this.applyVisibility();
+    }
+    if (this.xray) {
+      this.applyXray();
+    }
   }
 
   private updateCombinedBoundsAndFit(fitCamera = false): Bounds | null {
@@ -199,6 +259,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   dispose(): void {
     this.disposed = true;
+    if (this.boundCanvas) {
+      this.boundCanvas.removeEventListener('pointerdown', this.onPointerDown);
+      this.boundCanvas.removeEventListener('pointerup', this.onPointerUp);
+      this.boundCanvas.removeEventListener('pointermove', this.onPointerMove);
+      this.boundCanvas.removeEventListener('pointerleave', this.onPointerLeave);
+      this.boundCanvas = null;
+    }
+    if (this.highlighter) {
+      this.highlighter.dispose();
+      this.highlighter = null;
+    }
     if (this.world) {
       for (const [, entry] of this.modelsMap) {
         this.world.scene.three.remove(entry.model.object);
@@ -306,6 +377,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.modelsMap.set(name, { model, jnnModel });
       this.parsedModel = jnnModel;
       this.updateCombinedBoundsAndFit(true);
+      if (this.selection.size > 0) {
+        this.select([...this.selection]);
+      }
+      if (this.visibility.hidden.size > 0 || this.visibility.isolated.size > 0) {
+        this.applyVisibility();
+      }
+      if (this.xray) {
+        this.applyXray();
+      }
       onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
 
       return ok({
@@ -379,8 +459,24 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
   }
 
-  fitToView(_ids?: readonly string[]): AdapterResult {
+  fitToView(ids?: readonly string[]): AdapterResult {
     if (!this.world || this.modelsMap.size === 0) return fail('not-loaded', 'No active model to fit.');
+
+    if (ids && ids.length > 0) {
+      const modelIdMap = this.toModelIdMap(ids);
+      let hasItems = false;
+      for (const set of Object.values(modelIdMap)) {
+        if (set.size > 0) {
+          hasItems = true;
+          break;
+        }
+      }
+      if (hasItems && this.highlighter) {
+        (this.highlighter as any).zoomSelection(modelIdMap).catch(console.error);
+        return okVoid;
+      }
+    }
+
     const combined = new THREE.Box3();
     for (const entry of this.modelsMap.values()) {
       if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
@@ -471,26 +567,66 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
   }
 
-  projectToScreen(_id: string): AdapterResult<{ x: number; y: number; onScreen: boolean }> {
-    return fail('unsupported', 'projectToScreen not implemented for ThatOpenViewerAdapter.');
+  projectToScreen(id: string): AdapterResult<{ x: number; y: number; onScreen: boolean }> {
+    if (!this.world || !this.world.renderer) return fail('not-loaded', 'Viewer is not mounted.');
+    const { targetModelId } = this.parseElementId(id);
+    const entry = this.modelsMap.get(targetModelId) ?? this.modelsMap.values().next().value;
+    const box = entry?.model.box;
+    if (!box || box.isEmpty()) return fail('not-found', `Element not found: ${id}`);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const v = center.clone().project(this.world.camera.three);
+    const dom = this.world.renderer.three.domElement;
+    const w = dom.clientWidth;
+    const h = dom.clientHeight;
+    return ok({
+      x: ((v.x + 1) / 2) * w,
+      y: ((1 - v.y) / 2) * h,
+      onScreen: v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1,
+    });
   }
 
-  select(_ids: readonly string[]): AdapterResult {
-    return fail('unsupported', 'Element selection will be available in T07.');
+  select(ids: readonly string[]): AdapterResult {
+    if (ids.length > 0) {
+      let anyFound = false;
+      for (const id of ids) {
+        const { targetModelId, localId } = this.parseElementId(id);
+        const entry = this.modelsMap.get(targetModelId);
+        if (entry && (entry.jnnModel.elements.some((e) => e.id === id) || localId !== -1)) {
+          anyFound = true;
+          break;
+        }
+      }
+      if (!anyFound) {
+        return fail('not-found', 'None of the requested elements exist in loaded models.');
+      }
+    }
+
+    this.selection = new Set(ids);
+    if (this.highlighter) {
+      if (ids.length === 0) {
+        this.highlighter.clear('select').catch((err) => console.warn('highlighter.clear failed:', err));
+      } else {
+        const modelIdMap = this.toModelIdMap(ids);
+        this.highlighter.highlightByID('select', modelIdMap, true, false).catch((err) => console.warn('highlightByID failed:', err));
+      }
+    }
+    if (this.xray) {
+      this.applyXray();
+    }
+    return okVoid;
   }
 
   async getProperties(id: string): Promise<AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>> {
     if (this.propertiesCache.has(id)) {
       return ok(this.propertiesCache.get(id)!);
     }
-    const parts = id.split(':');
-    const localId = Number(parts[parts.length - 1]);
-    const modelId = parts.slice(0, parts.length - 1).join(':');
-    if (isNaN(localId)) {
+    const { targetModelId, localId } = this.parseElementId(id);
+    if (localId === -1) {
       return fail('invalid-argument', `Invalid element ID format: ${id}`);
     }
 
-    const entry = this.modelsMap.get(modelId) ?? this.modelsMap.values().next().value;
+    const entry = this.modelsMap.get(targetModelId) ?? this.modelsMap.values().next().value;
     const targetModel = entry?.model ?? this.activeModel;
     if (!targetModel) return fail('not-loaded', 'No active IFC model.');
 
@@ -549,25 +685,275 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
   }
 
-  setHidden(_ids: readonly string[]): AdapterResult {
-    return fail('unsupported', 'Hide element will be available in T07.');
+  setHidden(ids: readonly string[]): AdapterResult {
+    this.visibility = { hidden: new Set(ids), isolated: this.visibility.isolated };
+    this.applyVisibility();
+    return okVoid;
   }
 
-  isolate(_ids: readonly string[]): AdapterResult {
-    return fail('unsupported', 'Isolate element will be available in T07.');
+  isolate(ids: readonly string[]): AdapterResult {
+    this.visibility = { hidden: this.visibility.hidden, isolated: new Set(ids) };
+    this.applyVisibility();
+    return okVoid;
   }
 
   setSection(_spec: SectionSpec | null): AdapterResult {
     return fail('unsupported', 'Section clipper will be available in T08.');
   }
 
-  highlight(_ids: readonly string[] | null, _color?: string): AdapterResult {
-    return fail('unsupported', 'Element highlight will be available in T07.');
+  highlight(ids: readonly string[] | null, color = '#2f9e44'): AdapterResult {
+    if (!ids) {
+      if (this.highlighter) {
+        for (const styleName of this.activeHighlightStyles) {
+          this.highlighter.clear(styleName).catch(console.error);
+        }
+      }
+      this.activeHighlightStyles.clear();
+      return okVoid;
+    }
+
+    const cleanColor = color.replace('#', '');
+    const styleName = `hl_${cleanColor}`;
+    if (this.highlighter) {
+      if (!this.highlighter.styles.has(styleName)) {
+        this.highlighter.styles.set(styleName, {
+          color: new THREE.Color(color),
+          renderedFaces: 0,
+          opacity: 1,
+          transparent: false,
+        });
+      }
+      const modelIdMap = this.toModelIdMap(ids);
+      this.highlighter.highlightByID(styleName, modelIdMap, true, false).catch(console.error);
+    }
+    this.activeHighlightStyles.add(styleName);
+    return okVoid;
   }
 
-  setXray(_enabled: boolean): AdapterResult {
-    return fail('unsupported', 'X-ray mode will be available in T07.');
+  setXray(enabled: boolean): AdapterResult {
+    this.xray = enabled;
+    this.applyXray();
+    return okVoid;
   }
+
+  debugState() {
+    let totalElements = 0;
+    for (const entry of this.modelsMap.values()) {
+      totalElements += entry.jnnModel.elements.length;
+    }
+    const isIsolated = this.visibility.isolated.size > 0;
+    let visibleCount = totalElements;
+    if (isIsolated) {
+      let count = 0;
+      for (const id of this.visibility.isolated) {
+        if (!this.visibility.hidden.has(id)) count++;
+      }
+      visibleCount = count;
+    } else {
+      visibleCount = Math.max(0, totalElements - this.visibility.hidden.size);
+    }
+
+    return {
+      elementCount: totalElements,
+      visibleCount,
+      selected: [...this.selection],
+      clipPlaneCount: 0,
+      projection: this.currentProjection,
+      xray: this.xray,
+    };
+  }
+
+  private parseElementId(id: string): { targetModelId: string; localId: number } {
+    const lastColon = id.lastIndexOf(':');
+    if (lastColon === -1) {
+      const num = Number(id);
+      const fallbackModelId = this.modelsMap.keys().next().value ?? '';
+      return { targetModelId: fallbackModelId, localId: isNaN(num) ? -1 : num };
+    }
+    const modelId = id.slice(0, lastColon);
+    const localId = Number(id.slice(lastColon + 1));
+    let targetModelId = modelId;
+    if (!this.modelsMap.has(targetModelId) && this.modelsMap.size === 1) {
+      targetModelId = this.modelsMap.keys().next().value!;
+    }
+    return { targetModelId, localId: isNaN(localId) ? -1 : localId };
+  }
+
+  private toModelIdMap(ids: readonly string[]): Record<string, Set<number>> {
+    const map: Record<string, Set<number>> = {};
+    for (const id of ids) {
+      const { targetModelId, localId } = this.parseElementId(id);
+      if (localId === -1 || !targetModelId) continue;
+      if (!map[targetModelId]) {
+        map[targetModelId] = new Set<number>();
+      }
+      map[targetModelId].add(localId);
+    }
+    return map;
+  }
+
+  private applyVisibility(): void {
+    if (!this.fragments) return;
+
+    const isIsolated = this.visibility.isolated.size > 0;
+    const isHidden = this.visibility.hidden.size > 0;
+
+    for (const [modelId, entry] of this.modelsMap) {
+      const model = entry.model;
+
+      if (!isIsolated && !isHidden) {
+        model.setVisible(undefined, true).catch((err) => console.warn('setVisible failed:', err));
+        continue;
+      }
+
+      if (isIsolated) {
+        model.setVisible(undefined, false).then(() => {
+          const toShow: number[] = [];
+          for (const id of this.visibility.isolated) {
+            if (this.visibility.hidden.has(id)) continue;
+            const { targetModelId, localId } = this.parseElementId(id);
+            if (targetModelId === modelId && localId !== -1) {
+              toShow.push(localId);
+            }
+          }
+          if (toShow.length > 0) {
+            model.setVisible(toShow, true).catch((err) => console.warn('setVisible failed:', err));
+          }
+          this.fragments?.core.update(true);
+        }).catch((err) => console.warn('setVisible failed:', err));
+      } else {
+        const toHide: number[] = [];
+        for (const id of this.visibility.hidden) {
+          const { targetModelId, localId } = this.parseElementId(id);
+          if (targetModelId === modelId && localId !== -1) {
+            toHide.push(localId);
+          }
+        }
+        model.setVisible(undefined, true).then(() => {
+          if (toHide.length > 0) {
+            model.setVisible(toHide, false).catch((err) => console.warn('setVisible failed:', err));
+          }
+          this.fragments?.core.update(true);
+        }).catch((err) => console.warn('setVisible failed:', err));
+      }
+    }
+
+    this.fragments.core.update(true);
+  }
+
+  private applyXray(): void {
+    for (const [modelId, entry] of this.modelsMap) {
+      if (this.xray) {
+        const selectedLocalIds: number[] = [];
+        for (const id of this.selection) {
+          const { targetModelId, localId } = this.parseElementId(id);
+          if (targetModelId === modelId && localId !== -1) {
+            selectedLocalIds.push(localId);
+          }
+        }
+        entry.model.setGhostItems(selectedLocalIds, true).catch(() => {});
+      } else {
+        entry.model.clearGhost();
+      }
+    }
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+  }
+
+  async pickAt(clientX: number, clientY: number): Promise<PickResult | null> {
+    if (!this.world || !this.world.renderer || this.modelsMap.size === 0) return null;
+    const dom = this.world.renderer.three.domElement;
+    const rect = dom.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    const position = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+
+    try {
+      const raycasters = this.components?.get(OBC.Raycasters);
+      const raycaster = raycasters?.get(this.world);
+      if (!raycaster) return null;
+
+      const hit = (await raycaster.castRay({ position })) as any;
+      if (!hit || hit.localId === undefined || hit.localId === null) return null;
+
+      let matchedEntry: { model: FragmentsModel; jnnModel: JnnModel } | undefined;
+      for (const entry of this.modelsMap.values()) {
+        if (entry.model === hit.fragments || entry.model.modelId === (hit as any).modelId) {
+          matchedEntry = entry;
+          break;
+        }
+      }
+      if (!matchedEntry) {
+        matchedEntry = this.modelsMap.values().next().value;
+      }
+      if (!matchedEntry) return null;
+
+      const elementId = `${matchedEntry.jnnModel.modelId}:${hit.localId}`;
+      if (!isVisible(elementId, this.visibility)) return null;
+
+      const point = hit.point ? toModel(hit.point) : ([0, 0, 0] as Vec3);
+      return { elementId, point };
+    } catch (err) {
+      console.warn('pickAt failed:', err);
+      return null;
+    }
+  }
+
+  private onPointerDown = (ev: PointerEvent) => {
+    if (ev.button !== 0) return;
+    this.pointerDown = { x: ev.clientX, y: ev.clientY };
+  };
+
+  private onPointerUp = async (ev: PointerEvent) => {
+    const d = this.pointerDown;
+    this.pointerDown = null;
+    if (!d || ev.button !== 0) return;
+    const moved = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
+    if (moved > 5) return;
+    const hit = await this.pickAt(ev.clientX, ev.clientY);
+    this.events.emit('pick', {
+      result: hit,
+      additive: ev.ctrlKey || ev.metaKey || ev.shiftKey,
+    });
+  };
+
+  private onPointerMove = async (ev: PointerEvent) => {
+    if (ev.buttons !== 0 || ev.pointerType === 'touch') return;
+    const now = performance.now();
+    if (now - this.lastHoverAt < 40) return;
+    this.lastHoverAt = now;
+    const hit = await this.pickAt(ev.clientX, ev.clientY);
+    const id = hit?.elementId ?? null;
+    if (id !== this.hovered) {
+      this.hovered = id;
+      if (this.world?.renderer?.three?.domElement) {
+        this.world.renderer.three.domElement.style.cursor = id ? 'pointer' : 'default';
+      }
+      if (this.highlighter) {
+        if (id) {
+          const modelIdMap = this.toModelIdMap([id]);
+          this.highlighter.highlightByID('hover', modelIdMap, true, false).catch(() => {});
+        } else {
+          this.highlighter.clear('hover').catch(() => {});
+        }
+      }
+      this.events.emit('hover', { elementId: id });
+    }
+  };
+
+  private onPointerLeave = () => {
+    if (this.hovered) {
+      this.hovered = null;
+      if (this.highlighter) {
+        this.highlighter.clear('hover').catch(() => {});
+      }
+      this.events.emit('hover', { elementId: null });
+    }
+  };
 
   on<K extends keyof ViewerEvents>(event: K, handler: (payload: ViewerEvents[K]) => void): () => void {
     return this.events.on(event, handler);
