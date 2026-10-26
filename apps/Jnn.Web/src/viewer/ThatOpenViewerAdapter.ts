@@ -267,6 +267,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     const combined = new THREE.Box3();
     for (const entry of this.modelsMap.values()) {
       if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
+        entry.model.object.updateMatrixWorld?.(true);
         combined.union(entry.model.box);
       }
     }
@@ -324,6 +325,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.modelsMap.clear();
       this.propertiesCache.clear();
     }
+    if (this.fragments) {
+      this.fragments.core.baseCoordinates = null;
+      this.fragments.baseCoordinationModel = '';
+      this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+    }
     if (this.components) {
       this.components.dispose();
       this.components = null;
@@ -375,12 +381,29 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
             }
             this.modelsMap.clear();
             this.propertiesCache.clear();
+            if (this.fragments) {
+              this.fragments.core.baseCoordinates = null;
+              this.fragments.baseCoordinationModel = '';
+              this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+            }
+          }
+
+          if (this.fragments) {
+            this.fragments.core.settings.autoCoordinate = true;
           }
 
           const model = await this.fragments.core.load(new Uint8Array(cached.fragBuffer), {
             modelId: name,
             camera: this.world.camera.three,
           });
+
+          // Model coordination: FragmentsModels with autoCoordinate = true coordinates relative to base model
+          const coordMatrix = await model.getCoordinationMatrix().catch(() => new THREE.Matrix4());
+          if (this.fragments && !this.fragments.baseCoordinationModel) {
+            this.fragments.baseCoordinationModel = name;
+            this.fragments.baseCoordinationMatrix = coordMatrix;
+          }
+          model.object.updateMatrixWorld?.(true);
 
           this.activeModel = model;
           if (this.clipPlanes.length > 0) {
@@ -423,9 +446,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         }
         this.modelsMap.clear();
         this.propertiesCache.clear();
+        if (this.fragments) {
+          this.fragments.core.baseCoordinates = null;
+          this.fragments.baseCoordinationModel = '';
+          this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+        }
       }
 
-      const model = await this.ifcLoader.load(buffer, false, name, {
+      const model = await this.ifcLoader.load(buffer, true, name, {
         processData: {
           progressCallback: (p: any) => {
             if (onProgress && p?.progress !== undefined) {
@@ -434,6 +462,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
           },
         },
       });
+
+      // Model coordination: FragmentsModels with autoCoordinate = true coordinates relative to base model
+      const coordMatrix = await model.getCoordinationMatrix().catch(() => new THREE.Matrix4());
+      if (this.fragments && !this.fragments.baseCoordinationModel) {
+        this.fragments.baseCoordinationModel = name;
+        this.fragments.baseCoordinationMatrix = coordMatrix;
+      }
+      model.object.updateMatrixWorld?.(true);
 
       this.activeModel = model;
       if (this.clipPlanes.length > 0) {
@@ -469,7 +505,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
 
       onProgress?.(92, 'Đang đọc thuộc tính các cấu kiện...');
-      const itemsBasicData = await model.getItemsData(elementLocalIds, { attributesDefault: true }).catch(() => []);
+      // Chunk getItemsData in batches of 200 with yielding to prevent blocking the main thread (B2)
+      const itemsBasicData: any[] = [];
+      const CHUNK_SIZE = 200;
+      for (let i = 0; i < elementLocalIds.length; i += CHUNK_SIZE) {
+        const chunk = elementLocalIds.slice(i, i + CHUNK_SIZE);
+        const chunkData = await model.getItemsData(chunk, { attributesDefault: true }).catch(() => []);
+        itemsBasicData.push(...chunkData);
+        if (i + CHUNK_SIZE < elementLocalIds.length) {
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
 
       const jnnModel = mapIfcToJnnModel({
         modelId: name,
@@ -550,6 +596,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.activeModel === entry.model) {
       this.activeModel = this.modelsMap.values().next().value?.model ?? null;
     }
+    if (this.modelsMap.size === 0 && this.fragments) {
+      this.fragments.baseCoordinationModel = '';
+      this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+    }
     this.updateCombinedBoundsAndFit(false);
     return okVoid;
   }
@@ -579,7 +629,19 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return fail('failed', 'Model has empty bounding box.');
   }
 
-  getModelBounds(): AdapterResult<Bounds> {
+  getModelBounds(modelId?: string): AdapterResult<Bounds> {
+    if (modelId) {
+      const entry = this.modelsMap.get(modelId);
+      if (!entry || !entry.model.box || entry.model.box.isEmpty()) {
+        return fail('not-found', `Model "${modelId}" bounds not found.`);
+      }
+      entry.model.object.updateMatrixWorld?.(true);
+      const worldBox = entry.model.box;
+      return ok({
+        min: [worldBox.min.x, -worldBox.max.z, worldBox.min.y],
+        max: [worldBox.max.x, -worldBox.min.z, worldBox.max.y],
+      });
+    }
     if (this.modelBounds) return ok(this.modelBounds);
     const updated = this.updateCombinedBoundsAndFit(false);
     if (updated) return ok(updated);
@@ -1055,6 +1117,20 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       clipPlaneCount: this.clipPlanes.length,
       projection: this.currentProjection,
       xray: this.xray,
+      models: [...this.modelsMap.entries()].map(([id, entry]) => {
+        entry.model.object.updateMatrixWorld?.(true);
+        const worldBox = entry.model.box && !entry.model.box.isEmpty() ? entry.model.box : null;
+        return {
+          id,
+          elementCount: entry.jnnModel.elements.length,
+          bounds: worldBox
+            ? {
+                min: [worldBox.min.x, -worldBox.max.z, worldBox.min.y],
+                max: [worldBox.max.x, -worldBox.min.z, worldBox.max.y],
+              }
+            : null,
+        };
+      }),
     };
   }
 

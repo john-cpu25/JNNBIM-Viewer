@@ -93,7 +93,7 @@ export interface ViewerAdapter {
   removeModel?(modelId: string): AdapterResult;
   setModelVisibility?(modelId: string, visible: boolean): AdapterResult;
   fitToModel?(modelId: string): AdapterResult;
-  getModelBounds(): AdapterResult<Bounds>;
+  getModelBounds(modelId?: string): AdapterResult<Bounds>;
 
   select(ids: readonly string[]): AdapterResult;
   getProperties(
