@@ -100,11 +100,27 @@ describe('reducer', () => {
 });
 
 describe('defaultPlane', () => {
-  it('cuts plans 1.5 m above the lowest point', () => {
-    const p = defaultPlane('z', { min: [0, 0, -0.25], max: [10, 10, 12] });
-    expect(p).toEqual({ kind: 'plane', axis: 'z', offset: 1.25, flipped: false });
-  });
   it('cuts vertical sections through the middle', () => {
     expect(defaultPlane('x', { min: [0, 0, 0], max: [24, 10, 12] }).offset).toBe(12);
+    expect(defaultPlane('y', { min: [0, 0, 0], max: [10, 30, 12] }).offset).toBe(15);
+  });
+
+  it('cuts Z plan at 1.2m above architectural ground storey when storeys are present (FIX-B6)', () => {
+    // Clinic model case: deep foundations at -11.4m, ground floor at 0.0m, upper floors at 4m and 8m
+    const clinicBounds = { min: [-52.9, -19.9, -11.4] as Vec3, max: [2.7, 57.1, 13.8] as Vec3 };
+    const storeys = [
+      { elevation: 0.0, name: 'First Floor' },
+      { elevation: 4.0, name: 'Second Floor' },
+      { elevation: 8.0, name: 'Third Floor' },
+    ];
+    const p = defaultPlane('z', clinicBounds, storeys);
+    expect(p).toEqual({ kind: 'plane', axis: 'z', offset: 1.2, flipped: false });
+  });
+
+  it('cuts Z plan fallback appropriately when storeys are absent', () => {
+    // Model with underground piles without storey metadata -> sets 1.2m ground cut
+    expect(defaultPlane('z', { min: [0, 0, -5.0], max: [10, 10, 15] }).offset).toBe(1.2);
+    // Model starting at Z = 0 -> sets 1.2m
+    expect(defaultPlane('z', { min: [0, 0, 0], max: [10, 10, 15] }).offset).toBe(1.2);
   });
 });

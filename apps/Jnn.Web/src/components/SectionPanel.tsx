@@ -66,7 +66,7 @@ function PlaneControls({ axis, offset, flipped, bounds: b }: { axis: SectionAxis
         <Segmented
           label="Section axis"
           value={axis}
-          onChange={(a) => dispatch({ type: 'setSection', section: { ...defaultPlane(a, b), flipped } })}
+          onChange={(a) => dispatch({ type: 'setSection', section: { ...defaultPlane(a, b, state.model?.storeys), flipped } })}
           options={[
             { value: 'x', label: 'X', title: 'Cut along X (east–west)' },
             { value: 'y', label: 'Y', title: 'Cut along Y (north–south)' },

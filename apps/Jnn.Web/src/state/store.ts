@@ -259,12 +259,43 @@ export function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-/** Default section plane for an axis: through the middle of the model. */
-export function defaultPlane(axis: SectionAxis, bounds: { min: Vec3; max: Vec3 }): Extract<SectionSpec, { kind: 'plane' }> {
+/** Default section plane for an axis: through the middle of the model, or 1.2m above ground storey for Z. */
+export function defaultPlane(
+  axis: SectionAxis,
+  bounds: { min: Vec3; max: Vec3 },
+  storeys?: Array<{ elevation: number; name?: string }>
+): Extract<SectionSpec, { kind: 'plane' }> {
   const i = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
   const mid = (bounds.min[i]! + bounds.max[i]!) / 2;
-  // For horizontal cuts, a plan-style cut ~1.2 m above the lowest floor is
-  // more useful than the geometric middle.
-  const offset = axis === 'z' ? Math.min(bounds.max[2], bounds.min[2] + 1.5) : mid;
+
+  let offset = mid;
+  if (axis === 'z') {
+    if (storeys && storeys.length > 0) {
+      // Find ground floor / first floor with elevation >= -0.5m, or closest to 0
+      const validStoreys = storeys
+        .filter((s) => typeof s.elevation === 'number' && !isNaN(s.elevation))
+        .sort((a, b) => a.elevation - b.elevation);
+
+      if (validStoreys.length > 0) {
+        // Priority 1: Storey named "First Floor", "Ground", "Tầng 1", or elevation in [-0.5m, 1.5m]
+        const groundStorey =
+          validStoreys.find((s) => {
+            const name = (s.name || '').toLowerCase();
+            return name.includes('first') || name.includes('ground') || name.includes('tầng 1') || name.includes('level 1');
+          }) ??
+          validStoreys.find((s) => s.elevation >= -0.5 && s.elevation <= 1.5) ??
+          validStoreys.find((s) => s.elevation >= -0.5) ??
+          validStoreys[0];
+
+        if (groundStorey) {
+          offset = groundStorey.elevation + 1.2;
+        }
+      }
+    } else {
+      // Fallback if no storey data: if min Z is underground (footings/piles), use 1.2m, else min[2] + 1.2m
+      offset = bounds.min[2] < -0.5 ? 1.2 : bounds.min[2] + 1.2;
+    }
+  }
+
   return { kind: 'plane', axis, offset: Math.round(offset * 100) / 100, flipped: false };
 }

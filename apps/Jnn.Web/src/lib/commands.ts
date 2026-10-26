@@ -78,7 +78,7 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
       if (isEmpty(b)) {
         b = { min: [-10, -10, 0], max: [10, 10, 10] };
       }
-      dispatch({ type: 'setSection', section: defaultPlane('z', b) });
+      dispatch({ type: 'setSection', section: defaultPlane('z', b, s.model?.storeys) });
       return;
     }
     case 'sectionBox': {
