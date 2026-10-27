@@ -33,11 +33,13 @@ export interface IntegrationClashReport {
   totalTimeMs: number;
   hardClashesCount: number;
   clearanceClashesCount: number;
-  sampleClashes: Array<{
+  allClashes: Array<{
     clashId: string;
     type: string;
     aId: string | number;
     bId: string | number;
+    aGuid?: string;
+    bGuid?: string;
     distance: number;
     point: [number, number, number];
   }>;
@@ -66,6 +68,9 @@ export async function runIntegrationClashSpike(options?: {
     wasm: {
       path: wasmDir,
       absolute: true,
+    },
+    webIfc: {
+      COORDINATE_TO_ORIGIN: false,
     },
   });
 
@@ -97,20 +102,64 @@ export async function runIntegrationClashSpike(options?: {
   const extractTimeMs = performance.now() - tStartExtract;
   log(`Extracted ${geomsA.length} mesh elements from Model A and ${geomsB.length} mesh elements from Model B in ${extractTimeMs.toFixed(2)} ms.`);
 
+  const sampleA = geomsA.find(g => g.localId === 44);
+  if (sampleA) {
+    log(`Arch_44 (floor) bbox: min=[${sampleA.box.min.toArray().map(v=>v.toFixed(3)).join(', ')}], max=[${sampleA.box.max.toArray().map(v=>v.toFixed(3)).join(', ')}]`);
+  }
+  const sampleB = geomsB.find(g => g.localId === 685);
+  if (sampleB) {
+    log(`Struct_685 (inner wall) bbox: min=[${sampleB.box.min.toArray().map(v=>v.toFixed(3)).join(', ')}], max=[${sampleB.box.max.toArray().map(v=>v.toFixed(3)).join(', ')}]`);
+  }
+
   // Build NarrowphaseElements
   const elementMap = new Map<string | number, NarrowphaseElement>();
   const selA: Array<string | number> = [];
   const selB: Array<string | number> = [];
+
+  const guidMapA = new Map<number, string>();
+  try {
+    const itemsA = await (modelA as any).getItemsData(localIdsA, { attributesDefault: true });
+    log(`getItemsData returned ${itemsA?.length} items for Model A.`);
+    for (let i = 0; i < (itemsA || []).length; i++) {
+      const item = itemsA[i];
+      const rawLid = item?._localId?.value ?? item?._localId ?? item?.expressID ?? item?._id ?? localIdsA[i];
+      const lid = Number(rawLid);
+      const rawGid = item?._guid?.value ?? item?._guid ?? item?.GlobalId?.value ?? item?.GlobalId;
+      const gid = typeof rawGid === 'string' ? rawGid : rawGid?.value;
+      if (gid && !Number.isNaN(lid)) guidMapA.set(lid, gid);
+    }
+    log(`Mapped ${guidMapA.size} GUIDs for Model A.`);
+  } catch (err: any) {
+    log(`getItemsData Model A error: ${err.message}`);
+  }
+
+  const guidMapB = new Map<number, string>();
+  try {
+    const itemsB = await (modelB as any).getItemsData(localIdsB, { attributesDefault: true });
+    log(`getItemsData returned ${itemsB?.length} items for Model B.`);
+    for (let i = 0; i < (itemsB || []).length; i++) {
+      const item = itemsB[i];
+      const rawLid = item?._localId?.value ?? item?._localId ?? item?.expressID ?? item?._id ?? localIdsB[i];
+      const lid = Number(rawLid);
+      const rawGid = item?._guid?.value ?? item?._guid ?? item?.GlobalId?.value ?? item?.GlobalId;
+      const gid = typeof rawGid === 'string' ? rawGid : rawGid?.value;
+      if (gid && !Number.isNaN(lid)) guidMapB.set(lid, gid);
+    }
+    log(`Mapped ${guidMapB.size} GUIDs for Model B.`);
+  } catch (err: any) {
+    log(`getItemsData Model B error: ${err.message}`);
+  }
 
   for (const g of geomsA) {
     const id = `arch_${g.localId}`;
     selA.push(id);
     const geom = createBufferGeometry(g.positions, g.indices);
     const bvh = createMeshBVH(geom);
+    const guid = guidMapA.get(g.localId) || `guid_${id}`;
     elementMap.set(id, {
       id,
-      guid: `guid_${id}`,
-      ifcClass: 'ArchElement',
+      guid,
+      ifcClass: 'IfcBuildingElement',
       box: g.box,
       geometry: geom,
       bvh,
@@ -123,10 +172,11 @@ export async function runIntegrationClashSpike(options?: {
     selB.push(id);
     const geom = createBufferGeometry(g.positions, g.indices);
     const bvh = createMeshBVH(geom);
+    const guid = guidMapB.get(g.localId) || `guid_${id}`;
     elementMap.set(id, {
       id,
-      guid: `guid_${id}`,
-      ifcClass: 'StructElement',
+      guid,
+      ifcClass: 'IfcBuildingElement',
       box: g.box,
       geometry: geom,
       bvh,
@@ -177,14 +227,20 @@ export async function runIntegrationClashSpike(options?: {
 
   const totalTimeMs = broadphaseTimeMs + narrowphaseTimeMs;
 
-  const sampleClashes = hardSummary.results.slice(0, 10).map((c) => ({
-    clashId: c.clashId,
-    type: c.type,
-    aId: c.aId,
-    bId: c.bId,
-    distance: c.distance,
-    point: c.point,
-  }));
+  const allClashes = [...hardSummary.results, ...clearanceSummary.results].map((c) => {
+    const elA = elementMap.get(c.aId);
+    const elB = elementMap.get(c.bId);
+    return {
+      clashId: c.clashId,
+      type: c.type,
+      aId: c.aId,
+      bId: c.bId,
+      aGuid: elA?.guid,
+      bGuid: elB?.guid,
+      distance: c.distance,
+      point: c.point,
+    };
+  });
 
   const report: IntegrationClashReport = {
     modelAName: urlA.split('/').pop() || 'modelA.ifc',
@@ -197,7 +253,7 @@ export async function runIntegrationClashSpike(options?: {
     totalTimeMs,
     hardClashesCount: hardSummary.clashesCount,
     clearanceClashesCount: clearanceSummary.clashesCount,
-    sampleClashes,
+    allClashes,
   };
 
   log('=== INTEGRATION BENCHMARK SUMMARY ===');
