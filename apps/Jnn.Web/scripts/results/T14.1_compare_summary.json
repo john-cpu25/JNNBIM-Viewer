@@ -1,0 +1,94 @@
+{
+  "timestamp": "2026-10-27T15:17:24.340Z",
+  "environment": {
+    "ifcclashVersion": "0.9.0",
+    "pythonVersion": "3.12",
+    "jnnBvhEngine": "three-mesh-bvh 0.9.16",
+    "thatOpenVersion": "@thatopen/fragments 3.6.0"
+  },
+  "models": {
+    "modelA": "building-arch-2x3.ifc (14 physical elements)",
+    "modelB": "building-struct-2x3.ifc (16 physical elements)"
+  },
+  "modeA_StrictPenetrations": {
+    "ifcCount": 10,
+    "matchedCount": 10,
+    "matchRatePercent": 100,
+    "matchedPairs": [
+      "1AQAupaRP1txwK1AGiN61V <-> 37GxndZsXCwBzM0QrdRDLo",
+      "12UVOn4wvAJPMUExKdZLb8 <-> 3oNJ9yHi5FJuFnK8yg68Yt",
+      "37GxndZsXCwBzM0QrdRDLo <-> 3zR0BOEcLADRKln4HYporH",
+      "12UVOn4wvAJPMUExKdZLb8 <-> 3SGBcf7Lv0r80vKtUCgOpf",
+      "1yP7NInQz5uQzbiOpVFFJr <-> 3oNJ9yHi5FJuFnK8yg68Yt",
+      "1yP7NInQz5uQzbiOpVFFJr <-> 3Fbgsvr8nAYfGs9y5keub0",
+      "0OfZwWc8j9QP5uX8xPTxDH <-> 37GxndZsXCwBzM0QrdRDLo",
+      "0pFmhV8oD1dB40_b4pscr8 <-> 1yP7NInQz5uQzbiOpVFFJr",
+      "0ZTBBPo6f6bxqV2K7Oelrq <-> 2ddLgAnQf4mBfh5IpUp54U",
+      "0ZTBBPo6f6bxqV2K7Oelrq <-> 3SGBcf7Lv0r80vKtUCgOpf"
+    ],
+    "missingPairs": []
+  },
+  "modeB_CombinedContacts": {
+    "ifcCount": 30,
+    "jnnCount": 44,
+    "matchedCount": 30,
+    "jnnOnlyCount": 14,
+    "ifcOnlyCount": 0,
+    "matchRatePercent": 100
+  },
+  "matchedPairs": [
+    "0pFmhV8oD1dB40_b4pscr8 <-> 1yP7NInQz5uQzbiOpVFFJr",
+    "1yP7NInQz5uQzbiOpVFFJr <-> 3oNJ9yHi5FJuFnK8yg68Yt",
+    "1yP7NInQz5uQzbiOpVFFJr <-> 3Fbgsvr8nAYfGs9y5keub0",
+    "3Fit2Fad92zf2f6aWdJtF5 <-> 3Fit2Fad92zf2f6aWdJtF5",
+    "0pFmhV8oD1dB40_b4pscr8 <-> 3zR0BOEcLADRKln4HYporH",
+    "37GxndZsXCwBzM0QrdRDLo <-> 3zR0BOEcLADRKln4HYporH",
+    "3SGBcf7Lv0r80vKtUCgOpf <-> 3zR0BOEcLADRKln4HYporH",
+    "3oNJ9yHi5FJuFnK8yg68Yt <-> 3zR0BOEcLADRKln4HYporH",
+    "3Fbgsvr8nAYfGs9y5keub0 <-> 3zR0BOEcLADRKln4HYporH",
+    "0ZTBBPo6f6bxqV2K7Oelrq <-> 3SGBcf7Lv0r80vKtUCgOpf",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 0ZTBBPo6f6bxqV2K7Oelrq",
+    "0ZTBBPo6f6bxqV2K7Oelrq <-> 2ddLgAnQf4mBfh5IpUp54U",
+    "12UVOn4wvAJPMUExKdZLb8 <-> 37GxndZsXCwBzM0QrdRDLo",
+    "12UVOn4wvAJPMUExKdZLb8 <-> 3SGBcf7Lv0r80vKtUCgOpf",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 12UVOn4wvAJPMUExKdZLb8",
+    "12UVOn4wvAJPMUExKdZLb8 <-> 2ddLgAnQf4mBfh5IpUp54U",
+    "12UVOn4wvAJPMUExKdZLb8 <-> 3oNJ9yHi5FJuFnK8yg68Yt",
+    "12UVOn4wvAJPMUExKdZLb8 <-> 3Fbgsvr8nAYfGs9y5keub0",
+    "0pFmhV8oD1dB40_b4pscr8 <-> 1AQAupaRP1txwK1AGiN61V",
+    "1AQAupaRP1txwK1AGiN61V <-> 37GxndZsXCwBzM0QrdRDLo",
+    "1AQAupaRP1txwK1AGiN61V <-> 3oNJ9yHi5FJuFnK8yg68Yt",
+    "0pFmhV8oD1dB40_b4pscr8 <-> 3wdauVJT5Fx9drrREiDqA$",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 3wdauVJT5Fx9drrREiDqA$",
+    "3oNJ9yHi5FJuFnK8yg68Yt <-> 3wdauVJT5Fx9drrREiDqA$",
+    "3Fbgsvr8nAYfGs9y5keub0 <-> 3wdauVJT5Fx9drrREiDqA$",
+    "0OfZwWc8j9QP5uX8xPTxDH <-> 0pFmhV8oD1dB40_b4pscr8",
+    "0OfZwWc8j9QP5uX8xPTxDH <-> 37GxndZsXCwBzM0QrdRDLo",
+    "0OfZwWc8j9QP5uX8xPTxDH <-> 3SGBcf7Lv0r80vKtUCgOpf",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 0OfZwWc8j9QP5uX8xPTxDH",
+    "0Q5LjisRjDwhFSOc_WQjlF <-> 3Fbgsvr8nAYfGs9y5keub0"
+  ],
+  "jnnOnlyPairs": [
+    "1yP7NInQz5uQzbiOpVFFJr <-> 3SGBcf7Lv0r80vKtUCgOpf",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 1yP7NInQz5uQzbiOpVFFJr",
+    "0pFmhV8oD1dB40_b4pscr8 <-> 3_4VN63S96DfWiJjgG8j1C",
+    "2F44QMqSH3TOkM$SZoqCBe <-> 2F44QMqSH3TOkM$SZoqCBe",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 3zR0BOEcLADRKln4HYporH",
+    "0ZTBBPo6f6bxqV2K7Oelrq <-> 37GxndZsXCwBzM0QrdRDLo",
+    "0ZTBBPo6f6bxqV2K7Oelrq <-> 2fjJuPht9EIQaZQYZfC1Op",
+    "0rh7bRO0L9fg1NzgGKU$Ut <-> 12UVOn4wvAJPMUExKdZLb8",
+    "0Lvk$Qa81D5et3l3a4S9Vk <-> 12UVOn4wvAJPMUExKdZLb8",
+    "0fqX614OH1YO1Njdxms2$Q <-> 12UVOn4wvAJPMUExKdZLb8",
+    "12UVOn4wvAJPMUExKdZLb8 <-> 3roxUKbVv98xiUcl22_T07",
+    "1AQAupaRP1txwK1AGiN61V <-> 3SGBcf7Lv0r80vKtUCgOpf",
+    "0DyViLJJ175RvWQi1rE7a6 <-> 0Q5LjisRjDwhFSOc_WQjlF",
+    "0Q5LjisRjDwhFSOc_WQjlF <-> 3oNJ9yHi5FJuFnK8yg68Yt"
+  ],
+  "ifcOnlyPairs": [],
+  "performance": {
+    "broadphaseCandidates": 64,
+    "broadphaseTimeMs": 0.30000000074505806,
+    "narrowphaseTimeMs": 34,
+    "totalTimeMs": 34.30000000074506
+  }
+}

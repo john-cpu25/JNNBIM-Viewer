@@ -8,9 +8,13 @@ const __dirname = path.dirname(__filename);
 const webRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(webRoot, '../..');
 const reviewDir = path.resolve(repoRoot, '../TODO/2_Review');
+const inRepoResultsDir = path.resolve(__dirname, 'results');
 
 if (!fs.existsSync(reviewDir)) {
   fs.mkdirSync(reviewDir, { recursive: true });
+}
+if (!fs.existsSync(inRepoResultsDir)) {
+  fs.mkdirSync(inRepoResultsDir, { recursive: true });
 }
 
 console.log('================================================================');
@@ -33,6 +37,7 @@ try {
 
 const ifcclashJsonPath = path.join(reviewDir, 'T14.1_ifcclash_raw.json');
 fs.writeFileSync(ifcclashJsonPath, JSON.stringify(ifcData.touching_collisions, null, 2), 'utf8');
+fs.writeFileSync(path.join(inRepoResultsDir, 'T14.1_ifcclash_raw.json'), JSON.stringify(ifcData.touching_collisions, null, 2), 'utf8');
 
 // 2. Run JNN Clash Integration Spike
 console.log('\n2. Executing JNN Clash Engine (ThreeMeshBVH + Sweep-and-Prune)...');
@@ -55,8 +60,12 @@ console.log(`   -> JNN Engine Touching/Coincident detected: ${jnnTouchingClashes
 // 3. Normalized pair comparison helper
 const normalizePair = (g1, g2) => [String(g1).trim(), String(g2).trim()].sort().join(' <-> ');
 
-// Space elements to exclude from physical check (IfcSpace represents void architectural volumes)
-const spaceGuids = new Set(['0xY$LvXaDEswJDk_VU74C_', '18QhMtUIXBvQktPHXXxs7H']);
+// Helper to filter out virtual architectural space volumes (IfcSpace) dynamically by IFC class metadata
+const isSpaceClash = (c) => {
+  const clsA = String(c.aClass || c.a_class || '').toUpperCase();
+  const clsB = String(c.bClass || c.b_class || '').toUpperCase();
+  return clsA.includes('SPACE') || clsB.includes('SPACE');
+};
 
 // 3A. Compare Strict Penetrations (True Hard Collisions)
 console.log('\n================================================================');
@@ -65,25 +74,35 @@ console.log('================================================================');
 
 const ifcPenMap = new Map();
 for (const c of ifcData.strict_penetrations) {
+  if (isSpaceClash(c)) continue;
   ifcPenMap.set(normalizePair(c.a_guid, c.b_guid), c);
 }
 
 const jnnHardMap = new Map();
 for (const c of jnnHardClashes) {
-  if (spaceGuids.has(c.aGuid) || spaceGuids.has(c.bGuid)) continue;
+  if (isSpaceClash(c)) continue;
   jnnHardMap.set(normalizePair(c.aGuid || c.aId, c.bGuid || c.bId), c);
 }
 
 let penMatches = 0;
-for (const [key] of ifcPenMap) {
+const penMatchedKeys = [];
+const penMissingKeys = [];
+
+for (const [key, c] of ifcPenMap) {
   if (jnnHardMap.has(key)) {
     penMatches++;
+    penMatchedKeys.push(key);
+  } else {
+    penMissingKeys.push({ key, c });
   }
 }
 const penMatchRate = (penMatches / ifcPenMap.size) * 100;
 console.log(`ifcclash Strict Penetrations : ${ifcPenMap.size}`);
 console.log(`JNN Detected Intersection     : ${penMatches}`);
 console.log(`Strict Penetration Match Rate : ${penMatchRate.toFixed(2)}%`);
+if (penMissingKeys.length > 0) {
+  console.log('Missing pairs:', penMissingKeys);
+}
 
 // 3B. Compare Broad Physical Geometric Contacts (Hard + Touching)
 console.log('\n================================================================');
@@ -92,12 +111,13 @@ console.log('================================================================');
 
 const ifcTouchMap = new Map();
 for (const c of ifcData.touching_collisions) {
+  if (isSpaceClash(c)) continue;
   ifcTouchMap.set(normalizePair(c.a_guid, c.b_guid), c);
 }
 
 const jnnCombinedMap = new Map();
 for (const c of allJnnClashes) {
-  if (spaceGuids.has(c.aGuid) || spaceGuids.has(c.bGuid)) continue;
+  if (isSpaceClash(c)) continue;
   if (c.type === 'Hard' || c.distance <= 0.001) {
     jnnCombinedMap.set(normalizePair(c.aGuid || c.aId, c.bGuid || c.bId), c);
   }
@@ -147,6 +167,8 @@ const summaryResult = {
     ifcCount: ifcPenMap.size,
     matchedCount: penMatches,
     matchRatePercent: penMatchRate,
+    matchedPairs: penMatchedKeys,
+    missingPairs: penMissingKeys.map((m) => m.key),
   },
   modeB_CombinedContacts: {
     ifcCount: ifcTouchMap.size,
@@ -169,4 +191,10 @@ const summaryResult = {
 
 const summaryJsonPath = path.join(reviewDir, 'T14.1_compare_summary.json');
 fs.writeFileSync(summaryJsonPath, JSON.stringify(summaryResult, null, 2), 'utf8');
-console.log(`Saved detailed comparison summary to: ${summaryJsonPath}`);
+
+const inRepoSummaryPath = path.join(inRepoResultsDir, 'T14.1_compare_summary.json');
+fs.writeFileSync(inRepoSummaryPath, JSON.stringify(summaryResult, null, 2), 'utf8');
+
+console.log(`Saved comparison summary to:`);
+console.log(` - ${summaryJsonPath}`);
+console.log(` - ${inRepoSummaryPath}`);

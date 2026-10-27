@@ -40,6 +40,8 @@ export interface IntegrationClashReport {
     bId: string | number;
     aGuid?: string;
     bGuid?: string;
+    aClass?: string;
+    bClass?: string;
     distance: number;
     point: [number, number, number];
   }>;
@@ -117,6 +119,7 @@ export async function runIntegrationClashSpike(options?: {
   const selB: Array<string | number> = [];
 
   const guidMapA = new Map<number, string>();
+  const classMapA = new Map<number, string>();
   try {
     const itemsA = await (modelA as any).getItemsData(localIdsA, { attributesDefault: true });
     log(`getItemsData returned ${itemsA?.length} items for Model A.`);
@@ -127,13 +130,18 @@ export async function runIntegrationClashSpike(options?: {
       const rawGid = item?._guid?.value ?? item?._guid ?? item?.GlobalId?.value ?? item?.GlobalId;
       const gid = typeof rawGid === 'string' ? rawGid : rawGid?.value;
       if (gid && !Number.isNaN(lid)) guidMapA.set(lid, gid);
+
+      const rawCat = item?._category?.value ?? item?._category;
+      const cat = typeof rawCat === 'string' ? rawCat : rawCat?.value;
+      if (cat && !Number.isNaN(lid)) classMapA.set(lid, cat);
     }
-    log(`Mapped ${guidMapA.size} GUIDs for Model A.`);
+    log(`Mapped ${guidMapA.size} GUIDs and ${classMapA.size} Classes for Model A.`);
   } catch (err: any) {
     log(`getItemsData Model A error: ${err.message}`);
   }
 
   const guidMapB = new Map<number, string>();
+  const classMapB = new Map<number, string>();
   try {
     const itemsB = await (modelB as any).getItemsData(localIdsB, { attributesDefault: true });
     log(`getItemsData returned ${itemsB?.length} items for Model B.`);
@@ -144,8 +152,12 @@ export async function runIntegrationClashSpike(options?: {
       const rawGid = item?._guid?.value ?? item?._guid ?? item?.GlobalId?.value ?? item?.GlobalId;
       const gid = typeof rawGid === 'string' ? rawGid : rawGid?.value;
       if (gid && !Number.isNaN(lid)) guidMapB.set(lid, gid);
+
+      const rawCat = item?._category?.value ?? item?._category;
+      const cat = typeof rawCat === 'string' ? rawCat : rawCat?.value;
+      if (cat && !Number.isNaN(lid)) classMapB.set(lid, cat);
     }
-    log(`Mapped ${guidMapB.size} GUIDs for Model B.`);
+    log(`Mapped ${guidMapB.size} GUIDs and ${classMapB.size} Classes for Model B.`);
   } catch (err: any) {
     log(`getItemsData Model B error: ${err.message}`);
   }
@@ -156,10 +168,11 @@ export async function runIntegrationClashSpike(options?: {
     const geom = createBufferGeometry(g.positions, g.indices);
     const bvh = createMeshBVH(geom);
     const guid = guidMapA.get(g.localId) || `guid_${id}`;
+    const ifcClass = classMapA.get(g.localId) || 'IfcBuildingElement';
     elementMap.set(id, {
       id,
       guid,
-      ifcClass: 'IfcBuildingElement',
+      ifcClass,
       box: g.box,
       geometry: geom,
       bvh,
@@ -173,10 +186,11 @@ export async function runIntegrationClashSpike(options?: {
     const geom = createBufferGeometry(g.positions, g.indices);
     const bvh = createMeshBVH(geom);
     const guid = guidMapB.get(g.localId) || `guid_${id}`;
+    const ifcClass = classMapB.get(g.localId) || 'IfcBuildingElement';
     elementMap.set(id, {
       id,
       guid,
-      ifcClass: 'IfcBuildingElement',
+      ifcClass,
       box: g.box,
       geometry: geom,
       bvh,
@@ -237,6 +251,8 @@ export async function runIntegrationClashSpike(options?: {
       bId: c.bId,
       aGuid: elA?.guid,
       bGuid: elB?.guid,
+      aClass: elA?.ifcClass,
+      bClass: elB?.ifcClass,
       distance: c.distance,
       point: c.point,
     };

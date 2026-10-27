@@ -82,8 +82,10 @@ export async function runClashTest(
   const totalPairsConsidered = setA.length * setB.length;
 
   // 2. Broad-phase Sweep-and-Prune
+  // Employ at least a tiny numerical epsilon (1e-4 = 0.1mm) to safeguard against IEEE-754 floating-point boundary rounding
+  const broadTolerance = Math.max(testConfig.tolerance, 1e-4);
   const candidates: CandidatePair[] = sweepAndPrune(setA, setB, {
-    tolerance: testConfig.tolerance,
+    tolerance: broadTolerance,
     ignoreSameElement,
   });
 

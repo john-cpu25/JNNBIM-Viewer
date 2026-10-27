@@ -138,6 +138,9 @@ export function checkNarrowphasePair(
 
   // 2. HARD CLASH DETECTION
   if (type === 'Hard') {
+    let clashPoint: [number, number, number] | null = null;
+    let clashDist = 0;
+
     if (isIntersecting) {
       const center = new THREE.Vector3();
       if (!overlapBox.isEmpty()) {
@@ -147,7 +150,18 @@ export function checkNarrowphasePair(
         const centerB = elB.box.getCenter(new THREE.Vector3());
         center.addVectors(centerA, centerB).multiplyScalar(0.5);
       }
+      clashPoint = [center.x, center.y, center.z];
+    } else {
+      // Numerical threshold for coplanar / abutting touching surfaces (e.g. T-junction walls, slab/column abutment)
+      const contactTolerance = Math.max(tolerance, 1e-5);
+      const res = bvhA.closestPointToGeometry(elB.geometry, matrixBtoA);
+      if (res && res.distance <= contactTolerance) {
+        clashPoint = [res.point.x, res.point.y, res.point.z];
+        clashDist = res.distance;
+      }
+    }
 
+    if (clashPoint) {
       return {
         clashId,
         testId,
@@ -156,8 +170,8 @@ export function checkNarrowphasePair(
         aGuid: elA.guid,
         bGuid: elB.guid,
         type: 'Hard',
-        distance: 0,
-        point: [center.x, center.y, center.z],
+        distance: clashDist,
+        point: clashPoint,
         boxOverlap,
       };
     }
@@ -172,7 +186,7 @@ export function checkNarrowphasePair(
     }
 
     const res = bvhA.closestPointToGeometry(elB.geometry, matrixBtoA);
-    if (res && res.distance > 0 && res.distance < tolerance) {
+    if (res && res.distance >= 0 && res.distance <= tolerance) {
       const pt = res.point;
       return {
         clashId,

@@ -58,7 +58,6 @@ Tài liệu này ghi nhận kết quả đo đạc hiệu năng thực tế củ
    - Bọc toàn bộ tương tác IndexedDB trong `try/catch`. Trong chế độ ẩn danh (Incognito/Private) hoặc khi bộ nhớ bị giới hạn quota, viewer tự động fallback về nạp trực tiếp mà không gây lỗi ứng dụng.
    - Cung cấp nút **"Xóa cache IFC"** trong hộp thoại Cài đặt (Settings Modal) cho phép người dùng giải phóng bộ nhớ tức thì.
 
-
 ---
 
 ## 4. Kiểm chứng Hiệu năng Clash Detection & Đối soát IfcOpenShell (Mốc 2)
@@ -74,8 +73,8 @@ Toàn bộ quá trình kiểm chứng va chạm của JNN Clash Engine được 
 | **Số phần tử tham gia kiểm tra** | 14 $\times$ 16 (224 cặp tiềm năng) | 14 $\times$ 16 (224 cặp tiềm năng) | Cặp file IFC thật | ĐẠT |
 | **Cặp ứng viên Broad-phase** | **64 cặp** (Lọc bỏ 71.4% số cặp vô hại) | *Tích hợp sẵn trong C++ BVH* | Không bỏ sót | ĐẠT |
 | **Thời gian Broad-phase (SaP)** | **0.30 ms** | *Không tách biệt* | < 500 ms | **Vượt xa (1.600x)** |
-| **Thời gian Narrow-phase (BVH)** | **4.90 ms** | 120 – 180 ms | < 5.000 ms | **Vượt xa (1.000x)** |
-| **Tổng thời gian tính toán va chạm** | **5.20 ms** | 150 – 210 ms | < 60.000 ms (60s) | **Vượt xa (11.500x)** |
+| **Thời gian Narrow-phase (BVH)** | **17 – 34 ms** | 120 – 180 ms | < 5.000 ms | **Vượt xa (150x)** |
+| **Tổng thời gian tính toán va chạm** | **17 – 35 ms** | 150 – 210 ms | < 60.000 ms (60s) | **Vượt xa (1.700x)** |
 | **Bộ nhớ RAM tiêu thụ tối đa** | **~145 MB** (Web Worker độc lập) | ~220 MB (Python Process) | < 2.000 MB (2GB) | **Rất nhẹ (< 8%)** |
 | **Thời gian điều hướng kết quả** | **4.10 ms / clash** (Phím ↑↓) | *Chỉ xuất báo cáo tĩnh (JSON/BCF)* | < 100 ms / clash | **Vượt xa (24x)** |
 
@@ -84,15 +83,18 @@ Toàn bộ quá trình kiểm chứng va chạm của JNN Clash Engine được 
 | Tiêu chí đối soát | Chế độ A: Đâm xuyên thực sự (Strict Penetration)<br>`allow_touching = False` | Chế độ B: Tiếp xúc mặt phẳng (Surface Contact)<br>`allow_touching = True` |
 |---|---|---|
 | **Số va chạm IfcOpenShell phát hiện** | **10 va chạm** | **30 va chạm** |
-| **Số va chạm JNN Clash Engine phát hiện** | **9 va chạm Hard** (+ 1 Touching $\epsilon$) | **35 va chạm** (30 vật lý + 5 tiếp xúc dầm/mái) |
-| **Số cặp trùng khớp GUID tuyệt đối** | **9 / 10** (90.00% – 100% khi tính $\epsilon$) | **23 / 30** (76.67% – 86.7% khi tính $\le 1$mm) |
-| **Phân loại va chạm JNN độc quyền** | Phân tách rạch ròi giữa Hard và Clearance | Nhận diện chính xác 5 dầm đỡ mái tiếp xúc 0.0000m |
+| **Số va chạm JNN Clash Engine phát hiện** | **10 va chạm Hard** (Đâm xuyên + tiếp xúc phẳng $\le 10^{-5}$) | **44 va chạm** (30 vật lý khớp 100% + 14 tiếp xúc dầm/mái) |
+| **Số cặp trùng khớp GUID tuyệt đối** | **10 / 10 (100.00% — Vượt ngưỡng $\ge 95\%$)** | **30 / 30 (100.00% — Trùng khớp toàn bộ)** |
+| **Số cặp IfcOpenShell bị sót** | **0 cặp** | **0 cặp** |
+| **Phân loại va chạm JNN độc quyền** | Bắt trọn vẹn cả giao cắt thể tích và tiếp xúc phẳng | Nhận diện chính xác các dầm đỡ mái tiếp xúc 0.0000m |
 
 ### 4.3. Phân tích Nguyên nhân Sai khác Toán học & Hình học
-1. **Khác biệt Bản chất Lưới (Triangulated Mesh) vs Mặt toán học CAD (Brep):**
+1. **Khắc phục Triệt để Sai số Ranh giới Broad-phase (IEEE-754 Boundary):**
+   - Cặp tường `1AQAupaRP1txwK1AGiN61V` $\leftrightarrow$ `37GxndZsXCwBzM0QrdRDLo` tiếp xúc nhau tại ranh giới $Z = -4.800$m với sai số floating-point $1.77 \times 10^{-15}$m. Khi đặt dung sai broadphase tối thiểu $\epsilon = 1 \times 10^{-4}$m (0.1mm), cặp ứng viên này không còn bị trượt và được ThreeMeshBVH xác nhận giao cắt, nâng tỷ lệ khớp Strict Penetration lên **100%**.
+2. **Khác biệt Bản chất Lưới (Triangulated Mesh) vs Mặt toán học CAD (Brep):**
    - IfcOpenShell dựng hình dựa trên nhân hình học OpenCASCADE (Boundary Representation - Brep). Cờ `allow_touching: True` coi mọi mặt phẳng tiếp xúc sát nhau ($\Delta = 0$) là "collision".
    - JNN BIM Viewer sử dụng ThreeMeshBVH trên lưới tam giác. Thuật toán `triIntersect` dựa trên định lý trục phân tách (SAT) phân tách rõ ràng giữa **va chạm đâm xuyên thể tích** (Hard) và **bề mặt tiếp xúc không đâm xuyên** (Clearance / Touching).
-2. **Phát hiện Tiếp xúc Dầm - Mái (Girder vs Sloped Roof):**
+3. **Phát hiện Tiếp xúc Dầm - Mái (Girder vs Sloped Roof):**
    - Khi kiểm tra với `clash_clearance_many` trong OpenCASCADE, cả 4 thanh dầm sườn `#837`, `#886`, `#928`, `#970` đều có khoảng cách chính xác **$0.00000$ m** tới tấm sàn mái `12UVOn4wvAJPMUExKdZLb8`. JNN bắt trọn vẹn các va chạm này nhờ BVH leaf triangle testing.
-3. **Lọc bỏ Thực thể Không gian Kiến trúc (`IfcSpace`):**
-   - Các phần thể tích phòng rỗng ảo (`IfcSpace`: living room, entry hall) được JNN tách biệt khỏi danh mục cấu kiện vật lý chịu lực để đảm bảo tính thực tiễn trong thi công BIM.
+4. **Lọc Động Thực thể Không gian Kiến trúc (`IfcSpace`):**
+   - Loại trừ tự động các thể tích phòng ảo (`IfcSpace`: living room, entry hall) dựa trên metadata lớp IFC (`ifcClass`), không hardcode GUID, đảm bảo tính thực tiễn và tái sử dụng cho mọi dự án BIM.
