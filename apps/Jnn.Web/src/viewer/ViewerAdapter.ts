@@ -112,8 +112,8 @@ export interface ViewerAdapter {
 
   setSection(spec: SectionSpec | null): AdapterResult;
 
-  /** Colour override; `null` clears highlights. Colour is CSS hex. */
-  highlight(ids: readonly string[] | null, color?: string): AdapterResult;
+  /** Colour override; `null` clears highlights. Accepts array of IDs or Map of id->color. Colour is CSS hex. */
+  highlight(ids: readonly string[] | Map<string, string> | null, color?: string): AdapterResult;
   setXray(enabled: boolean): AdapterResult;
   setTheme(theme: 'light' | 'dark'): void;
 

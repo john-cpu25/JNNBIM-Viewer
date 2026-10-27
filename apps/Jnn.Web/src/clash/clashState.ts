@@ -1,4 +1,5 @@
 import type { ClashResult, ClashType } from './narrowphase';
+import type { ClashRecord } from './clashResults';
 
 export type ClashTestStatus = 'idle' | 'running' | 'completed' | 'error';
 
@@ -21,6 +22,7 @@ export interface ClashTestItem {
   clashesCount?: number;
   lastRunTime?: number;
   results?: ClashResult[];
+  records?: ClashRecord[];
   error?: string;
 }
 
@@ -44,10 +46,12 @@ export type ClashAction =
   | { type: 'setActiveTest'; id: string | null }
   | { type: 'setTestRunning'; id: string }
   | { type: 'setTestProgress'; id: string; percent: number }
-  | { type: 'setTestCompleted'; id: string; results: ClashResult[] }
+  | { type: 'setTestCompleted'; id: string; results: ClashResult[]; records?: ClashRecord[] }
   | { type: 'setTestError'; id: string; error: string }
   | { type: 'loadTests'; tests: ClashTestItem[] }
-  | { type: 'selectClash'; clashId: string | null };
+  | { type: 'selectClash'; clashId: string | null }
+  | { type: 'updateClashRecord'; testId: string; clashId: string; updates: Partial<ClashRecord> }
+  | { type: 'setClashStatus'; testId: string; clashId: string; status: ClashRecord['status'] };
 
 export function createDefaultClashTest(existingCount = 0, partial?: Partial<ClashTestItem>): ClashTestItem {
   const id = `test_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -70,6 +74,7 @@ export function createDefaultClashTest(existingCount = 0, partial?: Partial<Clas
     progressPercent: 0,
     clashesCount: 0,
     results: [],
+    records: [],
     ...partial,
   };
 }
@@ -164,11 +169,42 @@ export function clashReducer(state: ClashState, action: ClashAction): ClashState
                 status: 'completed',
                 progressPercent: 100,
                 results: action.results,
-                clashesCount: action.results.length,
+                records: action.records ?? t.records,
+                clashesCount: action.records ? action.records.length : action.results.length,
                 lastRunTime: Date.now(),
               }
             : t,
         ),
+      };
+    }
+
+    case 'updateClashRecord': {
+      return {
+        ...state,
+        tests: state.tests.map((t) => {
+          if (t.id !== action.testId || !t.records) return t;
+          return {
+            ...t,
+            records: t.records.map((r) =>
+              r.clashId === action.clashId ? { ...r, ...action.updates } : r,
+            ),
+          };
+        }),
+      };
+    }
+
+    case 'setClashStatus': {
+      return {
+        ...state,
+        tests: state.tests.map((t) => {
+          if (t.id !== action.testId || !t.records) return t;
+          return {
+            ...t,
+            records: t.records.map((r) =>
+              r.clashId === action.clashId ? { ...r, status: action.status } : r,
+            ),
+          };
+        }),
       };
     }
 

@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { openViewer } from './helpers';
 import * as path from 'path';
 
-test.describe('Clash Detective UI & persistence', () => {
-  test('creates clash test, runs detection, persists via IndexedDB and captures UI screenshot', async ({
+test.describe('Clash Detective UI, Results & Viewer interaction', () => {
+  test('creates clash test, runs detection, inspects clash result with red/green highlight & section box', async ({
     page,
   }) => {
     await openViewer(page);
@@ -21,10 +21,6 @@ test.describe('Clash Detective UI & persistence', () => {
     const addBtn = page.getByTestId('add-test-btn');
     await addBtn.click();
 
-    // Rename the test
-    const nameInput = page.getByTestId('test-name-input');
-    await nameInput.fill('E2E Test - Walls vs Beams');
-
     // Apply preset
     const presetBtn = page.getByTestId('preset-btn-0');
     await presetBtn.click();
@@ -34,22 +30,44 @@ test.describe('Clash Detective UI & persistence', () => {
     await expect(runBtn).toBeEnabled();
     await runBtn.click();
 
-    // Wait for completed banner
-    const completedBanner = page.getByTestId('test-completed-banner');
-    await expect(completedBanner).toBeVisible({ timeout: 15_000 });
+    // 5. Detection completes and automatically switches to results table
+    const resultsTable = page.getByTestId('clash-results-table');
+    await expect(resultsTable).toBeVisible({ timeout: 15_000 });
 
-    // 5. Take screenshot of the Clash Detective UI
+    // Check that at least one row exists
+    const firstRow = page.getByTestId(/clash-row-/).first();
+    await expect(firstRow).toBeVisible();
+
+    // Click on the clash row to inspect and highlight
+    await firstRow.click();
+
+    // Inspector should be visible
+    const inspector = page.getByTestId('clash-inspector');
+    await expect(inspector).toBeVisible();
+
+    // Turn on section box
+    const sectionBoxCheck = page.getByTestId('section-box-checkbox');
+    await sectionBoxCheck.check();
+
+    // Change status to Reviewed
+    const reviewedBtn = page.getByTestId('set-status-reviewed');
+    await reviewedBtn.click();
+    await expect(page.getByTestId('clash-inspector')).toContainText('Reviewed');
+
+    // Settle camera / renderer
+    await page.waitForTimeout(500);
+
+    // Take screenshot showing red/green highlight and clash inspector
     const screenshotDir = path.resolve(process.cwd(), '../../../TODO/2_Review');
-    const screenshotPath = path.join(screenshotDir, 'T12.3_ui.png');
+    const screenshotPath = path.join(screenshotDir, 'T13.2_clash_view.png');
     await page.screenshot({ path: screenshotPath, fullPage: true });
 
-    // 6. Reload and verify persistence in IndexedDB
+    // 6. Test persistence across reload
     await page.reload();
     await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', {
       timeout: 20_000,
     });
 
-    // Re-open clash tab
     await page.getByTestId('tab-clash-btn').click();
     await expect(page.getByTestId('test-list')).toContainText('Kết cấu × Kiến trúc (Hard)');
   });

@@ -29,7 +29,25 @@ import type { ClashType } from '../clash/narrowphase';
 import { ClashWorkerClient } from '../clash/clashWorkerClient';
 import type { SerializedElementPayload } from '../clash/clash.worker';
 import type { ClashProgress } from '../clash/engine';
+import { mergeClashResults } from '../clash/clashResults';
+import { elementBounds, isEmpty } from '../domain/bounds';
+import { ClashResultsTable } from './ClashResultsTable';
 import { cn } from '../lib/cn';
+
+function normalizeCategory(cat: string): string {
+  let s = (cat || '').toLowerCase().trim();
+  if (s.startsWith('ifc')) s = s.slice(3);
+  if (s.endsWith('segment')) s = s.slice(0, -7);
+  if (s.endsWith('s') && s.length > 3) s = s.slice(0, -1);
+  return s;
+}
+
+function matchClassCriteria(elementCategory: string, criteriaClasses?: string): boolean {
+  if (!criteriaClasses || !criteriaClasses.trim()) return true;
+  const targets = criteriaClasses.split(',').map(normalizeCategory).filter(Boolean);
+  const normCat = normalizeCategory(elementCategory);
+  return targets.some((t) => normCat.includes(t) || t.includes(normCat));
+}
 
 const PRESET_TEMPLATES: Array<{
   name: string;
@@ -69,6 +87,7 @@ export function ClashPanel() {
   const { state, viewer } = useApp();
   const [clashState, dispatch] = useReducer(clashReducer, initialClashState);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [subTab, setSubTab] = useState<'config' | 'results'>('config');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workerClientRef = useRef<ClashWorkerClient | null>(null);
 
@@ -124,20 +143,11 @@ export function ClashPanel() {
     if (!activeTest) return { countA: 0, countB: 0 };
 
     const countMatches = (criteria: { modelId?: string; ifcClass?: string }) => {
-      const targetClasses = criteria.ifcClass
-        ? criteria.ifcClass.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean)
-        : [];
-
       return state.model.elements.filter((el) => {
         if (criteria.modelId && el.modelId && el.modelId !== criteria.modelId) {
           return false;
         }
-        if (targetClasses.length > 0) {
-          const elClass = (el.category || '').toLowerCase();
-          const matches = targetClasses.some((tc) => elClass.includes(tc) || tc.includes(elClass));
-          if (!matches) return false;
-        }
-        return true;
+        return matchClassCriteria(el.category, criteria.ifcClass);
       }).length;
     };
 
@@ -248,15 +258,30 @@ export function ClashPanel() {
         }
       }
 
-      // If no meshes extracted from viewer, produce elements from state.model
+      // If no meshes extracted from viewer, produce elements from state.model with real AABBs
       if (serializedElements.length === 0) {
         serializedElements = state.model.elements.map((el) => {
-          // Default synthetic triangle box
+          const eb = elementBounds(el);
+          const min = isEmpty(eb) ? [-0.5, -0.5, 0] : eb.min;
+          const max = isEmpty(eb) ? [0.5, 0.5, 0.5] : eb.max;
+          const x0 = min[0] ?? -0.5;
+          const y0 = min[1] ?? -0.5;
+          const z0 = min[2] ?? 0;
+          const x1 = max[0] ?? 0.5;
+          const y1 = max[1] ?? 0.5;
+          const z1 = max[2] ?? 0.5;
           const pos = new Float32Array([
-            -0.5, -0.5, 0,  0.5, -0.5, 0,  0.5, 0.5, 0,
-            -0.5, -0.5, 0,  0.5,  0.5, 0, -0.5, 0.5, 0,
+            x0, y0, z0,  x1, y0, z0,  x1, y1, z0,  x0, y1, z0, // 0..3 bottom
+            x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1, // 4..7 top
           ]);
-          const ind = new Uint32Array([0, 1, 2, 3, 4, 5]);
+          const ind = new Uint32Array([
+            0, 1, 2,  0, 2, 3, // bottom
+            4, 6, 5,  4, 7, 6, // top
+            0, 4, 1,  1, 4, 5, // front
+            1, 5, 2,  2, 5, 6, // right
+            2, 6, 3,  3, 6, 7, // back
+            3, 7, 0,  0, 7, 4, // left
+          ]);
           return {
             id: el.id,
             guid: el.globalId || el.id,
@@ -264,8 +289,8 @@ export function ClashPanel() {
             positions: pos.buffer.slice(0) as ArrayBuffer,
             indices: ind.buffer.slice(0) as ArrayBuffer,
             box: {
-              min: [-0.5, -0.5, 0] as [number, number, number],
-              max: [0.5, 0.5, 0.5] as [number, number, number],
+              min: [x0, y0, z0] as [number, number, number],
+              max: [x1, y1, z1] as [number, number, number],
             },
           };
         });
@@ -280,14 +305,7 @@ export function ClashPanel() {
         criteria: { modelId?: string; ifcClass?: string },
       ) => {
         if (criteria.modelId && el.modelId && el.modelId !== criteria.modelId) return false;
-        if (criteria.ifcClass) {
-          const classes = criteria.ifcClass.split(',').map((c) => c.trim().toLowerCase());
-          const geomClass = (el.category || '').toLowerCase();
-          if (!classes.some((c) => geomClass.includes(c) || c.includes(geomClass))) {
-            return false;
-          }
-        }
-        return true;
+        return matchClassCriteria(el.category, criteria.ifcClass);
       };
 
       const idsA = state.model.elements.filter((e) => matchCriteria(e, activeTest.selectionA)).map((e) => e.id);
@@ -312,7 +330,19 @@ export function ClashPanel() {
       );
 
       if (summary.status === 'completed') {
-        dispatch({ type: 'setTestCompleted', id: activeTest.id, results: summary.results });
+        const mergedRecords = mergeClashResults(
+          activeTest.id,
+          activeTest.records ?? [],
+          summary.results,
+          { elementsMap: state.byId },
+        );
+        dispatch({
+          type: 'setTestCompleted',
+          id: activeTest.id,
+          results: summary.results,
+          records: mergedRecords,
+        });
+        setSubTab('results');
       } else if (summary.status === 'cancelled') {
         dispatch({ type: 'setTestError', id: activeTest.id, error: 'Đã hủy kiểm tra' });
       } else {
@@ -469,8 +499,58 @@ export function ClashPanel() {
           </div>
         </div>
 
-        {/* Active Test Configuration Form */}
+        {/* Active Test Sub-tabs Switcher */}
         {activeTest && (
+          <div className="flex items-center border-b border-line bg-surface-2 px-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setSubTab('config')}
+              data-testid="subtab-config-btn"
+              className={cn(
+                'border-b-2 px-3 py-1.5 text-xs font-medium transition-colors',
+                subTab === 'config'
+                  ? 'border-accent text-accent font-semibold'
+                  : 'border-transparent text-muted hover:text-ink',
+              )}
+            >
+              Cấu hình
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTab('results')}
+              data-testid="subtab-results-btn"
+              className={cn(
+                'flex items-center gap-1.5 border-b-2 px-3 py-1.5 text-xs font-medium transition-colors',
+                subTab === 'results'
+                  ? 'border-accent text-accent font-semibold'
+                  : 'border-transparent text-muted hover:text-ink',
+              )}
+            >
+              <span>Kết quả</span>
+              {(activeTest.records?.length ?? activeTest.clashesCount ?? 0) > 0 && (
+                <span className="rounded bg-accent/20 px-1.5 py-0.2 text-[10px] font-semibold text-accent tabular">
+                  {activeTest.records?.length ?? activeTest.clashesCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Results tab view */}
+        {activeTest && subTab === 'results' && (
+          <ClashResultsTable
+            testId={activeTest.id}
+            records={activeTest.records ?? []}
+            selectedClashId={clashState.selectedClashId}
+            onSelectClash={(clashId) => dispatch({ type: 'selectClash', clashId })}
+            onUpdateRecord={(clashId, updates) =>
+              dispatch({ type: 'updateClashRecord', testId: activeTest.id, clashId, updates })
+            }
+          />
+        )}
+
+        {/* Active Test Configuration Form */}
+        {activeTest && subTab === 'config' && (
           <div className="space-y-4 p-3" data-testid="test-config-form">
             {/* Presets row */}
             <div className="space-y-1.5">

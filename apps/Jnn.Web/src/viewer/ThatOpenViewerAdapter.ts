@@ -1104,7 +1104,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return group;
   }
 
-  highlight(ids: readonly string[] | null, color = '#2f9e44'): AdapterResult {
+  highlight(ids: readonly string[] | Map<string, string> | null, color = '#2f9e44'): AdapterResult {
     if (!ids) {
       if (this.highlighter) {
         for (const styleName of this.activeHighlightStyles) {
@@ -1112,6 +1112,41 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         }
       }
       this.activeHighlightStyles.clear();
+      return okVoid;
+    }
+
+    if (ids instanceof Map) {
+      if (this.highlighter) {
+        for (const styleName of this.activeHighlightStyles) {
+          this.highlighter.clear(styleName).catch(console.error);
+        }
+      }
+      this.activeHighlightStyles.clear();
+
+      const byColor = new Map<string, string[]>();
+      for (const [id, col] of ids) {
+        const arr = byColor.get(col) ?? [];
+        arr.push(id);
+        byColor.set(col, arr);
+      }
+
+      for (const [col, groupIds] of byColor) {
+        const cleanColor = col.replace('#', '');
+        const styleName = `hl_${cleanColor}`;
+        if (this.highlighter) {
+          if (!this.highlighter.styles.has(styleName)) {
+            this.highlighter.styles.set(styleName, {
+              color: new THREE.Color(col),
+              renderedFaces: 0,
+              opacity: 1,
+              transparent: false,
+            });
+          }
+          const modelIdMap = this.toModelIdMap(groupIds);
+          this.highlighter.highlightByID(styleName, modelIdMap, false, false).catch(console.error);
+        }
+        this.activeHighlightStyles.add(styleName);
+      }
       return okVoid;
     }
 

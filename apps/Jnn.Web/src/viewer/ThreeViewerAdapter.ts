@@ -331,9 +331,13 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
-  highlight(ids: readonly string[] | null, color = '#2f9e44'): AdapterResult {
+  highlight(ids: readonly string[] | Map<string, string> | null, color = '#2f9e44'): AdapterResult {
     this.highlights.clear();
-    if (ids) {
+    if (ids instanceof Map) {
+      for (const [id, col] of ids) {
+        if (this.entries.has(id)) this.highlights.set(id, new THREE.Color(col));
+      }
+    } else if (ids) {
       const c = new THREE.Color(color);
       for (const id of ids) if (this.entries.has(id)) this.highlights.set(id, c);
     }
