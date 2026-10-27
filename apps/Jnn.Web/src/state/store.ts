@@ -38,6 +38,7 @@ export interface AppState {
   theme: Theme;
   explorerOpen: boolean;
   propertiesOpen: boolean;
+  rightTab: 'properties' | 'clash';
   mobilePane: MobilePane;
   notices: Notice[];
 }
@@ -61,6 +62,7 @@ export type Action =
   | { type: 'setProjection'; projection: AppState['projection'] }
   | { type: 'setTheme'; theme: Theme }
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
+  | { type: 'setRightTab'; tab: 'properties' | 'clash' }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
   | { type: 'dismissNotice'; id: number }
@@ -100,6 +102,7 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     theme,
     explorerOpen: true,
     propertiesOpen: true,
+    rightTab: 'properties',
     mobilePane: 'viewer',
     notices: [],
   };
@@ -179,6 +182,8 @@ export function reducer(state: AppState, action: Action): AppState {
       const key = action.panel === 'explorer' ? 'explorerOpen' : 'propertiesOpen';
       return { ...state, [key]: action.open ?? !state[key] };
     }
+    case 'setRightTab':
+      return { ...state, rightTab: action.tab, propertiesOpen: true };
     case 'setMobilePane':
       return { ...state, mobilePane: action.pane };
     case 'notify':
@@ -192,6 +197,7 @@ export function reducer(state: AppState, action: Action): AppState {
         theme: state.theme,
         explorerOpen: state.explorerOpen,
         propertiesOpen: state.propertiesOpen,
+        rightTab: state.rightTab,
         mobilePane: state.mobilePane,
       };
     }

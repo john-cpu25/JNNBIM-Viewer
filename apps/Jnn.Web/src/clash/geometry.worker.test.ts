@@ -72,3 +72,4 @@ describe('geometry worker BVH generation', () => {
     expect(stats.box.max[0]).toBeCloseTo(5, 1);
   });
 });
+

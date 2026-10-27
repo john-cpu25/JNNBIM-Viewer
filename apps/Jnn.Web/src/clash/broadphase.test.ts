@@ -129,3 +129,4 @@ describe('clash broadphase sweep-and-prune', () => {
     expect(sapDuration).toBeLessThanOrEqual(bfDuration + 5); // Allow small margin on fast runs
   });
 });
+

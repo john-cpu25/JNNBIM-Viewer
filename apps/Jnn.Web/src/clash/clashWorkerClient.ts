@@ -134,3 +134,4 @@ export class ClashWorkerClient {
     this.worker.terminate();
   }
 }
+

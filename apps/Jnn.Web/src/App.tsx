@@ -9,7 +9,7 @@ import { useShortcuts } from './lib/useShortcuts';
 import type { ViewerAdapter } from './viewer/ViewerAdapter';
 import { TopBar } from './components/TopBar';
 import { Explorer } from './components/Explorer';
-import { Properties } from './components/Properties';
+import { RightPanel } from './components/RightPanel';
 import { isSampleMode, Viewport } from './components/Viewport';
 import { StatusBar } from './components/StatusBar';
 import { MobileNav } from './components/MobileNav';
@@ -66,8 +66,8 @@ export default function App() {
             <Viewport model={state.model} onViewer={setViewer} compact={isNarrow} />
           </section>
           {showProperties && (
-            <aside className={panelClass('right')} aria-label="Properties" data-testid="properties-panel">
-              <Properties />
+            <aside className={panelClass('right')} aria-label="Properties and Clash" data-testid="properties-panel">
+              <RightPanel />
             </aside>
           )}
           <Notices />

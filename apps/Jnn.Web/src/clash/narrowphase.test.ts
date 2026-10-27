@@ -115,3 +115,4 @@ describe('clash narrowphase detection', () => {
     expect(id3).not.toBe(id1);
   });
 });
+

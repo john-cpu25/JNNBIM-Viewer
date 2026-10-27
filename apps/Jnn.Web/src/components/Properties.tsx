@@ -7,15 +7,17 @@ import { aggregateQuantities, formatNumber, formatValue } from '../lib/format';
 import { IconButton, SectionLabel } from './ui';
 import { cn } from '../lib/cn';
 
-export function Properties() {
+export function Properties({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const { state } = useApp();
   const sel = state.selection;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-[41px] items-center border-b border-line px-3">
-        <h2 className="text-xs font-semibold tracking-wide">Properties</h2>
-        {sel.length > 1 && <span className="ml-2 rounded bg-surface-3 px-1.5 text-[11px] text-muted tabular">{sel.length} selected</span>}
-      </div>
+      {!hideHeader && (
+        <div className="flex h-[41px] items-center border-b border-line px-3">
+          <h2 className="text-xs font-semibold tracking-wide">Properties</h2>
+          {sel.length > 1 && <span className="ml-2 rounded bg-surface-3 px-1.5 text-[11px] text-muted tabular">{sel.length} selected</span>}
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-auto scroll-thin" data-testid="properties-body">
         {sel.length === 0 && <ModelSummary />}
         {sel.length === 1 && <ElementProperties element={state.byId.get(sel[0]!)!} />}

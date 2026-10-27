@@ -106,3 +106,4 @@ if (typeof self !== 'undefined' && typeof (self as any).postMessage === 'functio
     }
   };
 }
+

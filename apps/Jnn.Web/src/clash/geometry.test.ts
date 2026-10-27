@@ -143,3 +143,4 @@ describe('geometry extraction and MeshBVH', () => {
     expect(identicalDiff.maxError).toBe(0);
   });
 });
+
