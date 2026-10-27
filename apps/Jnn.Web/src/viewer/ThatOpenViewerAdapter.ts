@@ -24,7 +24,7 @@ import {
   parseSpatialStructure,
   type SpatialNode,
 } from '../ifc/mapToJnn';
-import { computeSha256, getCachedIfcModel, saveCachedIfcModel } from '../lib/ifcCache';
+import { computeSha256, getCachedIfcModel, getIfcCacheStats, saveCachedIfcModel } from '../lib/ifcCache';
 import {
   Emitter,
   fail,
@@ -132,6 +132,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.lastCachePromise) {
       await this.lastCachePromise;
     }
+  }
+
+  async getCacheStats(): Promise<any> {
+    return getIfcCacheStats();
   }
 
   mount(container: HTMLElement): void {
@@ -472,6 +476,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         }
       }
 
+      // Yield to event loop before the heavy WASM parse (see docs/DUNG_SOM_B2.md)
+      await new Promise((r) => setTimeout(r, 0));
+
       const model = await this.ifcLoader.load(buffer, true, name, {
         processData: {
           progressCallback: (p: any) => {
@@ -481,6 +488,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
           },
         },
       });
+
+      // Yield after WASM parse completes to let pending rAF / microtasks run
+      await new Promise((r) => setTimeout(r, 0));
 
       // Model coordination: FragmentsModels with autoCoordinate = true coordinates relative to base model
       const coordMatrix = await model.getCoordinationMatrix().catch(() => new THREE.Matrix4());
@@ -536,6 +546,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         }
       }
 
+      // Yield before domain mapping
+      await new Promise((r) => setTimeout(r, 0));
+
       const jnnModel = mapIfcToJnnModel({
         modelId: name,
         filename: name,
@@ -546,6 +559,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         geometryLocalIds: geomIds,
         fileSize: buffer.byteLength,
       });
+
+      // Yield after domain mapping
+      await new Promise((r) => setTimeout(r, 0));
 
       this.modelsMap.set(name, { model, jnnModel });
       this.parsedModel = jnnModel;
@@ -564,7 +580,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       if (sha256) {
         this.lastCachePromise = (async () => {
           try {
-            const fragBuffer = await model.getBuffer(false);
+            const fragBuffer = await model.getBuffer();
             if (fragBuffer && fragBuffer.byteLength > 0) {
               await saveCachedIfcModel({
                 sha256,
