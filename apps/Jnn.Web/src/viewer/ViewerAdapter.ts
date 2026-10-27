@@ -22,6 +22,7 @@ export const fail = (code: AdapterErrorCode, message: string): AdapterResult<nev
 
 export type ViewerCapability =
   | 'loadModel'
+  | 'loadIfc'
   | 'select'
   | 'getProperties'
   | 'visibility'
@@ -83,10 +84,21 @@ export interface ViewerAdapter {
   dispose(): void;
 
   loadModel(model: JnnModel): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>>;
-  getModelBounds(): AdapterResult<Bounds>;
+  loadIfc?(
+    file: ArrayBuffer | Uint8Array,
+    name: string,
+    onProgress?: (percent: number, status?: string) => void,
+    options?: { append?: boolean; bypassCache?: boolean },
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel; fromCache?: boolean }>>;
+  removeModel?(modelId: string): AdapterResult;
+  setModelVisibility?(modelId: string, visible: boolean): AdapterResult;
+  fitToModel?(modelId: string): AdapterResult;
+  getModelBounds(modelId?: string): AdapterResult<Bounds>;
 
   select(ids: readonly string[]): AdapterResult;
-  getProperties(id: string): AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>;
+  getProperties(
+    id: string,
+  ): AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }> | Promise<AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>>;
 
   setHidden(ids: readonly string[]): AdapterResult;
   /** Empty array clears isolation. */

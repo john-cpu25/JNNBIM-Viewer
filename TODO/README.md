@@ -1,5 +1,7 @@
 # TODO — Kế hoạch công việc JNN BIM Viewer
 
+> Kế hoạch giai đoạn IFC + Clash do Claude giao nằm ngoài repo (`1_Task`). Các file M1–M7 trong thư mục này là kế hoạch dài hạn.
+
 Dự án lớn nên công việc được chia thành **task nhỏ, mỗi task làm trong 1 phiên (session)**.
 Mỗi task tự mô tả đủ ngữ cảnh: đọc gì, làm gì, khi nào là xong. Một phiên mới chỉ cần đọc
 file TODO của milestone đó cùng các file nằm trong mục "Đọc trước", không phải đọc lại toàn bộ repo.

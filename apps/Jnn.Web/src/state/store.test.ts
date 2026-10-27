@@ -1,6 +1,7 @@
 import { createSampleModel } from '../domain/sampleModel';
 import { createInitialState, defaultPlane, reducer } from './store';
 import { elementNodeId } from '../domain/tree';
+import type { Vec3 } from '../viewer/ViewerAdapter';
 
 const model = createSampleModel();
 const init = () => createInitialState(model, 'light');
@@ -55,14 +56,72 @@ describe('reducer', () => {
     for (let i = 0; i < 6; i++) s = reducer(s, { type: 'notify', tone: 'info', text: String(i) });
     expect(s.notices.map((n) => n.text)).toEqual(['2', '3', '4', '5']);
   });
+
+  it('supports federated models: append, toggle visibility, and remove', () => {
+    let s = init();
+    expect(s.models.length).toBe(1);
+    const initialCount = s.model.elements.length;
+
+    const secondModel = {
+      ...createSampleModel(),
+      modelId: 'struct-002',
+      name: 'Structure Model',
+      elements: [
+        {
+          ...model.elements[0]!,
+          id: 'struct-002:beam-1',
+          sourceElementId: 'beam-1',
+          name: 'Steel Beam W12x26',
+          category: 'IfcBeam',
+        },
+      ],
+    };
+
+    s = reducer(s, { type: 'appendModel', model: secondModel });
+    expect(s.models.length).toBe(2);
+    expect(s.model.elements.length).toBe(initialCount + 1);
+    expect(s.byId.has('struct-002:beam-1')).toBe(true);
+
+    // Hide second model
+    s = reducer(s, { type: 'toggleModelVisibility', modelId: 'struct-002' });
+    expect(s.models[1]?.visible).toBe(false);
+    expect(s.visibility.hidden.has('struct-002:beam-1')).toBe(true);
+
+    // Show second model
+    s = reducer(s, { type: 'toggleModelVisibility', modelId: 'struct-002' });
+    expect(s.models[1]?.visible).toBe(true);
+    expect(s.visibility.hidden.has('struct-002:beam-1')).toBe(false);
+
+    // Remove second model
+    s = reducer(s, { type: 'removeModel', modelId: 'struct-002' });
+    expect(s.models.length).toBe(1);
+    expect(s.model.elements.length).toBe(initialCount);
+    expect(s.byId.has('struct-002:beam-1')).toBe(false);
+  });
 });
 
 describe('defaultPlane', () => {
-  it('cuts plans 1.5 m above the lowest point', () => {
-    const p = defaultPlane('z', { min: [0, 0, -0.25], max: [10, 10, 12] });
-    expect(p).toEqual({ kind: 'plane', axis: 'z', offset: 1.25, flipped: false });
-  });
   it('cuts vertical sections through the middle', () => {
     expect(defaultPlane('x', { min: [0, 0, 0], max: [24, 10, 12] }).offset).toBe(12);
+    expect(defaultPlane('y', { min: [0, 0, 0], max: [10, 30, 12] }).offset).toBe(15);
+  });
+
+  it('cuts Z plan at 1.2m above architectural ground storey when storeys are present (FIX-B6)', () => {
+    // Clinic model case: deep foundations at -11.4m, ground floor at 0.0m, upper floors at 4m and 8m
+    const clinicBounds = { min: [-52.9, -19.9, -11.4] as Vec3, max: [2.7, 57.1, 13.8] as Vec3 };
+    const storeys = [
+      { elevation: 0.0, name: 'First Floor' },
+      { elevation: 4.0, name: 'Second Floor' },
+      { elevation: 8.0, name: 'Third Floor' },
+    ];
+    const p = defaultPlane('z', clinicBounds, storeys);
+    expect(p).toEqual({ kind: 'plane', axis: 'z', offset: 1.2, flipped: false });
+  });
+
+  it('cuts Z plan fallback appropriately when storeys are absent', () => {
+    // Model with underground piles without storey metadata -> sets 1.2m ground cut
+    expect(defaultPlane('z', { min: [0, 0, -5.0], max: [10, 10, 15] }).offset).toBe(1.2);
+    // Model starting at Z = 0 -> sets 1.2m
+    expect(defaultPlane('z', { min: [0, 0, 0], max: [10, 10, 15] }).offset).toBe(1.2);
   });
 });

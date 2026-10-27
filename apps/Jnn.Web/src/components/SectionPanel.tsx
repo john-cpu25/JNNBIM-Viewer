@@ -1,8 +1,8 @@
 import { ArrowLeftRight, X } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { defaultPlane } from '../state/store';
-import { boundsOf } from '../domain/bounds';
-import type { Bounds, SectionAxis } from '../viewer/ViewerAdapter';
+import { boundsOf, isEmpty } from '../domain/bounds';
+import type { Bounds, SectionAxis, Vec3 } from '../viewer/ViewerAdapter';
 import { IconButton, Segmented } from './ui';
 import { useMemo } from 'react';
 import { formatNumber } from '../lib/format';
@@ -12,7 +12,17 @@ const AXIS_INDEX = { x: 0, y: 1, z: 2 } as const;
 export function SectionPanel({ compact = false }: { compact?: boolean }) {
   const { state, dispatch } = useApp();
   const s = state.section!;
-  const bounds = useMemo(() => boundsOf(state.model.elements), [state.model]);
+  const bounds = useMemo(() => {
+    const b = boundsOf(state.model.elements);
+    if (!isEmpty(b)) return b;
+    if (state.model.storeys.length > 0) {
+      const elevs = state.model.storeys.map((st) => st.elevation);
+      const minZ = Math.min(...elevs);
+      const maxZ = Math.max(...elevs) + 4.0;
+      return { min: [-25, -25, minZ] as Vec3, max: [25, 25, maxZ] as Vec3 };
+    }
+    return { min: [-25, -25, -1] as Vec3, max: [25, 25, 20] as Vec3 };
+  }, [state.model]);
   const close = () => dispatch({ type: 'setSection', section: null });
 
   return (
@@ -56,7 +66,7 @@ function PlaneControls({ axis, offset, flipped, bounds: b }: { axis: SectionAxis
         <Segmented
           label="Section axis"
           value={axis}
-          onChange={(a) => dispatch({ type: 'setSection', section: { ...defaultPlane(a, b), flipped } })}
+          onChange={(a) => dispatch({ type: 'setSection', section: { ...defaultPlane(a, b, state.model?.storeys), flipped } })}
           options={[
             { value: 'x', label: 'X', title: 'Cut along X (east–west)' },
             { value: 'y', label: 'Y', title: 'Cut along Y (north–south)' },

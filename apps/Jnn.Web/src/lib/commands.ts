@@ -1,7 +1,7 @@
 import type { Dispatch } from 'react';
 import type { Action, AppState } from '../state/store';
 import { defaultPlane } from '../state/store';
-import { boundsOf, pad } from '../domain/bounds';
+import { boundsOf, isEmpty, pad } from '../domain/bounds';
 import type { ViewerAdapter, ViewerCapability } from '../viewer/ViewerAdapter';
 
 export type CommandId =
@@ -70,15 +70,30 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
       return;
     case 'sectionPlane': {
       if (s.section?.kind === 'plane') return dispatch({ type: 'setSection', section: null });
-      const b = boundsOf(s.model.elements);
-      dispatch({ type: 'setSection', section: defaultPlane('z', b) });
+      let b = boundsOf(s.model.elements);
+      if (isEmpty(b)) {
+        const vb = v?.getModelBounds();
+        if (vb?.ok) b = vb.value;
+      }
+      if (isEmpty(b)) {
+        b = { min: [-10, -10, 0], max: [10, 10, 10] };
+      }
+      dispatch({ type: 'setSection', section: defaultPlane('z', b, s.model?.storeys) });
       return;
     }
     case 'sectionBox': {
       if (s.section?.kind === 'box') return dispatch({ type: 'setSection', section: null });
       const els = sel.length ? sel.map((id) => s.byId.get(id)!).filter(Boolean) : s.model.elements;
-      const b = pad(boundsOf(els), sel.length ? 0.6 : 0.01);
-      dispatch({ type: 'setSection', section: { kind: 'box', min: b.min, max: b.max } });
+      let b = boundsOf(els);
+      if (isEmpty(b)) {
+        const vb = v?.getModelBounds();
+        if (vb?.ok) b = vb.value;
+      }
+      if (isEmpty(b)) {
+        b = { min: [-10, -10, 0], max: [10, 10, 10] };
+      }
+      const pb = pad(b, sel.length ? 0.6 : 0.01);
+      dispatch({ type: 'setSection', section: { kind: 'box', min: pb.min, max: pb.max } });
       return;
     }
     case 'projection':

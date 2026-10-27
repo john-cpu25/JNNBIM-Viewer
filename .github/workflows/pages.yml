@@ -36,6 +36,12 @@ jobs:
         run: npm test
       - name: Build (type-check + Vite)
         run: npm run build
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: E2E tests with IFC
+        run: npm run test:e2e
+        env:
+          CI: 'true'
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

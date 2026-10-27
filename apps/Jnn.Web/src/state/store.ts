@@ -1,5 +1,5 @@
-import type { JnnElement, JnnModel } from '../domain/model';
-import { indexElements } from '../domain/model';
+import type { FederatedModel, JnnElement, JnnModel } from '../domain/model';
+import { createFederatedModel, indexElements } from '../domain/model';
 import {
   allBranchIds,
   ancestorIds,
@@ -22,10 +22,11 @@ export interface Notice {
 
 export interface AppState {
   model: JnnModel;
+  models: FederatedModel[];
   byId: Map<string, JnnElement>;
-  trees: Record<TreeMode, TreeNode>;
+  trees: Record<'spatial' | 'category', TreeNode>;
   treeMode: TreeMode;
-  expanded: Record<TreeMode, Set<string>>;
+  expanded: Record<'spatial' | 'category', Set<string>>;
   search: string;
   /** Ordered; last item is the "primary" selection shown in Properties. */
   selection: string[];
@@ -62,14 +63,29 @@ export type Action =
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
-  | { type: 'dismissNotice'; id: number };
+  | { type: 'dismissNotice'; id: number }
+  | { type: 'setModel'; model: JnnModel }
+  | { type: 'appendModel'; model: JnnModel }
+  | { type: 'removeModel'; modelId: string }
+  | { type: 'toggleModelVisibility'; modelId: string; visible?: boolean };
 
 let noticeSeq = 1;
 
 export function createInitialState(model: JnnModel, theme: Theme): AppState {
-  const trees = { spatial: buildTree(model, 'spatial'), category: buildTree(model, 'category') };
+  const fed: FederatedModel = {
+    modelId: model.modelId,
+    name: model.name,
+    fileName: model.name,
+    schema: model.ifcSchema,
+    elementCount: model.elements.length,
+    visible: true,
+    jnnModel: model,
+  };
+  const models = [fed];
+  const trees = { spatial: buildTree(model, 'spatial', models), category: buildTree(model, 'category', models) };
   return {
     model,
+    models,
     byId: indexElements(model),
     trees,
     treeMode: 'spatial',
@@ -135,15 +151,20 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'setTreeMode':
       return { ...state, treeMode: action.mode };
     case 'toggleExpanded': {
+      if (state.treeMode === 'models') return state;
       const s = new Set(state.expanded[state.treeMode]);
       if (s.has(action.nodeId)) s.delete(action.nodeId);
       else s.add(action.nodeId);
       return { ...state, expanded: { ...state.expanded, [state.treeMode]: s } };
     }
-    case 'expandAll':
+    case 'expandAll': {
+      if (state.treeMode === 'models') return state;
       return { ...state, expanded: { ...state.expanded, [state.treeMode]: new Set(allBranchIds(state.trees[state.treeMode])) } };
-    case 'collapseAll':
+    }
+    case 'collapseAll': {
+      if (state.treeMode === 'models') return state;
       return { ...state, expanded: { ...state.expanded, [state.treeMode]: defaultExpanded(state.trees[state.treeMode]) } };
+    }
     case 'setSearch':
       return { ...state, search: action.query };
     case 'setSection':
@@ -164,15 +185,117 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, notices: [...state.notices.slice(-3), { id: noticeSeq++, tone: action.tone, text: action.text }] };
     case 'dismissNotice':
       return { ...state, notices: state.notices.filter((n) => n.id !== action.id) };
+    case 'setModel': {
+      const initial = createInitialState(action.model, state.theme);
+      return {
+        ...initial,
+        theme: state.theme,
+        explorerOpen: state.explorerOpen,
+        propertiesOpen: state.propertiesOpen,
+        mobilePane: state.mobilePane,
+      };
+    }
+    case 'appendModel': {
+      const fed: FederatedModel = {
+        modelId: action.model.modelId,
+        name: action.model.name,
+        fileName: action.model.name,
+        schema: action.model.ifcSchema,
+        elementCount: action.model.elements.length,
+        visible: true,
+        jnnModel: action.model,
+      };
+      const existing = state.models.findIndex((m) => m.modelId === action.model.modelId);
+      const nextModels = existing >= 0
+        ? state.models.map((m, i) => (i === existing ? fed : m))
+        : [...state.models.filter((m) => m.modelId !== 'empty'), fed];
+      const combined = createFederatedModel(nextModels);
+      const byId = indexElements(combined);
+      const trees = {
+        spatial: buildTree(combined, 'spatial', nextModels),
+        category: buildTree(combined, 'category', nextModels),
+      };
+      return {
+        ...state,
+        model: combined,
+        models: nextModels,
+        byId,
+        trees,
+        expanded: { spatial: defaultExpanded(trees.spatial), category: defaultExpanded(trees.category) },
+      };
+    }
+    case 'removeModel': {
+      const nextModels = state.models.filter((m) => m.modelId !== action.modelId);
+      const combined = createFederatedModel(nextModels);
+      const byId = indexElements(combined);
+      const trees = {
+        spatial: buildTree(combined, 'spatial', nextModels),
+        category: buildTree(combined, 'category', nextModels),
+      };
+      return {
+        ...state,
+        model: combined,
+        models: nextModels,
+        byId,
+        trees,
+        selection: state.selection.filter((id) => byId.has(id)),
+        expanded: { spatial: defaultExpanded(trees.spatial), category: defaultExpanded(trees.category) },
+      };
+    }
+    case 'toggleModelVisibility': {
+      const target = state.models.find((m) => m.modelId === action.modelId);
+      if (!target) return state;
+      const isNowVisible = action.visible !== undefined ? action.visible : !target.visible;
+      const nextModels = state.models.map((m) => (m.modelId === action.modelId ? { ...m, visible: isNowVisible } : m));
+      const targetIds = target.jnnModel.elements.map((e) => e.id);
+      const visibility = isNowVisible ? show(state.visibility, targetIds) : hide(state.visibility, targetIds);
+      return {
+        ...state,
+        models: nextModels,
+        visibility,
+        selection: isNowVisible ? state.selection : state.selection.filter((id) => !targetIds.includes(id)),
+      };
+    }
   }
 }
 
-/** Default section plane for an axis: through the middle of the model. */
-export function defaultPlane(axis: SectionAxis, bounds: { min: Vec3; max: Vec3 }): Extract<SectionSpec, { kind: 'plane' }> {
+/** Default section plane for an axis: through the middle of the model, or 1.2m above ground storey for Z. */
+export function defaultPlane(
+  axis: SectionAxis,
+  bounds: { min: Vec3; max: Vec3 },
+  storeys?: Array<{ elevation: number; name?: string }>
+): Extract<SectionSpec, { kind: 'plane' }> {
   const i = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
   const mid = (bounds.min[i]! + bounds.max[i]!) / 2;
-  // For horizontal cuts, a plan-style cut ~1.2 m above the lowest floor is
-  // more useful than the geometric middle.
-  const offset = axis === 'z' ? Math.min(bounds.max[2], bounds.min[2] + 1.5) : mid;
+
+  let offset = mid;
+  if (axis === 'z') {
+    if (storeys && storeys.length > 0) {
+      // Find ground floor / first floor with elevation >= -0.5m, or closest to 0
+      const validStoreys = storeys
+        .filter((s) => typeof s.elevation === 'number' && !isNaN(s.elevation))
+        .sort((a, b) => a.elevation - b.elevation);
+
+      if (validStoreys.length > 0) {
+        // Priority 1: Storey named "First Floor", "Ground", "Tầng 1", or elevation in [-0.5m, 1.5m]
+        const groundStorey =
+          validStoreys.find((s) => {
+            const name = (s.name || '').toLowerCase();
+            return name.includes('first') || name.includes('ground') || name.includes('tầng 1') || name.includes('level 1');
+          }) ??
+          validStoreys.find((s) => s.elevation >= -0.5 && s.elevation <= 1.5) ??
+          validStoreys.find((s) => s.elevation >= -0.5) ??
+          validStoreys[0];
+
+        if (groundStorey) {
+          offset = groundStorey.elevation + 1.2;
+        }
+      }
+    } else {
+      // Fallback if no storey data: if min Z is underground (footings/piles), use 1.2m, else min[2] + 1.2m
+      offset = bounds.min[2] < -0.5 ? 1.2 : bounds.min[2] + 1.2;
+    }
+  }
+
   return { kind: 'plane', axis, offset: Math.round(offset * 100) / 100, flipped: false };
 }

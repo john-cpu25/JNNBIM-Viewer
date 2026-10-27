@@ -1,0 +1,216 @@
+{
+  "metadata": {
+    "schema": "IFC2X3",
+    "names": [
+      "Building-Architecture.ifc",
+      "2026-06-23T11:53:12",
+      "",
+      "",
+      "Sketchup-IFC-manager 5.6.0 / SketchUp 2026 (26.2.242)",
+      "BIM_Tools - Sketchup_IFC_manager - 5.6.0",
+      "None"
+    ]
+  },
+  "spatialStructure": {
+    "category": "IFCPROJECT",
+    "localId": null,
+    "children": [
+      {
+        "category": null,
+        "localId": 13,
+        "children": [
+          {
+            "category": "IFCSITE",
+            "localId": null,
+            "children": [
+              {
+                "category": null,
+                "localId": 18,
+                "children": [
+                  {
+                    "category": "IFCBUILDING",
+                    "localId": null,
+                    "children": [
+                      {
+                        "category": null,
+                        "localId": 25,
+                        "children": [
+                          {
+                            "category": "IFCBUILDINGSTOREY",
+                            "localId": null,
+                            "children": [
+                              {
+                                "category": null,
+                                "localId": 36,
+                                "children": [
+                                  {
+                                    "category": "IFCSLAB",
+                                    "localId": null,
+                                    "children": [{ "category": null, "localId": 44 }]
+                                  },
+                                  {
+                                    "category": "IFCWALL",
+                                    "localId": null,
+                                    "children": [
+                                      { "category": null, "localId": 319 },
+                                      { "category": null, "localId": 370 },
+                                      { "category": null, "localId": 415 },
+                                      { "category": null, "localId": 468 }
+                                    ]
+                                  },
+                                  {
+                                    "category": "IFCBUILDINGELEMENTPROXY",
+                                    "localId": null,
+                                    "children": [{ "category": null, "localId": 460 }]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "category": "IFCROOF",
+                        "localId": null,
+                        "children": [
+                          {
+                            "category": null,
+                            "localId": 546,
+                            "children": [
+                              {
+                                "category": "IFCSLAB",
+                                "localId": null,
+                                "children": [
+                                  { "category": null, "localId": 555 },
+                                  { "category": null, "localId": 606 }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "spatialHeaders": [
+    {
+      "_category": { "value": "IFCPROJECT" },
+      "_localId": { "value": 13 },
+      "_guid": { "value": "2Ndyd$OSX7s9A04nc4lyye" },
+      "Name": { "value": "ifc silly sample scene - project" }
+    },
+    {
+      "_category": { "value": "IFCSITE" },
+      "_localId": { "value": 18 },
+      "_guid": { "value": "23sFQGRy90RxVbRHD9iSE2" },
+      "Name": { "value": "environment - site" }
+    },
+    {
+      "_category": { "value": "IFCBUILDING" },
+      "_localId": { "value": 25 },
+      "_guid": { "value": "0c$N1CTon2BB2Sp89385G8" },
+      "Name": { "value": "Single-family house" }
+    },
+    {
+      "_category": { "value": "IFCBUILDINGSTOREY" },
+      "_localId": { "value": 36 },
+      "_guid": { "value": "1Ano2ZUxnEIvVQ_beukl8b" },
+      "Name": { "value": "00 groundfloor" },
+      "Elevation": { "value": 0 }
+    }
+  ],
+  "itemsBasic": [
+    {
+      "_category": { "value": "IFCWALL" },
+      "_localId": { "value": 319 },
+      "_guid": { "value": "1AQAupaRP1txwK1AGiN61V" },
+      "Name": { "value": "house - outer wall - house right front" },
+      "ObjectType": { "value": "solidwall" },
+      "Tag": { "value": "454425" }
+    },
+    {
+      "_category": { "value": "IFCSLAB" },
+      "_localId": { "value": 44 },
+      "_guid": { "value": "0D4R9wY9b7gO9w3Q2" },
+      "Name": { "value": "Floor Slab" },
+      "ObjectType": { "value": "slab" }
+    },
+    {
+      "_category": { "value": "IFCROOF" },
+      "_localId": { "value": 546 },
+      "_guid": { "value": "3K1b_9x8e820L" },
+      "Name": { "value": "Pitched Roof" },
+      "ObjectType": { "value": "roof" }
+    }
+  ],
+  "wall319Full": {
+    "_category": { "value": "IFCWALL" },
+    "_localId": { "value": 319 },
+    "_guid": { "value": "1AQAupaRP1txwK1AGiN61V" },
+    "Name": { "value": "house - outer wall - house right front" },
+    "Description": { "value": "A solid outer wall, forming the right front side of the house." },
+    "ObjectType": { "value": "solidwall" },
+    "Tag": { "value": "454425" },
+    "IsDefinedBy": [
+      {
+        "_category": { "value": "IFCWALLTYPE" },
+        "_localId": { "value": 317 },
+        "Name": { "value": "Basic Wall: Timber 200mm" },
+        "ElementType": { "value": "solidwall" }
+      },
+      {
+        "_category": { "value": "IFCELEMENTQUANTITY" },
+        "_localId": { "value": 326 },
+        "Name": { "value": "Qto_WallBaseQuantities" },
+        "Quantities": [
+          {
+            "_category": { "value": "IFCQUANTITYVOLUME" },
+            "Name": { "value": "NetVolume" },
+            "VolumeValue": { "value": 1.269 }
+          },
+          {
+            "_category": { "value": "IFCQUANTITYLENGTH" },
+            "Name": { "value": "Width" },
+            "LengthValue": { "value": 0.2 }
+          },
+          {
+            "_category": { "value": "IFCQUANTITYLENGTH" },
+            "Name": { "value": "Length" },
+            "LengthValue": { "value": 1.8 }
+          },
+          {
+            "_category": { "value": "IFCQUANTITYAREA" },
+            "Name": { "value": "NetSideArea" },
+            "AreaValue": { "value": 6.346 }
+          }
+        ]
+      },
+      {
+        "_category": { "value": "IFCPROPERTYSET" },
+        "_localId": { "value": 330 },
+        "Name": { "value": "Pset_WallCommon" },
+        "HasProperties": [
+          {
+            "Name": { "value": "LoadBearing" },
+            "NominalValue": { "value": true }
+          },
+          {
+            "Name": { "value": "IsExternal" },
+            "NominalValue": { "value": true }
+          },
+          {
+            "Name": { "value": "FireRating" },
+            "NominalValue": { "value": "REI 60" }
+          }
+        ]
+      }
+    ]
+  }
+}

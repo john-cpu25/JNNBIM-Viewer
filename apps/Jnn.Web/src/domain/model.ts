@@ -98,11 +98,31 @@ export interface JnnModel {
   upAxis: 'Z';
   storeys: Storey[];
   elements: JnnElement[];
+  application?: string;
+  fileSize?: number;
+  ifcSchema?: string;
 }
 
 export const IDENTITY_TRANSFORM: Transform = Object.freeze([
   1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
 ]);
+
+export function createEmptyModel(): JnnModel {
+  return {
+    schemaVersion: JNN_SCHEMA_VERSION,
+    modelId: 'empty',
+    modelRevisionId: 'rev-0',
+    name: 'Chưa có mô hình',
+    projectName: 'Dự án mới',
+    siteName: '',
+    buildingName: '',
+    sourceFormat: 'IFC',
+    units: 'm',
+    upAxis: 'Z',
+    storeys: [],
+    elements: [],
+  };
+}
 
 export function indexElements(model: JnnModel): Map<string, JnnElement> {
   return new Map(model.elements.map((e) => [e.id, e]));
@@ -125,4 +145,52 @@ export function elementMark(el: JnnElement): string | null {
 export function elementLabel(el: JnnElement): string {
   const mark = elementMark(el);
   return mark ? `${mark} · ${el.type}` : el.name;
+}
+
+export interface FederatedModel {
+  modelId: string;
+  name: string;
+  fileName: string;
+  schema?: string;
+  elementCount: number;
+  visible: boolean;
+  color?: string;
+  jnnModel: JnnModel;
+}
+
+export function createFederatedModel(models: FederatedModel[]): JnnModel {
+  if (models.length === 0) return createEmptyModel();
+  if (models.length === 1) return models[0]!.jnnModel;
+
+  const first = models[0]!.jnnModel;
+  const allElements = models.flatMap((m) => m.jnnModel.elements);
+
+  const storeyMap = new Map<string, Storey>();
+  for (const m of models) {
+    for (const s of m.jnnModel.storeys) {
+      if (!storeyMap.has(s.name)) {
+        storeyMap.set(s.name, s);
+      }
+    }
+  }
+  const storeys = [...storeyMap.values()].sort((a, b) => a.elevation - b.elevation);
+  const totalSize = models.reduce((acc, m) => acc + (m.jnnModel.fileSize ?? 0), 0);
+
+  return {
+    schemaVersion: JNN_SCHEMA_VERSION,
+    modelId: 'federated',
+    name: `${models.length} Models (Federated)`,
+    projectName: first.projectName,
+    siteName: first.siteName,
+    buildingName: first.buildingName,
+    modelRevisionId: 'rev-001',
+    sourceFormat: 'IFC',
+    units: first.units,
+    upAxis: 'Z',
+    storeys,
+    elements: allElements,
+    fileSize: totalSize > 0 ? totalSize : undefined,
+    ifcSchema: [...new Set(models.map((m) => m.schema).filter(Boolean))].join(', ') || undefined,
+    application: [...new Set(models.map((m) => m.jnnModel.application).filter(Boolean))].join(' | ') || undefined,
+  };
 }

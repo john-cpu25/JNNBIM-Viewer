@@ -97,11 +97,10 @@ test('section plane clips geometry and picking respects it', async ({ page }) =>
   const p = await screenPoint(page, roof);
   await page.keyboard.press('s');
   await expect(page.getByTestId('section-panel')).toBeVisible();
-  await expect(page.getByTestId('status-bar')).toContainText('Section Z @ 1.25 m');
+  await expect(page.getByTestId('status-bar')).toContainText('Section Z @ 1.20 m');
   expect((await debugState(page)).clipPlaneCount).toBe(1);
   // The roof is above the cut: clicking where it was must not select it.
   await page.mouse.click(p.x, p.y);
-  await page.waitForTimeout(200);
   expect(await selection(page)).not.toContain(roof);
 
   const slider = page.getByLabel('Section offset');

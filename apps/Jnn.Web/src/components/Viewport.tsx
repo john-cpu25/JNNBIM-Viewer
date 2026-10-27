@@ -1,43 +1,63 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Box, FolderOpen, Loader2, Sparkles, UploadCloud } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
-import type { ViewerAdapter } from '../viewer/ViewerAdapter';
+import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
+import type { AdapterResult, ViewerAdapter } from '../viewer/ViewerAdapter';
 import { useApp } from '../state/AppContext';
 import { Toolbar } from './Toolbar';
 import { ViewPresets } from './ViewPresets';
 import { SectionPanel } from './SectionPanel';
+import { loadIfcFile } from '../lib/ifcLoaderHelper';
+import { cn } from '../lib/cn';
 
 declare global {
   interface Window {
     /** Test/debug hook — only installed in dev builds or with `?debug=1`. */
-    __jnn?: { viewer: ThreeViewerAdapter; getState: () => unknown };
+    __jnn?: { viewer: ViewerAdapter; getState: () => unknown };
   }
 }
 
 const debugEnabled = () => import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
 
+export const isSampleMode = () => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('sample') === '1' || import.meta.env.MODE === 'test';
+};
+
 export function Viewport({ model, onViewer, compact }: { model: JnnModel; onViewer: (v: ViewerAdapter | null) => void; compact: boolean }) {
   const { state, dispatch, viewer } = useApp();
   const hostRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertStatus, setConvertStatus] = useState<string>('');
+
+  const sample = isSampleMode();
 
   // Create / dispose the adapter with the component.
   useEffect(() => {
     const host = hostRef.current!;
-    let adapter: ThreeViewerAdapter;
+    let adapter: ViewerAdapter;
+    let cancelled = false;
+
     try {
-      adapter = new ThreeViewerAdapter();
+      if (sample) {
+        adapter = new ThreeViewerAdapter();
+      } else {
+        adapter = new ThatOpenViewerAdapter();
+      }
       adapter.mount(host);
     } catch (e) {
       setStatus('error');
       setError(e instanceof Error ? e.message : String(e));
       return;
     }
-    let cancelled = false;
+
     const offPick = adapter.on('pick', ({ result, additive }) => {
       if (!result) {
         if (!additive) dispatch({ type: 'clearSelection' });
@@ -46,17 +66,25 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       dispatch({ type: 'select', ids: [result.elementId], mode: additive ? 'toggle' : 'replace', reveal: true });
     });
     const offHover = adapter.on('hover', ({ elementId }) => dispatch({ type: 'hover', id: elementId }));
-    adapter.loadModel(model).then((r) => {
-      if (cancelled) return;
-      if (r.ok) {
-        setStatus('ready');
-        onViewer(adapter);
-        if (debugEnabled()) window.__jnn = { viewer: adapter, getState: () => stateRef.current };
-      } else {
-        setStatus('error');
-        setError(r.message);
-      }
-    });
+
+    if (sample) {
+      adapter.loadModel(model).then((r) => {
+        if (cancelled) return;
+        if (r.ok) {
+          setStatus('ready');
+          onViewer(adapter);
+          if (debugEnabled()) window.__jnn = { viewer: adapter, getState: () => stateRef.current };
+        } else {
+          setStatus('error');
+          setError(r.message);
+        }
+      });
+    } else {
+      setStatus('ready');
+      onViewer(adapter);
+      if (debugEnabled()) window.__jnn = { viewer: adapter, getState: () => stateRef.current };
+    }
+
     return () => {
       cancelled = true;
       offPick();
@@ -65,11 +93,20 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       adapter.dispose();
       if (window.__jnn?.viewer === adapter) delete window.__jnn;
     };
-  }, [model, dispatch, onViewer]);
+  }, [sample, dispatch, onViewer]);
+
+  // In sample mode, reload if model changes without remounting the adapter
+  useEffect(() => {
+    if (sample && viewer && model.modelId !== 'empty') {
+      viewer.loadModel(model);
+    }
+  }, [sample, viewer, model]);
 
   // State → viewer synchronisation. Each effect reports adapter failures.
-  const report = (r: { ok: boolean; message?: string } | undefined) => {
-    if (r && !r.ok) dispatch({ type: 'notify', tone: 'warning', text: r.message ?? 'Viewer operation failed.' });
+  const report = (r: AdapterResult | undefined) => {
+    if (r && !r.ok && r.code !== 'unsupported') {
+      dispatch({ type: 'notify', tone: 'warning', text: r.message ?? 'Viewer operation failed.' });
+    }
   };
   useEffect(() => report(viewer?.select(state.selection)), [viewer, state.selection]);
   useEffect(() => {
@@ -82,11 +119,70 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   useEffect(() => report(viewer?.setProjection(state.projection)), [viewer, state.projection]);
   useEffect(() => viewer?.setTheme(state.theme), [viewer, state.theme]);
 
+  // Drag and drop handler
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const handleDragLeave = () => setIsDragging(false);
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setIsConverting(true);
+      setConvertStatus('Đang nạp file kéo thả...');
+      await loadIfcFile(file, viewer, dispatch, {
+        onProgress: (pct, msg) => setConvertStatus(`${msg || 'Đang xử lý'} (${pct.toFixed(0)}%)`),
+      });
+      setIsConverting(false);
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIsConverting(true);
+      setConvertStatus('Đang đọc file IFC...');
+      await loadIfcFile(file, viewer, dispatch, {
+        onProgress: (pct, msg) => setConvertStatus(`${msg || 'Đang xử lý'} (${pct.toFixed(0)}%)`),
+      });
+      setIsConverting(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleLoadSample = async (samplePath: string) => {
+    setIsConverting(true);
+    setConvertStatus('Đang tải mô hình mẫu...');
+    const url = new URL(samplePath, window.location.href).href;
+    await loadIfcFile(url, viewer, dispatch, {
+      onProgress: (pct, msg) => setConvertStatus(`${msg || 'Đang xử lý'} (${pct.toFixed(0)}%)`),
+    });
+    setIsConverting(false);
+  };
+
   const hovered = state.hovered ? state.byId.get(state.hovered) : null;
+  const showEmptyState = !sample && state.model.modelId === 'empty' && !isConverting;
 
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div
+      className={cn('absolute inset-0 overflow-hidden', isDragging && 'ring-2 ring-inset ring-accent')}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".ifc"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       <div ref={hostRef} className="absolute inset-0" data-testid="viewer-host" data-status={status} />
+
       {status === 'loading' && (
         <div className="absolute inset-0 grid place-items-center text-muted">
           <div className="flex items-center gap-2 text-sm">
@@ -94,6 +190,17 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           </div>
         </div>
       )}
+
+      {isConverting && (
+        <div className="absolute inset-0 z-40 grid place-items-center bg-surface/70 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface p-6 shadow-float">
+            <Loader2 className="animate-spin text-accent" size={28} />
+            <div className="text-sm font-medium text-ink">{convertStatus || 'Đang chuyển đổi mô hình sang Fragments...'}</div>
+            <div className="text-xs text-muted">Web Worker & WebAssembly (offline)</div>
+          </div>
+        </div>
+      )}
+
       {status === 'error' && (
         <div role="alert" className="absolute inset-0 grid place-items-center p-6 text-center">
           <div className="max-w-sm rounded-lg border border-line bg-surface p-4 shadow-float">
@@ -103,6 +210,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           </div>
         </div>
       )}
+
       {status === 'ready' && (
         <>
           <ViewPresets />
@@ -111,6 +219,57 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           {hovered && !compact && (
             <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-surface/90 px-2.5 py-1 text-xs text-muted shadow-float backdrop-blur">
               <span className="text-ink">{hovered.category}</span> · {hovered.name}
+            </div>
+          )}
+
+          {showEmptyState && (
+            <div className="pointer-events-auto absolute inset-0 z-10 flex flex-col items-center justify-center p-4">
+              <div className="flex max-w-md flex-col items-center rounded-2xl border border-line bg-surface/90 p-8 text-center shadow-float backdrop-blur-md">
+                <div className="mb-4 grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent">
+                  <UploadCloud size={28} />
+                </div>
+                <h2 className="mb-1.5 text-base font-semibold text-ink">Mở file IFC để bắt đầu</h2>
+                <p className="mb-6 text-xs leading-relaxed text-muted">
+                  Kéo và thả file IFC vào khung nhìn 3D này, hoặc chọn từ máy tính để phân tích và xem mô hình.
+                </p>
+
+                <div className="flex w-full flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-accent-contrast shadow-sm transition hover:bg-accent-hover active:scale-[0.99]"
+                  >
+                    <FolderOpen size={15} />
+                    <span>Chọn file IFC từ máy</span>
+                  </button>
+
+                  <div className="relative my-1 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-line"></div>
+                    </div>
+                    <span className="relative bg-surface px-2 text-[11px] uppercase tracking-wider text-faint">hoặc thử file mẫu</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSample('./samples/building-arch-2x3.ifc')}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
+                    >
+                      <Sparkles size={13} className="text-accent" />
+                      <span>Kiến trúc (90 KB)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSample('./samples/building-struct-2x3.ifc')}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
+                    >
+                      <Box size={13} className="text-accent" />
+                      <span>Kết cấu (106 KB)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </>

@@ -260,7 +260,15 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     return ok({ elementCount: this.entries.size, bounds });
   }
 
-  getModelBounds(): AdapterResult<Bounds> {
+  async loadIfc(
+    _file: ArrayBuffer | Uint8Array,
+    _name: string,
+    _onProgress?: (percent: number, status?: string) => void,
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>> {
+    return fail('unsupported', 'ThreeViewerAdapter does not support IFC loading. Use ThatOpenViewerAdapter.');
+  }
+
+  getModelBounds(_modelId?: string): AdapterResult<Bounds> {
     return this.modelBounds ? ok(this.modelBounds) : fail('not-loaded', 'No model loaded.');
   }
 
@@ -738,6 +746,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
       clipPlaneCount: this.clipPlanes.length,
       projection: this.cameraState().projection,
       xray: this.xray,
+      models: this.modelBounds ? [{ id: 'model', elementCount: this.entries.size, bounds: this.modelBounds }] : [],
     };
   }
 }

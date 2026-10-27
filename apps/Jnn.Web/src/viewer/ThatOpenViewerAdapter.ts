@@ -1,0 +1,1383 @@
+/**
+ * ThatOpenViewerAdapter — implementation of ViewerAdapter using That Open Engine
+ * (@thatopen/components, @thatopen/fragments, web-ifc) for high-performance IFC rendering.
+ *
+ * Coordinates:
+ * - Model coordinates in JNN/IFC use +Z up.
+ * - That Open / Three.js scene uses +Y up.
+ * - Transformation:
+ *     toThree: (x, y, z) -> (x, z, -y)
+ *     toModel: (x, y, z) -> (x, -z, y)
+ */
+import * as THREE from 'three';
+import * as OBC from '@thatopen/components';
+import * as OBCF from '@thatopen/components-front';
+import * as WebIFC from 'web-ifc';
+import type { FragmentsModel } from '@thatopen/fragments';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
+import { center as boundsCenter, size as boundsSize } from '../domain/bounds';
+import { isVisible, type VisibilityState } from '../domain/visibility';
+import {
+  mapIfcToJnnModel,
+  parseItemPropertiesAndQuantities,
+  parseSpatialStructure,
+  type SpatialNode,
+} from '../ifc/mapToJnn';
+import { computeSha256, getCachedIfcModel, getIfcCacheStats, saveCachedIfcModel } from '../lib/ifcCache';
+import {
+  Emitter,
+  fail,
+  ok,
+  okVoid,
+  type AdapterResult,
+  type Bounds,
+  type CameraState,
+  type PickResult,
+  type SectionSpec,
+  type Vec3,
+  type ViewerAdapter,
+  type ViewerCapability,
+  type ViewerEvents,
+  type ViewPreset,
+} from './ViewerAdapter';
+
+// Global patch for WebIFC 0.0.78 StreamMeshes signature mismatch
+let webIfcPatched = false;
+function patchWebIfcOnce() {
+  if (webIfcPatched) return;
+  webIfcPatched = true;
+  const orig = WebIFC.IfcAPI.prototype.StreamMeshes;
+  WebIFC.IfcAPI.prototype.StreamMeshes = function (
+    modelID: number,
+    expressIDs: number[],
+    meshCallback: any,
+    ...args: any[]
+  ) {
+    try {
+      return (this as any).wasmModule.StreamMeshes(modelID, expressIDs, meshCallback);
+    } catch {
+      return orig.call(this, modelID, expressIDs, meshCallback, ...args);
+    }
+  };
+}
+
+const THEME_COLORS = {
+  light: 0xeef0f2,
+  dark: 0x15181c,
+} as const;
+
+const PRESET_DIRS: Record<ViewPreset, Vec3> = {
+  iso: [1, -1, 0.8],
+  top: [0, -0.0001, 1],
+  bottom: [0, 0.0001, -1],
+  front: [0, -1, 0],
+  back: [0, 1, 0],
+  left: [-1, 0, 0],
+  right: [1, 0, 0],
+};
+
+const toThree = (p: Vec3): THREE.Vector3 => new THREE.Vector3(p[0], p[2], -p[1]);
+const toModel = (v: THREE.Vector3): Vec3 => [v.x, -v.z, v.y];
+
+export class ThatOpenViewerAdapter implements ViewerAdapter {
+  readonly id = 'thatopen';
+  readonly capabilities: ReadonlySet<ViewerCapability> = new Set<ViewerCapability>([
+    'loadModel',
+    'loadIfc',
+    'fitToView',
+    'camera',
+    'getProperties',
+    'select',
+    'visibility',
+    'isolate',
+    'highlight',
+    'xray',
+    'sectionPlane',
+    'sectionBox',
+  ]);
+
+  private readonly events = new Emitter<ViewerEvents>();
+  private components: OBC.Components | null = null;
+  private world: (OBC.SimpleWorld<OBC.SimpleScene, OBC.OrthoPerspectiveCamera, OBC.SimpleRenderer>) | null = null;
+  private fragments: OBC.FragmentsManager | null = null;
+  private ifcLoader: OBC.IfcLoader | null = null;
+  private activeModel: FragmentsModel | null = null;
+  private modelsMap = new Map<string, { model: FragmentsModel; jnnModel: JnnModel }>();
+  private modelBounds: Bounds | null = null;
+  private parsedModel: JnnModel | null = null;
+  private propertiesCache = new Map<string, { element: JnnElement; propertySets: PropertySet[] }>();
+  private disposed = false;
+  private initializedPromise: Promise<void> | null = null;
+  private currentProjection: CameraState['projection'] = 'perspective';
+  private currentTheme: 'light' | 'dark' = 'dark';
+
+  private selection = new Set<string>();
+  private visibility: VisibilityState = { hidden: new Set(), isolated: new Set() };
+  private activeHighlightStyles = new Set<string>();
+  private xray = false;
+  private highlighter: OBCF.Highlighter | null = null;
+  private pointerDown: { x: number; y: number } | null = null;
+  private lastHoverAt = 0;
+  private hovered: string | null = null;
+  private boundCanvas: HTMLCanvasElement | null = null;
+
+  private clipPlanes: THREE.Plane[] = [];
+  private sectionHelper: THREE.Object3D | null = null;
+  private clipStyler: OBCF.ClipStyler | null = null;
+  private activeClipEdges: any | null = null;
+  private lastCachePromise: Promise<void> | null = null;
+
+  async waitForCache(): Promise<void> {
+    if (this.lastCachePromise) {
+      await this.lastCachePromise;
+    }
+  }
+
+  async getCacheStats(): Promise<any> {
+    return getIfcCacheStats();
+  }
+
+  mount(container: HTMLElement): void {
+    patchWebIfcOnce();
+
+    const components = new OBC.Components();
+    this.components = components;
+
+    const worlds = components.get(OBC.Worlds);
+    const world = worlds.create<
+      OBC.SimpleScene,
+      OBC.OrthoPerspectiveCamera,
+      OBC.SimpleRenderer
+    >();
+    this.world = world;
+
+    world.scene = new OBC.SimpleScene(components);
+    world.renderer = new OBC.SimpleRenderer(components, container);
+    world.camera = new OBC.OrthoPerspectiveCamera(components);
+
+    components.init();
+
+    world.scene.setup({
+      backgroundColor: new THREE.Color(THEME_COLORS[this.currentTheme]),
+    });
+
+    world.camera.controls.setLookAt(15, 15, 15, 0, 0, 0);
+
+    // Subtle ground grid
+    const gridHelper = new THREE.GridHelper(50, 50, 0xf97316, 0x2d333b);
+    gridHelper.position.y = -0.01;
+    world.scene.three.add(gridHelper);
+
+    // Setup local worker & wasm
+    this.initializedPromise = this.initEngine();
+
+    // Canvas pointer event listeners (≤ 5px drag threshold separation)
+    const canvas = world.renderer.three.domElement;
+    this.boundCanvas = canvas;
+    canvas.setAttribute('data-testid', 'viewer-canvas');
+    canvas.addEventListener('pointerdown', this.onPointerDown);
+    canvas.addEventListener('pointerup', this.onPointerUp);
+    canvas.addEventListener('pointermove', this.onPointerMove);
+    canvas.addEventListener('pointerleave', this.onPointerLeave);
+
+    // Camera change event listener
+    world.camera.controls.addEventListener('update', () => {
+      if (this.disposed) return;
+      const cam = this.getCamera();
+      if (cam.ok) {
+        this.events.emit('cameraChange', cam.value);
+      }
+    });
+  }
+
+  private async initEngine(): Promise<void> {
+    if (!this.components || !this.world) return;
+    const fragments = this.components.get(OBC.FragmentsManager);
+    this.fragments = fragments;
+
+    const workerUrl = new URL('./thatopen/worker.mjs', window.location.href).href;
+    await fragments.init(workerUrl);
+
+    this.world.camera.controls.addEventListener('update', () => {
+      fragments.core.update();
+    });
+
+    fragments.list.onItemSet.add(({ value: model }) => {
+      if (this.world) {
+        model.useCamera(this.world.camera.three);
+        this.world.scene.three.add(model.object);
+        fragments.core.update(true);
+      }
+    });
+
+    const ifcLoader = this.components.get(OBC.IfcLoader);
+    this.ifcLoader = ifcLoader;
+
+    const wasmDir = new URL('./thatopen/', window.location.href).href;
+    await ifcLoader.setup({
+      autoSetWasm: false,
+      wasm: {
+        path: wasmDir,
+        absolute: true,
+      },
+    });
+
+    // Highlighter setup with accent orange selection and lighter hover
+    const highlighter = this.components.get(OBCF.Highlighter);
+    this.highlighter = highlighter;
+    await highlighter.setup({
+      world: this.world,
+      selectName: 'select',
+      selectMaterialDefinition: {
+        color: new THREE.Color(0xf08c2e),
+        renderedFaces: 0,
+        opacity: 1,
+        transparent: false,
+      },
+    });
+    (highlighter as any).setupEvents(false);
+
+    highlighter.styles.set('hover', {
+      color: new THREE.Color(0xf59f00),
+      renderedFaces: 0,
+      opacity: 0.8,
+      transparent: true,
+    });
+
+    // ClipStyler setup for section edges and filled caps
+    try {
+      const clipStyler = this.components.get(OBCF.ClipStyler);
+      this.clipStyler = clipStyler;
+      clipStyler.world = this.world;
+      clipStyler.styles.set('default', {
+        linesMaterial: new LineMaterial({ color: 0x11161d, linewidth: 2 }),
+        fillsMaterial: new THREE.MeshBasicMaterial({
+          color: 0x4a5568,
+          side: THREE.DoubleSide,
+        }),
+      });
+    } catch (err) {
+      console.warn('ClipStyler setup skipped or failed:', err);
+    }
+
+    if (this.selection.size > 0) {
+      const modelIdMap = this.toModelIdMap([...this.selection]);
+      highlighter.highlightByID('select', modelIdMap, true, false).catch(() => {});
+    }
+    if (this.visibility.hidden.size > 0 || this.visibility.isolated.size > 0) {
+      this.applyVisibility();
+    }
+    if (this.xray) {
+      this.applyXray();
+    }
+  }
+
+  private updateCombinedBoundsAndFit(fitCamera = false): Bounds | null {
+    if (!this.world) return null;
+    const combined = new THREE.Box3();
+    for (const entry of this.modelsMap.values()) {
+      if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
+        entry.model.object.updateMatrixWorld?.(true);
+        combined.union(entry.model.box);
+      }
+    }
+    if (!combined.isEmpty()) {
+      this.modelBounds = {
+        min: [combined.min.x, -combined.max.z, combined.min.y],
+        max: [combined.max.x, -combined.min.z, combined.max.y],
+      };
+      if (fitCamera) {
+        this.world.camera.controls.fitToBox(combined, true);
+      }
+      return this.modelBounds;
+    }
+    return null;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    if (this.sectionHelper) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.sectionHelper);
+      }
+      this.sectionHelper.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose?.();
+      });
+      this.sectionHelper = null;
+    }
+    if (this.activeClipEdges) {
+      try {
+        this.activeClipEdges.dispose();
+      } catch (err) {
+        console.warn('ClipEdges dispose failed:', err);
+      }
+      this.activeClipEdges = null;
+    }
+    this.clipPlanes = [];
+    if (this.boundCanvas) {
+      this.boundCanvas.removeEventListener('pointerdown', this.onPointerDown);
+      this.boundCanvas.removeEventListener('pointerup', this.onPointerUp);
+      this.boundCanvas.removeEventListener('pointermove', this.onPointerMove);
+      this.boundCanvas.removeEventListener('pointerleave', this.onPointerLeave);
+      this.boundCanvas = null;
+    }
+    if (this.highlighter) {
+      this.highlighter.dispose();
+      this.highlighter = null;
+    }
+    if (this.world) {
+      for (const [, entry] of this.modelsMap) {
+        this.world.scene.three.remove(entry.model.object);
+        entry.model.dispose();
+      }
+      this.modelsMap.clear();
+      this.propertiesCache.clear();
+    }
+    if (this.fragments) {
+      this.fragments.core.baseCoordinates = null;
+      this.fragments.baseCoordinationModel = '';
+      this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+    }
+    if (this.components) {
+      this.components.dispose();
+      this.components = null;
+    }
+    this.world = null;
+    this.events.clear();
+  }
+
+  async loadModel(_model: JnnModel): Promise<AdapterResult<{ elementCount: number; bounds: Bounds }>> {
+    if (this.modelBounds) {
+      return ok({ elementCount: this.activeModel ? (await this.activeModel.getLocalIds()).length : 0, bounds: this.modelBounds });
+    }
+    return fail('unsupported', 'ThatOpenViewerAdapter is designed for loading IFC models via loadIfc.');
+  }
+
+  async loadIfc(
+    file: ArrayBuffer | Uint8Array,
+    name: string,
+    onProgress?: (percent: number, status?: string) => void,
+    options?: { append?: boolean; bypassCache?: boolean },
+  ): Promise<AdapterResult<{ elementCount: number; bounds: Bounds; model?: JnnModel; fromCache?: boolean }>> {
+    if (this.disposed) return fail('failed', 'Adapter has been disposed.');
+    if (this.initializedPromise) {
+      await this.initializedPromise;
+    }
+    if (!this.ifcLoader || !this.fragments || !this.world) {
+      return fail('not-loaded', 'Viewer engine is not initialized.');
+    }
+
+    try {
+      if (typeof performance !== 'undefined' && performance.mark) {
+        performance.mark('jnn-load-start');
+      }
+      const buffer = file instanceof Uint8Array ? file : new Uint8Array(file);
+      const sha256 = await computeSha256(buffer).catch(() => '');
+
+      // 1. Check IndexedDB cache if not bypassed
+      if (sha256 && !options?.bypassCache) {
+        let cached = null;
+        try {
+          cached = await getCachedIfcModel(sha256);
+        } catch (e) {
+          console.warn('[ThatOpenViewerAdapter] Error reading cache:', e);
+        }
+
+        if (cached && cached.fragBuffer) {
+          onProgress?.(25, 'Đang nạp nhanh từ bộ nhớ đệm (IndexedDB)...');
+          if (!options?.append) {
+            for (const [, entry] of this.modelsMap) {
+              this.world.scene.three.remove(entry.model.object);
+              entry.model.dispose();
+            }
+            this.modelsMap.clear();
+            this.propertiesCache.clear();
+            if (this.fragments) {
+              this.fragments.core.baseCoordinates = null;
+              this.fragments.baseCoordinationModel = '';
+              this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+            }
+          }
+
+          if (this.fragments) {
+            this.fragments.core.settings.autoCoordinate = true;
+          }
+
+          const model = await this.fragments.core.load(new Uint8Array(cached.fragBuffer), {
+            modelId: name,
+            camera: this.world.camera.three,
+          });
+
+          // Model coordination: FragmentsModels with autoCoordinate = true coordinates relative to base model
+          const coordMatrix = await model.getCoordinationMatrix().catch(() => new THREE.Matrix4());
+          if (this.fragments && !this.fragments.baseCoordinationModel) {
+            this.fragments.baseCoordinationModel = name;
+            this.fragments.baseCoordinationMatrix = coordMatrix;
+          }
+          model.object.updateMatrixWorld?.(true);
+
+          this.activeModel = model;
+          if (this.clipPlanes.length > 0) {
+            model.useClippingPlanes(this.clipPlanes);
+          }
+          this.world.scene.three.add(model.object);
+          this.fragments.core.update(true);
+
+          const jnnModel = cached.jnnModel;
+          this.modelsMap.set(name, { model, jnnModel });
+          this.parsedModel = jnnModel;
+          this.updateCombinedBoundsAndFit(true);
+
+          if (this.selection.size > 0) {
+            this.select([...this.selection]);
+          }
+          if (this.visibility.hidden.size > 0 || this.visibility.isolated.size > 0) {
+            this.applyVisibility();
+          }
+          if (this.xray) {
+            this.applyXray();
+          }
+          onProgress?.(100, 'Đã mở mô hình từ cache.');
+
+          if (typeof performance !== 'undefined' && performance.mark) {
+            performance.mark('jnn-load-end');
+            try {
+              performance.measure('jnn-load-duration', 'jnn-load-start', 'jnn-load-end');
+            } catch {
+              // ignore
+            }
+          }
+
+          return ok({
+            elementCount: jnnModel.elements.length,
+            bounds: this.modelBounds ?? { min: [-10, -10, 0], max: [10, 10, 10] },
+            model: jnnModel,
+            fromCache: true,
+          });
+        }
+      }
+
+      // 2. Cache miss or bypassed: full parse via That Open IFC loader
+      if (!options?.append) {
+        // Clear old models if not in append mode
+        for (const [, entry] of this.modelsMap) {
+          this.world.scene.three.remove(entry.model.object);
+          entry.model.dispose();
+        }
+        this.modelsMap.clear();
+        this.propertiesCache.clear();
+        if (this.fragments) {
+          this.fragments.core.baseCoordinates = null;
+          this.fragments.baseCoordinationModel = '';
+          this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+        }
+      }
+
+      // Yield to event loop before the heavy WASM parse (see docs/DUNG_SOM_B2.md)
+      await new Promise((r) => setTimeout(r, 0));
+
+      const model = await this.ifcLoader.load(buffer, true, name, {
+        processData: {
+          progressCallback: (p: any) => {
+            if (onProgress && p?.progress !== undefined) {
+              onProgress(p.progress * 80, p.currentProcess);
+            }
+          },
+        },
+      });
+
+      // Yield after WASM parse completes to let pending rAF / microtasks run
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Model coordination: FragmentsModels with autoCoordinate = true coordinates relative to base model
+      const coordMatrix = await model.getCoordinationMatrix().catch(() => new THREE.Matrix4());
+      if (this.fragments && !this.fragments.baseCoordinationModel) {
+        this.fragments.baseCoordinationModel = name;
+        this.fragments.baseCoordinationMatrix = coordMatrix;
+      }
+      model.object.updateMatrixWorld?.(true);
+
+      this.activeModel = model;
+      if (this.clipPlanes.length > 0) {
+        model.useClippingPlanes(this.clipPlanes);
+      }
+      this.world.scene.three.add(model.object);
+      this.fragments.core.update(true);
+
+      onProgress?.(85, 'Đang phân tích cây không gian...');
+      const metadata = await model.getMetadata().catch(() => ({}));
+      const spatial = (await model.getSpatialStructure().catch(() => null)) as SpatialNode | null;
+      const geomIds = new Set(await model.getItemsIdsWithGeometry().catch(() => []));
+
+      let headerData: any[] = [];
+      let elementLocalIds: number[] = [];
+
+      if (spatial) {
+        const parsed = parseSpatialStructure(spatial);
+        const headerIds = [
+          ...(parsed.projectLocalId ? [parsed.projectLocalId] : []),
+          ...(parsed.siteLocalId ? [parsed.siteLocalId] : []),
+          ...(parsed.buildingLocalId ? [parsed.buildingLocalId] : []),
+          ...parsed.storeyLocalIds,
+        ];
+        if (headerIds.length > 0) {
+          headerData = await model.getItemsData(headerIds, { attributesDefault: true }).catch(() => []);
+        }
+        elementLocalIds = parsed.allElementLocalIds;
+      }
+
+      if (elementLocalIds.length === 0) {
+        elementLocalIds = await model.getLocalIds();
+      }
+
+      onProgress?.(92, 'Đang đọc thuộc tính các cấu kiện...');
+      // Chunk getItemsData in batches of 200 with yielding to prevent blocking the main thread (B2)
+      const itemsBasicData: any[] = [];
+      const CHUNK_SIZE = 200;
+      for (let i = 0; i < elementLocalIds.length; i += CHUNK_SIZE) {
+        const chunk = elementLocalIds.slice(i, i + CHUNK_SIZE);
+        const chunkData = await model.getItemsData(chunk, { attributesDefault: true }).catch(() => []);
+        itemsBasicData.push(...chunkData);
+        if (i + CHUNK_SIZE < elementLocalIds.length) {
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+
+      // Yield before domain mapping
+      await new Promise((r) => setTimeout(r, 0));
+
+      const jnnModel = mapIfcToJnnModel({
+        modelId: name,
+        filename: name,
+        metadata,
+        spatialRoot: spatial ?? undefined,
+        spatialHeadersData: headerData,
+        itemsBasicData,
+        geometryLocalIds: geomIds,
+        fileSize: buffer.byteLength,
+      });
+
+      // Yield after domain mapping
+      await new Promise((r) => setTimeout(r, 0));
+
+      this.modelsMap.set(name, { model, jnnModel });
+      this.parsedModel = jnnModel;
+      this.updateCombinedBoundsAndFit(true);
+      if (this.selection.size > 0) {
+        this.select([...this.selection]);
+      }
+      if (this.visibility.hidden.size > 0 || this.visibility.isolated.size > 0) {
+        this.applyVisibility();
+      }
+      if (this.xray) {
+        this.applyXray();
+      }
+
+      // 3. Save converted .frag binary & jnnModel into IndexedDB cache asynchronously
+      if (sha256) {
+        this.lastCachePromise = (async () => {
+          try {
+            const fragBuffer = await model.getBuffer();
+            if (fragBuffer && fragBuffer.byteLength > 0) {
+              await saveCachedIfcModel({
+                sha256,
+                filename: name,
+                fileSize: buffer.byteLength,
+                fragBuffer,
+                jnnModel,
+                createdAt: Date.now(),
+                lastAccessedAt: Date.now(),
+              });
+            }
+          } catch (err) {
+            console.warn('[ThatOpenViewerAdapter] Export/save frag buffer error:', err);
+          }
+        })();
+      }
+
+      onProgress?.(100, 'Hoàn tất nạp mô hình IFC.');
+
+      if (typeof performance !== 'undefined' && performance.mark) {
+        performance.mark('jnn-load-end');
+        try {
+          performance.measure('jnn-load-duration', 'jnn-load-start', 'jnn-load-end');
+        } catch {
+          // ignore
+        }
+      }
+
+      return ok({
+        elementCount: jnnModel.elements.length,
+        bounds: this.modelBounds ?? { min: [-10, -10, 0], max: [10, 10, 10] },
+        model: jnnModel,
+        fromCache: false,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return fail('failed', `Failed to load IFC file "${name}": ${message}`);
+    }
+  }
+
+  removeModel(modelId: string): AdapterResult {
+    const entry = this.modelsMap.get(modelId);
+    if (!entry) {
+      return fail('not-found', `Model with ID "${modelId}" not found.`);
+    }
+    if (this.world) {
+      this.world.scene.three.remove(entry.model.object);
+    }
+    entry.model.dispose();
+    this.modelsMap.delete(modelId);
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+    for (const key of [...this.propertiesCache.keys()]) {
+      if (key.startsWith(`${modelId}:`)) {
+        this.propertiesCache.delete(key);
+      }
+    }
+    if (this.activeModel === entry.model) {
+      this.activeModel = this.modelsMap.values().next().value?.model ?? null;
+    }
+    if (this.modelsMap.size === 0 && this.fragments) {
+      this.fragments.baseCoordinationModel = '';
+      this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
+    }
+    this.updateCombinedBoundsAndFit(false);
+    return okVoid;
+  }
+
+  setModelVisibility(modelId: string, visible: boolean): AdapterResult {
+    const entry = this.modelsMap.get(modelId);
+    if (!entry) {
+      return fail('not-found', `Model with ID "${modelId}" not found.`);
+    }
+    entry.model.object.visible = visible;
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+    return okVoid;
+  }
+
+  fitToModel(modelId: string): AdapterResult {
+    const entry = this.modelsMap.get(modelId);
+    if (!entry || !this.world) {
+      return fail('not-found', `Model with ID "${modelId}" not found.`);
+    }
+    const box = entry.model.box;
+    if (box && !box.isEmpty()) {
+      this.world.camera.controls.fitToBox(box, true);
+      return okVoid;
+    }
+    return fail('failed', 'Model has empty bounding box.');
+  }
+
+  getModelBounds(modelId?: string): AdapterResult<Bounds> {
+    if (modelId) {
+      const entry = this.modelsMap.get(modelId);
+      if (!entry || !entry.model.box || entry.model.box.isEmpty()) {
+        return fail('not-found', `Model "${modelId}" bounds not found.`);
+      }
+      entry.model.object.updateMatrixWorld?.(true);
+      const worldBox = entry.model.box;
+      return ok({
+        min: [worldBox.min.x, -worldBox.max.z, worldBox.min.y],
+        max: [worldBox.max.x, -worldBox.min.z, worldBox.max.y],
+      });
+    }
+    if (this.modelBounds) return ok(this.modelBounds);
+    const updated = this.updateCombinedBoundsAndFit(false);
+    if (updated) return ok(updated);
+    return fail('not-loaded', 'No IFC model loaded.');
+  }
+
+  renderNow(): void {
+    if (this.world?.renderer && this.world?.scene && this.world?.camera) {
+      this.world.renderer.three.render(this.world.scene.three, this.world.camera.three);
+    }
+  }
+
+  fitToView(ids?: readonly string[]): AdapterResult {
+    if (!this.world || this.modelsMap.size === 0) return fail('not-loaded', 'No active model to fit.');
+
+    if (ids && ids.length > 0) {
+      const modelIdMap = this.toModelIdMap(ids);
+      let hasItems = false;
+      for (const set of Object.values(modelIdMap)) {
+        if (set.size > 0) {
+          hasItems = true;
+          break;
+        }
+      }
+      if (hasItems && this.highlighter) {
+        (this.highlighter as any).zoomSelection(modelIdMap).catch(console.error);
+        return okVoid;
+      }
+    }
+
+    const combined = new THREE.Box3();
+    for (const entry of this.modelsMap.values()) {
+      if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
+        combined.union(entry.model.box);
+      }
+    }
+    if (!combined.isEmpty()) {
+      this.world.camera.controls.fitToBox(combined, true);
+      return okVoid;
+    }
+    return fail('failed', 'Models have empty bounding box.');
+  }
+
+  setViewPreset(preset: ViewPreset): AdapterResult {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    const dirModel = PRESET_DIRS[preset];
+    if (!dirModel) return fail('invalid-argument', `Unknown preset: ${preset}`);
+
+    const targetThree = new THREE.Vector3();
+    if (this.activeModel?.box && !this.activeModel.box.isEmpty()) {
+      this.activeModel.box.getCenter(targetThree);
+    } else {
+      targetThree.set(0, 0, 0);
+    }
+
+    const dirThree = toThree(dirModel).normalize();
+    let distance = 25;
+    if (this.activeModel?.box && !this.activeModel.box.isEmpty()) {
+      const size = new THREE.Vector3();
+      this.activeModel.box.getSize(size);
+      distance = Math.max(size.x, size.y, size.z) * 1.8;
+    }
+
+    const posThree = targetThree.clone().addScaledVector(dirThree, distance);
+    this.world.camera.controls.setLookAt(
+      posThree.x,
+      posThree.y,
+      posThree.z,
+      targetThree.x,
+      targetThree.y,
+      targetThree.z,
+      true,
+    );
+    return okVoid;
+  }
+
+  setCamera(state: CameraState): AdapterResult {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    const pos = toThree(state.position);
+    const target = toThree(state.target);
+    this.world.camera.controls.setLookAt(pos.x, pos.y, pos.z, target.x, target.y, target.z, false);
+    if (state.projection !== this.currentProjection) {
+      this.setProjection(state.projection);
+    }
+    return okVoid;
+  }
+
+  getCamera(): AdapterResult<CameraState> {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    const posThree = new THREE.Vector3();
+    const targetThree = new THREE.Vector3();
+    this.world.camera.controls.getPosition(posThree);
+    this.world.camera.controls.getTarget(targetThree);
+
+    return ok({
+      position: toModel(posThree),
+      target: toModel(targetThree),
+      projection: this.currentProjection,
+    });
+  }
+
+  setProjection(projection: CameraState['projection']): AdapterResult {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    this.currentProjection = projection;
+    const target = projection === 'orthographic' ? 'Orthographic' : 'Perspective';
+    if (this.world.camera.projection.current !== target) {
+      this.world.camera.projection.set(target).catch((err) => {
+        console.warn('Failed to set projection:', err);
+      });
+    }
+    return okVoid;
+  }
+
+  setTheme(theme: 'light' | 'dark'): void {
+    this.currentTheme = theme;
+    if (this.world?.scene?.three) {
+      this.world.scene.three.background = new THREE.Color(THEME_COLORS[theme]);
+    }
+  }
+
+  projectToScreen(id: string): AdapterResult<{ x: number; y: number; onScreen: boolean }> {
+    if (!this.world || !this.world.renderer) return fail('not-loaded', 'Viewer is not mounted.');
+    const { targetModelId } = this.parseElementId(id);
+    const entry = this.modelsMap.get(targetModelId) ?? this.modelsMap.values().next().value;
+    const box = entry?.model.box;
+    if (!box || box.isEmpty()) return fail('not-found', `Element not found: ${id}`);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const v = center.clone().project(this.world.camera.three);
+    const dom = this.world.renderer.three.domElement;
+    const w = dom.clientWidth;
+    const h = dom.clientHeight;
+    return ok({
+      x: ((v.x + 1) / 2) * w,
+      y: ((1 - v.y) / 2) * h,
+      onScreen: v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1,
+    });
+  }
+
+  select(ids: readonly string[]): AdapterResult {
+    if (ids.length > 0) {
+      let anyFound = false;
+      for (const id of ids) {
+        const { targetModelId, localId } = this.parseElementId(id);
+        const entry = this.modelsMap.get(targetModelId);
+        if (entry && (entry.jnnModel.elements.some((e) => e.id === id) || localId !== -1)) {
+          anyFound = true;
+          break;
+        }
+      }
+      if (!anyFound) {
+        return fail('not-found', 'None of the requested elements exist in loaded models.');
+      }
+    }
+
+    this.selection = new Set(ids);
+    if (this.highlighter) {
+      if (ids.length === 0) {
+        this.highlighter.clear('select').catch((err) => console.warn('highlighter.clear failed:', err));
+      } else {
+        const modelIdMap = this.toModelIdMap(ids);
+        this.highlighter.highlightByID('select', modelIdMap, true, false).catch((err) => console.warn('highlightByID failed:', err));
+      }
+    }
+    if (this.xray) {
+      this.applyXray();
+    }
+    return okVoid;
+  }
+
+  async getProperties(id: string): Promise<AdapterResult<{ element: JnnElement; propertySets: PropertySet[] }>> {
+    if (this.propertiesCache.has(id)) {
+      return ok(this.propertiesCache.get(id)!);
+    }
+    const { targetModelId, localId } = this.parseElementId(id);
+    if (localId === -1) {
+      return fail('invalid-argument', `Invalid element ID format: ${id}`);
+    }
+
+    const entry = this.modelsMap.get(targetModelId) ?? this.modelsMap.values().next().value;
+    const targetModel = entry?.model ?? this.activeModel;
+    if (!targetModel) return fail('not-loaded', 'No active IFC model.');
+
+    try {
+      const items = await (targetModel as any).getItemsData([localId], {
+        attributesDefault: true,
+        relations: {
+          IsDefinedBy: {
+            attributes: true,
+            relations: {
+              HasProperties: { attributes: true, relations: false },
+              Quantities: { attributes: true, relations: false },
+            },
+          },
+        },
+      });
+
+      const rawItem = items?.[0] as any;
+      const parsed = parseItemPropertiesAndQuantities(rawItem);
+      const baseEl: JnnElement | undefined = entry?.jnnModel.elements.find((e) => e.id === id) ?? this.parsedModel?.elements.find((e) => e.id === id);
+
+      const element: JnnElement = baseEl
+        ? {
+            ...baseEl,
+            type: parsed.type || baseEl.type,
+            material: parsed.material ?? baseEl.material,
+            properties: parsed.properties,
+            quantities: parsed.quantities,
+          }
+        : {
+            modelId: this.parsedModel?.modelId || '',
+            modelRevisionId: 'rev-001',
+            sourceFormat: 'IFC',
+            sourceElementId: String(localId),
+            globalId: rawItem?._guid?.value ?? null,
+            id,
+            name: rawItem?.Name?.value || `Element #${localId}`,
+            category: baseEl ? (baseEl as JnnElement).category : 'IfcElement',
+            type: parsed.type || 'IfcElement',
+            material: parsed.material ?? null,
+            storey: baseEl ? (baseEl as JnnElement).storey : null,
+            transform: IDENTITY_TRANSFORM,
+            properties: parsed.properties,
+            quantities: parsed.quantities,
+            meshRefs: [],
+            geometryStatus: 'ok',
+            importWarnings: [],
+          };
+
+      const result = { element, propertySets: parsed.properties };
+      this.propertiesCache.set(id, result);
+      return ok(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return fail('failed', `Failed to load properties for "${id}": ${message}`);
+    }
+  }
+
+  setHidden(ids: readonly string[]): AdapterResult {
+    this.visibility = { hidden: new Set(ids), isolated: this.visibility.isolated };
+    this.applyVisibility();
+    return okVoid;
+  }
+
+  isolate(ids: readonly string[]): AdapterResult {
+    this.visibility = { hidden: this.visibility.hidden, isolated: new Set(ids) };
+    this.applyVisibility();
+    return okVoid;
+  }
+
+  setSection(spec: SectionSpec | null): AdapterResult {
+    if (this.sectionHelper) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.sectionHelper);
+      }
+      this.sectionHelper.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose?.();
+      });
+      this.sectionHelper = null;
+    }
+
+    if (this.activeClipEdges) {
+      try {
+        this.activeClipEdges.dispose();
+      } catch (err) {
+        console.warn('ClipEdges dispose failed:', err);
+      }
+      this.activeClipEdges = null;
+    }
+
+    if (!spec) {
+      this.clipPlanes = [];
+      if (this.world?.renderer?.three) {
+        this.world.renderer.three.clippingPlanes = [];
+      }
+      for (const entry of this.modelsMap.values()) {
+        entry.model.useClippingPlanes([]);
+      }
+      if (this.fragments) {
+        this.fragments.core.update(true);
+      }
+      return okVoid;
+    }
+
+    if (!this.modelBounds) return fail('not-loaded', 'No model loaded.');
+
+    let threePlanes: THREE.Plane[] = [];
+    if (spec.kind === 'plane') {
+      const modelNormal = spec.axis === 'x'
+        ? (spec.flipped ? [1, 0, 0] : [-1, 0, 0])
+        : spec.axis === 'y'
+          ? (spec.flipped ? [0, 1, 0] : [0, -1, 0])
+          : (spec.flipped ? [0, 0, 1] : [0, 0, -1]);
+      const modelOffset = spec.flipped ? -spec.offset : spec.offset;
+      const normalThree = toThree(modelNormal as Vec3);
+      threePlanes = [new THREE.Plane(normalThree, modelOffset)];
+    } else {
+      for (let i = 0; i < 3; i++) {
+        if (spec.min[i]! >= spec.max[i]!) return fail('invalid-argument', 'Section box min must be < max.');
+      }
+      // X axis
+      threePlanes.push(
+        new THREE.Plane(toThree([1, 0, 0]), -spec.min[0]!),
+        new THREE.Plane(toThree([-1, 0, 0]), spec.max[0]!),
+      );
+      // Y axis
+      threePlanes.push(
+        new THREE.Plane(toThree([0, 1, 0]), -spec.min[1]!),
+        new THREE.Plane(toThree([0, -1, 0]), spec.max[1]!),
+      );
+      // Z axis
+      threePlanes.push(
+        new THREE.Plane(toThree([0, 0, 1]), -spec.min[2]!),
+        new THREE.Plane(toThree([0, 0, -1]), spec.max[2]!),
+      );
+    }
+
+    this.clipPlanes = threePlanes;
+
+    if (this.world?.renderer?.three) {
+      this.world.renderer.three.clippingPlanes = this.clipPlanes;
+    }
+    for (const entry of this.modelsMap.values()) {
+      entry.model.useClippingPlanes(this.clipPlanes);
+    }
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+
+    this.sectionHelper = this.buildSectionHelper(spec, this.modelBounds);
+    if (this.world?.scene?.three) {
+      this.world.scene.three.add(this.sectionHelper);
+    }
+
+    // Generate section caps and edges for plane cuts
+    if (spec.kind === 'plane' && this.clipStyler && this.world && threePlanes[0]) {
+      try {
+        const clipEdges = this.clipStyler.create(threePlanes[0], {
+          world: this.world,
+          link: false,
+        });
+        clipEdges.items.set('default', { style: 'default' });
+        clipEdges.visible = true;
+        clipEdges.update().catch((err) => console.warn('ClipEdges update failed:', err));
+        this.activeClipEdges = clipEdges;
+      } catch (err) {
+        console.warn('ClipStyler create failed:', err);
+      }
+    }
+
+    return okVoid;
+  }
+
+  isPointClipped(p: Vec3): boolean {
+    const v = toThree(p);
+    return this.clipPlanes.some((pl) => pl.distanceToPoint(v) < -1e-6);
+  }
+
+  private buildSectionHelper(spec: SectionSpec, b: Bounds): THREE.Object3D {
+    const color = 0xf08c2e;
+    const group = new THREE.Group();
+    if (spec.kind === 'box') {
+      const sizeX = spec.max[0] - spec.min[0];
+      const sizeY = spec.max[1] - spec.min[1];
+      const sizeZ = spec.max[2] - spec.min[2];
+      const box = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(sizeX, sizeZ, sizeY)),
+        new THREE.LineBasicMaterial({ color }),
+      );
+      box.raycast = () => {};
+      const centerModel: Vec3 = [
+        (spec.min[0] + spec.max[0]) / 2,
+        (spec.min[1] + spec.max[1]) / 2,
+        (spec.min[2] + spec.max[2]) / 2,
+      ];
+      box.position.copy(toThree(centerModel));
+      group.add(box);
+      return group;
+    }
+
+    const s = boundsSize(b);
+    const c = boundsCenter(b);
+    const m = 1.5;
+    let w: number, h: number;
+    const obj = new THREE.Group();
+    if (spec.axis === 'x') {
+      [w, h] = [s[1] + m * 2, s[2] + m * 2];
+      obj.position.set(spec.offset, c[2], -c[1]);
+      obj.rotation.set(0, Math.PI / 2, 0);
+    } else if (spec.axis === 'y') {
+      [w, h] = [s[0] + m * 2, s[2] + m * 2];
+      obj.position.set(c[0], c[2], -spec.offset);
+      obj.rotation.set(0, 0, 0);
+    } else {
+      [w, h] = [s[0] + m * 2, s[1] + m * 2];
+      obj.position.set(c[0], spec.offset, -c[1]);
+      obj.rotation.set(Math.PI / 2, 0, 0);
+    }
+    const geom = new THREE.PlaneGeometry(w, h);
+    const fill = new THREE.Mesh(
+      geom,
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    fill.raycast = () => {};
+    const outline = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geom),
+      new THREE.LineBasicMaterial({ color }),
+    );
+    outline.raycast = () => {};
+    obj.add(fill, outline);
+    group.add(obj);
+    return group;
+  }
+
+  highlight(ids: readonly string[] | null, color = '#2f9e44'): AdapterResult {
+    if (!ids) {
+      if (this.highlighter) {
+        for (const styleName of this.activeHighlightStyles) {
+          this.highlighter.clear(styleName).catch(console.error);
+        }
+      }
+      this.activeHighlightStyles.clear();
+      return okVoid;
+    }
+
+    const cleanColor = color.replace('#', '');
+    const styleName = `hl_${cleanColor}`;
+    if (this.highlighter) {
+      if (!this.highlighter.styles.has(styleName)) {
+        this.highlighter.styles.set(styleName, {
+          color: new THREE.Color(color),
+          renderedFaces: 0,
+          opacity: 1,
+          transparent: false,
+        });
+      }
+      const modelIdMap = this.toModelIdMap(ids);
+      this.highlighter.highlightByID(styleName, modelIdMap, true, false).catch(console.error);
+    }
+    this.activeHighlightStyles.add(styleName);
+    return okVoid;
+  }
+
+  setXray(enabled: boolean): AdapterResult {
+    this.xray = enabled;
+    this.applyXray();
+    return okVoid;
+  }
+
+  debugState() {
+    let totalElements = 0;
+    for (const entry of this.modelsMap.values()) {
+      totalElements += entry.jnnModel.elements.length;
+    }
+    const isIsolated = this.visibility.isolated.size > 0;
+    let visibleCount = totalElements;
+    if (isIsolated) {
+      let count = 0;
+      for (const id of this.visibility.isolated) {
+        if (!this.visibility.hidden.has(id)) count++;
+      }
+      visibleCount = count;
+    } else {
+      visibleCount = Math.max(0, totalElements - this.visibility.hidden.size);
+    }
+
+    return {
+      elementCount: totalElements,
+      visibleCount,
+      selected: [...this.selection],
+      clipPlaneCount: this.clipPlanes.length,
+      projection: this.currentProjection,
+      xray: this.xray,
+      models: [...this.modelsMap.entries()].map(([id, entry]) => {
+        entry.model.object.updateMatrixWorld?.(true);
+        const worldBox = entry.model.box && !entry.model.box.isEmpty() ? entry.model.box : null;
+        return {
+          id,
+          elementCount: entry.jnnModel.elements.length,
+          bounds: worldBox
+            ? {
+                min: [worldBox.min.x, -worldBox.max.z, worldBox.min.y],
+                max: [worldBox.max.x, -worldBox.min.z, worldBox.max.y],
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
+  private parseElementId(id: string): { targetModelId: string; localId: number } {
+    const lastColon = id.lastIndexOf(':');
+    if (lastColon === -1) {
+      const num = Number(id);
+      const fallbackModelId = this.modelsMap.keys().next().value ?? '';
+      return { targetModelId: fallbackModelId, localId: isNaN(num) ? -1 : num };
+    }
+    const modelId = id.slice(0, lastColon);
+    const localId = Number(id.slice(lastColon + 1));
+    let targetModelId = modelId;
+    if (!this.modelsMap.has(targetModelId) && this.modelsMap.size === 1) {
+      targetModelId = this.modelsMap.keys().next().value!;
+    }
+    return { targetModelId, localId: isNaN(localId) ? -1 : localId };
+  }
+
+  private toModelIdMap(ids: readonly string[]): Record<string, Set<number>> {
+    const map: Record<string, Set<number>> = {};
+    for (const id of ids) {
+      const { targetModelId, localId } = this.parseElementId(id);
+      if (localId === -1 || !targetModelId) continue;
+      if (!map[targetModelId]) {
+        map[targetModelId] = new Set<number>();
+      }
+      map[targetModelId].add(localId);
+    }
+    return map;
+  }
+
+  private applyVisibility(): void {
+    if (!this.fragments) return;
+
+    const isIsolated = this.visibility.isolated.size > 0;
+    const isHidden = this.visibility.hidden.size > 0;
+
+    for (const [modelId, entry] of this.modelsMap) {
+      const model = entry.model;
+
+      if (!isIsolated && !isHidden) {
+        model.setVisible(undefined, true).catch((err) => console.warn('setVisible failed:', err));
+        continue;
+      }
+
+      if (isIsolated) {
+        model.setVisible(undefined, false).then(() => {
+          const toShow: number[] = [];
+          for (const id of this.visibility.isolated) {
+            if (this.visibility.hidden.has(id)) continue;
+            const { targetModelId, localId } = this.parseElementId(id);
+            if (targetModelId === modelId && localId !== -1) {
+              toShow.push(localId);
+            }
+          }
+          if (toShow.length > 0) {
+            model.setVisible(toShow, true).catch((err) => console.warn('setVisible failed:', err));
+          }
+          this.fragments?.core.update(true);
+        }).catch((err) => console.warn('setVisible failed:', err));
+      } else {
+        const toHide: number[] = [];
+        for (const id of this.visibility.hidden) {
+          const { targetModelId, localId } = this.parseElementId(id);
+          if (targetModelId === modelId && localId !== -1) {
+            toHide.push(localId);
+          }
+        }
+        model.setVisible(undefined, true).then(() => {
+          if (toHide.length > 0) {
+            model.setVisible(toHide, false).catch((err) => console.warn('setVisible failed:', err));
+          }
+          this.fragments?.core.update(true);
+        }).catch((err) => console.warn('setVisible failed:', err));
+      }
+    }
+
+    this.fragments.core.update(true);
+  }
+
+  private applyXray(): void {
+    for (const [modelId, entry] of this.modelsMap) {
+      if (this.xray) {
+        const selectedLocalIds: number[] = [];
+        for (const id of this.selection) {
+          const { targetModelId, localId } = this.parseElementId(id);
+          if (targetModelId === modelId && localId !== -1) {
+            selectedLocalIds.push(localId);
+          }
+        }
+        entry.model.setGhostItems(selectedLocalIds, true).catch(() => {});
+      } else {
+        entry.model.clearGhost();
+      }
+    }
+    if (this.fragments) {
+      this.fragments.core.update(true);
+    }
+  }
+
+  async pickAt(clientX: number, clientY: number): Promise<PickResult | null> {
+    if (!this.world || !this.world.renderer || this.modelsMap.size === 0) return null;
+    const dom = this.world.renderer.three.domElement;
+    const rect = dom.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    const position = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+
+    try {
+      const raycasters = this.components?.get(OBC.Raycasters);
+      const raycaster = raycasters?.get(this.world);
+      if (!raycaster) return null;
+
+      const hit = (await raycaster.castRay({ position })) as any;
+      if (!hit || hit.localId === undefined || hit.localId === null) return null;
+
+      // Ignore points clipped by active section planes
+      if (hit.point && this.clipPlanes.some((p) => p.distanceToPoint(hit.point) < -1e-6)) {
+        return null;
+      }
+
+      let matchedEntry: { model: FragmentsModel; jnnModel: JnnModel } | undefined;
+      for (const entry of this.modelsMap.values()) {
+        if (entry.model === hit.fragments || entry.model.modelId === (hit as any).modelId) {
+          matchedEntry = entry;
+          break;
+        }
+      }
+      if (!matchedEntry) {
+        matchedEntry = this.modelsMap.values().next().value;
+      }
+      if (!matchedEntry) return null;
+
+      const elementId = `${matchedEntry.jnnModel.modelId}:${hit.localId}`;
+      if (!isVisible(elementId, this.visibility)) return null;
+
+      const point = hit.point ? toModel(hit.point) : ([0, 0, 0] as Vec3);
+      return { elementId, point };
+    } catch (err) {
+      console.warn('pickAt failed:', err);
+      return null;
+    }
+  }
+
+  private onPointerDown = (ev: PointerEvent) => {
+    if (ev.button !== 0) return;
+    this.pointerDown = { x: ev.clientX, y: ev.clientY };
+  };
+
+  private onPointerUp = async (ev: PointerEvent) => {
+    const d = this.pointerDown;
+    this.pointerDown = null;
+    if (!d || ev.button !== 0) return;
+    const moved = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
+    if (moved > 5) return;
+    const hit = await this.pickAt(ev.clientX, ev.clientY);
+    this.events.emit('pick', {
+      result: hit,
+      additive: ev.ctrlKey || ev.metaKey || ev.shiftKey,
+    });
+  };
+
+  private onPointerMove = async (ev: PointerEvent) => {
+    if (ev.buttons !== 0 || ev.pointerType === 'touch') return;
+    const now = performance.now();
+    if (now - this.lastHoverAt < 40) return;
+    this.lastHoverAt = now;
+    const hit = await this.pickAt(ev.clientX, ev.clientY);
+    const id = hit?.elementId ?? null;
+    if (id !== this.hovered) {
+      this.hovered = id;
+      if (this.world?.renderer?.three?.domElement) {
+        this.world.renderer.three.domElement.style.cursor = id ? 'pointer' : 'default';
+      }
+      if (this.highlighter) {
+        if (id) {
+          const modelIdMap = this.toModelIdMap([id]);
+          this.highlighter.highlightByID('hover', modelIdMap, true, false).catch(() => {});
+        } else {
+          this.highlighter.clear('hover').catch(() => {});
+        }
+      }
+      this.events.emit('hover', { elementId: id });
+    }
+  };
+
+  private onPointerLeave = () => {
+    if (this.hovered) {
+      this.hovered = null;
+      if (this.highlighter) {
+        this.highlighter.clear('hover').catch(() => {});
+      }
+      this.events.emit('hover', { elementId: null });
+    }
+  };
+
+  on<K extends keyof ViewerEvents>(event: K, handler: (payload: ViewerEvents[K]) => void): () => void {
+    return this.events.on(event, handler);
+  }
+}
