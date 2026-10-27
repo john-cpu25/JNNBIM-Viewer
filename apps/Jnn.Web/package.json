@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "spike:test": "node scripts/test-spike.mjs",
-    "spike:geometry": "node scripts/test-spike-geometry.mjs"
+    "spike:geometry": "node scripts/test-spike-geometry.mjs",
+    "spike:clash": "node scripts/test-spike-integration.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",

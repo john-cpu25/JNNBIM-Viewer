@@ -26,6 +26,7 @@ export default defineConfig({
         main: path.resolve(import.meta.dirname, 'index.html'),
         spike: path.resolve(import.meta.dirname, 'spike-ifc.html'),
         spikeGeometry: path.resolve(import.meta.dirname, 'spike-geometry.html'),
+        spikeClash: path.resolve(import.meta.dirname, 'spike-clash.html'),
       },
       output: {
         manualChunks: (id) => {

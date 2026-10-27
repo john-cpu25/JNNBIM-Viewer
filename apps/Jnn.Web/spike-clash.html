@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JNN Spike T11.4 — Two-Model Clash Integration Test</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #111418;
+        color: #e5e7eb;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      header {
+        background: #1b1f24;
+        border-bottom: 1px solid #2d333b;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      header h1 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #f97316;
+      }
+      .btn {
+        background: #f97316;
+        color: #fff;
+        border: 1px solid #ea580c;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn:hover { background: #ea580c; }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      #main-content {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        gap: 12px;
+        padding: 16px;
+      }
+      #stats-panel {
+        width: 380px;
+        background: #181c20;
+        border: 1px solid #2d333b;
+        border-radius: 8px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      #stats-panel h2 {
+        font-size: 14px;
+        color: #9ca3af;
+        border-bottom: 1px solid #2d333b;
+        padding-bottom: 8px;
+      }
+      #stats-content {
+        font-size: 13px;
+        line-height: 1.6;
+        color: #d1d5db;
+      }
+      #log-container {
+        flex: 1;
+        background: #181c20;
+        border: 1px solid #2d333b;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      #log-container h2 {
+        font-size: 14px;
+        color: #9ca3af;
+        padding: 12px 16px;
+        border-bottom: 1px solid #2d333b;
+      }
+      #log-output {
+        flex: 1;
+        padding: 12px 16px;
+        overflow-y: auto;
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #9ca3af;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>JNN Spike T11.4 — Clash Engine Integration (Arch x Struct)</h1>
+      <button id="run-btn" class="btn">Chạy Kiểm Thử Va Chạm 2 Mô Hình</button>
+    </header>
+    <div id="main-content">
+      <div id="stats-panel">
+        <h2>Kết quả & Đo lường T11.4</h2>
+        <div id="stats-content">Nhấn nút bên trên để nạp 2 file IFC và chạy kiểm thử va chạm...</div>
+      </div>
+      <div id="log-container">
+        <h2>Nhật ký thực thi (Console Log)</h2>
+        <div id="log-output"></div>
+      </div>
+    </div>
+    <script type="module" src="./src/clash/spike-integration.ts"></script>
+  </body>
+</html>
