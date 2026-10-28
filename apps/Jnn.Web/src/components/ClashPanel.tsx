@@ -5,6 +5,7 @@ import {
   Clock,
   Copy,
   Download,
+  FolderInput,
   Play,
   Plus,
   Square,
@@ -30,6 +31,8 @@ import { ClashWorkerClient } from '../clash/clashWorkerClient';
 import type { SerializedElementPayload } from '../clash/clash.worker';
 import type { ClashProgress } from '../clash/engine';
 import { mergeClashResults } from '../clash/clashResults';
+import { importBCFToClashResults } from '../clash/bcfExport';
+import type { JnnElement } from '../domain/model';
 import { elementBounds, isEmpty } from '../domain/bounds';
 import { ClashResultsTable } from './ClashResultsTable';
 import { cn } from '../lib/cn';
@@ -89,6 +92,7 @@ export function ClashPanel() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'config' | 'results'>('config');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bcfInputRef = useRef<HTMLInputElement>(null);
   const workerClientRef = useRef<ClashWorkerClient | null>(null);
 
   // Compute key representing currently active models
@@ -236,6 +240,73 @@ export function ClashPanel() {
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  // Import BCF
+  const onImportBcf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(buffer);
+
+      // Build GUID to JnnElement map from state.model.elements
+      const guidToElementMap = new Map<string, JnnElement>();
+      for (const el of state.model.elements) {
+        if (el.globalId) guidToElementMap.set(el.globalId, el);
+        guidToElementMap.set(el.id, el);
+      }
+
+      const importedResults = await importBCFToClashResults(uint8, undefined, {
+        guidToElementMap,
+        testId: activeTest?.id,
+      });
+
+      if (importedResults.length === 0) {
+        alert('File BCF không chứa va chạm (topic) nào.');
+        return;
+      }
+
+      const importedRecords = importedResults.map((r) => r.record);
+      const warnings = importedResults.filter((r) => r.warning).map((r) => r.warning);
+
+      if (activeTest) {
+        // Merge into active test
+        const existingRecords = activeTest.records ?? [];
+        const mergedRecords = [...existingRecords, ...importedRecords];
+        dispatch({
+          type: 'updateTest',
+          id: activeTest.id,
+          updates: {
+            records: mergedRecords,
+            clashesCount: mergedRecords.length,
+          },
+        });
+        setSubTab('results');
+      } else {
+        // Create new test from imported BCF
+        const newTest = createDefaultClashTest(clashState.tests.length, {
+          name: `BCF: ${file.name.replace(/\.[^/.]+$/, '')}`,
+          records: importedRecords,
+          clashesCount: importedRecords.length,
+          status: 'completed',
+        });
+        dispatch({ type: 'addTest', test: newTest });
+        dispatch({ type: 'setActiveTest', id: newTest.id });
+        setSubTab('results');
+      }
+
+      let msg = `Đã nhập thành công ${importedRecords.length} va chạm từ file BCF!`;
+      if (warnings.length > 0) {
+        msg += `\nLưu ý: Có ${warnings.length} cấu kiện không tìm thấy trong mô hình hiện tại.`;
+      }
+      alert(msg);
+    } catch (err) {
+      alert('Lỗi nhập BCF: ' + (err as Error).message);
+    } finally {
+      e.target.value = '';
+    }
   };
 
   // Run test
@@ -413,6 +484,23 @@ export function ClashPanel() {
             className="hidden"
             onChange={onImportJson}
             data-testid="import-json-input"
+          />
+          <button
+            type="button"
+            onClick={() => bcfInputRef.current?.click()}
+            title="Nhập va chạm từ file BCF (.bcf)"
+            data-testid="import-bcf-btn"
+            className="rounded p-1 text-muted hover:bg-surface-2 hover:text-ink transition-colors"
+          >
+            <FolderInput size={13} />
+          </button>
+          <input
+            ref={bcfInputRef}
+            type="file"
+            accept=".bcf,.zip"
+            className="hidden"
+            onChange={onImportBcf}
+            data-testid="import-bcf-input"
           />
         </div>
       </div>

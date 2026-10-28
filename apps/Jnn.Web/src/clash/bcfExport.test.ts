@@ -6,9 +6,11 @@ import {
   clashToBcfTopic,
   exportSingleClashToBCF,
   exportClashTestToBCF,
+  importBCFToClashResults,
 } from './bcfExport';
 import type { ClashRecord } from './clashResults';
 import type { ClashTestItem } from './clashState';
+import type { JnnElement } from '../domain/model';
 
 describe('bcfExport - BCFTopics API Survey & Export (T16.1)', () => {
   const mockTest: ClashTestItem = {
@@ -217,6 +219,272 @@ describe('bcfExport - BCFTopics API Survey & Export (T16.1)', () => {
 
       const markups = filenames.filter((f) => f.endsWith('markup.bcf'));
       expect(markups).toHaveLength(0);
+    });
+  });
+
+  describe('importBCFToClashResults (T16.3)', () => {
+    const fiveClashes: ClashRecord[] = [
+      {
+        clashId: 'c-1',
+        testId: 'test-1',
+        name: 'Clash Dầm 1 x Cột 1',
+        status: 'New',
+        type: 'Hard',
+        distance: 0.0,
+        aId: 'el-1',
+        bId: 'el-2',
+        aGuid: 'guid-beam-01',
+        bGuid: 'guid-col-01',
+        aName: 'Dầm B300x500',
+        bName: 'Cột C400x400',
+        aClass: 'IfcBeam',
+        bClass: 'IfcColumn',
+        point: [10, 20, 3],
+        firstFoundAt: 1000,
+        lastFoundAt: 2000,
+        comments: 'Giao thoa dầm và cột tầng 2',
+      },
+      {
+        clashId: 'c-2',
+        testId: 'test-1',
+        name: 'Clash Ống x Sàn',
+        status: 'Active',
+        type: 'Clearance',
+        distance: 0.035,
+        aId: 'el-3',
+        bId: 'el-4',
+        aGuid: 'guid-pipe-01',
+        bGuid: 'guid-slab-01',
+        aName: 'Ống D90',
+        bName: 'Sàn S150',
+        point: [15, 25, 4],
+        firstFoundAt: 1000,
+        lastFoundAt: 2000,
+        comments: 'Khoảng hở 35mm < 50mm',
+      },
+      {
+        clashId: 'c-3',
+        testId: 'test-1',
+        name: 'Clash Tường x Vách',
+        status: 'Reviewed',
+        type: 'Duplicates',
+        distance: 0.0,
+        aId: 'el-5',
+        bId: 'el-6',
+        aGuid: 'guid-wall-01',
+        bGuid: 'guid-wall-02',
+        aName: 'Tường gạch 200',
+        bName: 'Vách bê tông',
+        point: [5, 10, 1],
+        firstFoundAt: 1000,
+        lastFoundAt: 2000,
+        comments: 'Vẽ trùng',
+      },
+      {
+        clashId: 'c-4',
+        testId: 'test-1',
+        name: 'Clash Dầm x Vách',
+        status: 'Approved',
+        type: 'Hard',
+        distance: 0.0,
+        aId: 'el-7',
+        bId: 'el-8',
+        aGuid: 'guid-beam-02',
+        bGuid: 'guid-wall-03',
+        point: [2, 4, 6],
+        firstFoundAt: 1000,
+        lastFoundAt: 2000,
+      },
+      {
+        clashId: 'c-5',
+        testId: 'test-1',
+        name: 'Clash Ống gió x Dầm',
+        status: 'Resolved',
+        type: 'Hard',
+        distance: 0.0,
+        aId: 'el-9',
+        bId: 'el-10',
+        aGuid: 'guid-duct-01',
+        bGuid: 'guid-beam-03',
+        point: [1, 2, 3],
+        firstFoundAt: 1000,
+        lastFoundAt: 2000,
+        comments: 'Đã mở sleeve',
+      },
+    ];
+
+    const testForRoundTrip: ClashTestItem = {
+      ...mockTest,
+      name: 'Test Roundtrip BCF',
+      records: fiveClashes,
+    };
+
+    const mockElementsMap = new Map<string, Pick<JnnElement, 'id'> & Partial<JnnElement>>([
+      [
+        'guid-beam-01',
+        {
+          id: 'el-1',
+          name: 'Dầm B300x500',
+          category: 'IfcBeam',
+          modelId: 'm1',
+          globalId: 'guid-beam-01',
+        },
+      ],
+      [
+        'guid-col-01',
+        {
+          id: 'el-2',
+          name: 'Cột C400x400',
+          category: 'IfcColumn',
+          modelId: 'm1',
+          globalId: 'guid-col-01',
+        },
+      ],
+      [
+        'guid-pipe-01',
+        {
+          id: 'el-3',
+          name: 'Ống D90',
+          category: 'IfcPipeSegment',
+          modelId: 'm2',
+          globalId: 'guid-pipe-01',
+        },
+      ],
+      [
+        'guid-slab-01',
+        {
+          id: 'el-4',
+          name: 'Sàn S150',
+          category: 'IfcSlab',
+          modelId: 'm1',
+          globalId: 'guid-slab-01',
+        },
+      ],
+      [
+        'guid-wall-01',
+        {
+          id: 'el-5',
+          name: 'Tường gạch 200',
+          category: 'IfcWall',
+          modelId: 'm1',
+          globalId: 'guid-wall-01',
+        },
+      ],
+      [
+        'guid-wall-02',
+        {
+          id: 'el-6',
+          name: 'Vách bê tông',
+          category: 'IfcWall',
+          modelId: 'm1',
+          globalId: 'guid-wall-02',
+        },
+      ],
+      [
+        'guid-beam-02',
+        {
+          id: 'el-7',
+          name: 'Dầm B2',
+          category: 'IfcBeam',
+          modelId: 'm1',
+          globalId: 'guid-beam-02',
+        },
+      ],
+      [
+        'guid-wall-03',
+        {
+          id: 'el-8',
+          name: 'Vách W3',
+          category: 'IfcWall',
+          modelId: 'm1',
+          globalId: 'guid-wall-03',
+        },
+      ],
+      [
+        'guid-duct-01',
+        {
+          id: 'el-9',
+          name: 'Ống gió 500x300',
+          category: 'IfcDuctSegment',
+          modelId: 'm2',
+          globalId: 'guid-duct-01',
+        },
+      ],
+      [
+        'guid-beam-03',
+        {
+          id: 'el-10',
+          name: 'Dầm B3',
+          category: 'IfcBeam',
+          modelId: 'm1',
+          globalId: 'guid-beam-03',
+        },
+      ],
+    ]);
+
+    it('performs round-trip: exports 5 clashes to BCF and imports back to exact 5 records with matching GUIDs', async () => {
+      const blob = await exportClashTestToBCF(testForRoundTrip);
+      const arrayBuffer = await blob.arrayBuffer();
+
+      const imported = await importBCFToClashResults(new Uint8Array(arrayBuffer), undefined, {
+        guidToElementMap: mockElementsMap,
+        testId: 'test-1',
+      });
+
+      expect(imported).toHaveLength(5);
+
+      // Verify records and GUIDs preservation
+      const importedRecords = imported.map((i) => i.record);
+      const importedAGuids = importedRecords.map((r) => r.aGuid);
+      const importedBGuids = importedRecords.map((r) => r.bGuid);
+
+      expect(importedAGuids).toContain('guid-beam-01');
+      expect(importedBGuids).toContain('guid-col-01');
+
+      // Check first clash details
+      const firstClash = importedRecords.find((r) => r.aGuid === 'guid-beam-01');
+      expect(firstClash).toBeDefined();
+      expect(firstClash?.status).toBe('New');
+      expect(firstClash?.type).toBe('Hard');
+      expect(firstClash?.aName).toBe('Dầm B300x500');
+      expect(firstClash?.bName).toBe('Cột C400x400');
+      expect(firstClash?.comments).toContain('Giao thoa dầm và cột tầng 2');
+
+      // Check clearance clash
+      const secondClash = importedRecords.find((r) => r.aGuid === 'guid-pipe-01');
+      expect(secondClash).toBeDefined();
+      expect(secondClash?.type).toBe('Clearance');
+      expect(secondClash?.distance).toBeCloseTo(0.035);
+
+      // No missing element warnings when all elements exist in map
+      expect(imported.every((i) => i.warning === undefined)).toBe(true);
+    });
+
+    it('handles BCF import with non-existent GUIDs gracefully with warning', async () => {
+      const blob = await exportClashTestToBCF(testForRoundTrip);
+      const arrayBuffer = await blob.arrayBuffer();
+
+      // Empty elements map (simulates foreign model or missing elements)
+      const emptyMap = new Map<string, JnnElement>();
+
+      const imported = await importBCFToClashResults(new Uint8Array(arrayBuffer), undefined, {
+        guidToElementMap: emptyMap,
+      });
+
+      expect(imported).toHaveLength(5);
+      // All items should have warnings about missing elements
+      expect(imported.every((i) => i.warning !== undefined)).toBe(true);
+      expect(imported[0]!.warning).toContain('không tìm thấy trong mô hình hiện tại');
+      // But GUIDs and titles are still correctly recovered
+      expect(imported[0]!.record.aGuid).toBeDefined();
+    });
+
+    it('throws descriptive error on corrupted or invalid BCF binary data', async () => {
+      const corruptedBytes = new Uint8Array([0, 1, 2, 3, 4, 5]);
+
+      await expect(importBCFToClashResults(corruptedBytes)).rejects.toThrow(
+        /File BCF không hợp lệ/,
+      );
     });
   });
 });

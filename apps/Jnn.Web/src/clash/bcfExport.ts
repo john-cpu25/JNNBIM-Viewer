@@ -1,6 +1,8 @@
 import * as OBC from '@thatopen/components';
-import type { ClashRecord } from './clashResults';
+import type { ClashRecord, ClashStatus } from './clashResults';
 import type { ClashTestItem } from './clashState';
+import type { ClashType } from './narrowphase';
+import type { JnnElement } from '../domain/model';
 
 /**
  * Initializes and configures the BCFTopics manager for consistent BCF 2.1 operations.
@@ -163,4 +165,153 @@ export async function exportSingleClashToBCF(
   const bcf = setupBcfManager(comps);
   const topic = clashToBcfTopic(clash, test, comps);
   return bcf.export([topic]);
+}
+
+/**
+ * Result structure for imported BCF topic.
+ */
+export interface ImportedClashResult {
+  record: ClashRecord;
+  warning?: string;
+}
+
+/**
+ * Options for BCF import.
+ */
+export interface ImportBcfOptions {
+  guidToElementMap?: Map<string, Pick<JnnElement, 'id'> & Partial<JnnElement>>;
+  testId?: string;
+}
+
+/**
+ * Imports a BCF 2.1 zip file (.bcf) into structured ClashRecord objects.
+ * Maps component GUIDs to current model elements when available.
+ */
+export async function importBCFToClashResults(
+  bcfData: Uint8Array,
+  components?: OBC.Components,
+  options?: ImportBcfOptions,
+): Promise<ImportedClashResult[]> {
+  const comps = components ?? new OBC.Components();
+  const bcf = setupBcfManager(comps);
+
+  let loaded: { topics: OBC.Topic[]; viewpoints: OBC.Viewpoint[] };
+  try {
+    loaded = await bcf.load(bcfData);
+  } catch (err) {
+    throw new Error(`File BCF không hợp lệ hoặc không đúng định dạng: ${(err as Error).message}`);
+  }
+
+  const { topics } = loaded;
+  const viewpointsManager = comps.get(OBC.Viewpoints);
+  const results: ImportedClashResult[] = [];
+
+  for (let idx = 0; idx < topics.length; idx++) {
+    const topic = topics[idx]!;
+    const warnings: string[] = [];
+
+    // Extract viewpoints
+    let aGuid = '';
+    let bGuid = '';
+    let point: [number, number, number] = [0, 0, 0];
+
+    const vpGuids = Array.from(topic.viewpoints);
+    if (vpGuids.length > 0) {
+      const vp = viewpointsManager.list.get(vpGuids[0]!);
+      if (vp) {
+        const selGuids = Array.from(vp.selectionComponents);
+        aGuid = selGuids[0] ?? '';
+        bGuid = selGuids[1] ?? '';
+
+        // Extract camera point
+        if (vp.camera?.camera_view_point) {
+          const cvp = vp.camera.camera_view_point;
+          const cd = (vp.camera as any).camera_direction;
+          if (cd) {
+            point = [cvp.x + cd.x, cvp.y + cd.y, cvp.z + cd.z];
+          } else {
+            point = [cvp.x, cvp.y, cvp.z];
+          }
+        }
+      }
+    }
+
+    // Map GUIDs to elements if map provided
+    const elA = aGuid && options?.guidToElementMap ? options.guidToElementMap.get(aGuid) : undefined;
+    const elB = bGuid && options?.guidToElementMap ? options.guidToElementMap.get(bGuid) : undefined;
+
+    if (aGuid && !elA && options?.guidToElementMap) {
+      warnings.push(`Cấu kiện A (GUID: ${aGuid}) không tìm thấy trong mô hình hiện tại`);
+    }
+    if (bGuid && !elB && options?.guidToElementMap) {
+      warnings.push(`Cấu kiện B (GUID: ${bGuid}) không tìm thấy trong mô hình hiện tại`);
+    }
+
+    // Status mapping
+    const rawStatus = topic.status;
+    let status: ClashStatus = 'New';
+    if (['New', 'Active', 'Reviewed', 'Approved', 'Resolved'].includes(rawStatus)) {
+      status = rawStatus as ClashStatus;
+    } else if (rawStatus === 'Closed') {
+      status = 'Resolved';
+    } else if (rawStatus === 'In Review') {
+      status = 'Reviewed';
+    }
+
+    // Type mapping from labels or description
+    let type: ClashType = 'Hard';
+    const labels = Array.from(topic.labels);
+    if (labels.includes('Clearance') || (topic.description && topic.description.includes('Clearance'))) {
+      type = 'Clearance';
+    } else if (labels.includes('Duplicates') || (topic.description && topic.description.includes('Duplicates'))) {
+      type = 'Duplicates';
+    }
+
+    // Distance mapping
+    let distance = 0;
+    if (topic.description) {
+      const distMatch = topic.description.match(/Khoảng cách:\s*([\d.]+)/i);
+      if (distMatch && distMatch[1]) {
+        distance = parseFloat(distMatch[1]);
+      }
+    }
+
+    // Extract comments
+    let comments = '';
+    const commentsList = Array.from(topic.comments.values());
+    if (commentsList.length > 0 && commentsList[0]?.comment) {
+      comments = commentsList.map((c) => c.comment).join('\n');
+    }
+
+    const record: ClashRecord = {
+      clashId: topic.guid || `imported_bcf_${idx + 1}`,
+      testId: options?.testId || 'imported_bcf_test',
+      name: topic.title || `Clash ${idx + 1}`,
+      status,
+      type,
+      distance,
+      aId: elA?.id ?? aGuid ?? `ext_A_${idx + 1}`,
+      bId: elB?.id ?? bGuid ?? `ext_B_${idx + 1}`,
+      aGuid: aGuid || undefined,
+      bGuid: bGuid || undefined,
+      aName: elA?.name || undefined,
+      bName: elB?.name || undefined,
+      aClass: elA?.category || undefined,
+      bClass: elB?.category || undefined,
+      aStorey: elA?.storey || undefined,
+      bStorey: elB?.storey || undefined,
+      point,
+      assignedTo: topic.assignedTo || undefined,
+      comments: comments || undefined,
+      firstFoundAt: topic.creationDate ? new Date(topic.creationDate).getTime() : Date.now(),
+      lastFoundAt: topic.modifiedDate ? new Date(topic.modifiedDate).getTime() : Date.now(),
+    };
+
+    results.push({
+      record,
+      warning: warnings.length > 0 ? warnings.join('; ') : undefined,
+    });
+  }
+
+  return results;
 }

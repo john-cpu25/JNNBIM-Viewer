@@ -117,4 +117,13 @@ describe('ClashPanel UI & Clash Detective workflow', () => {
     const sameModelCheck = screen.getByTestId('ignore-same-model-checkbox');
     expect(sameModelCheck).toBeChecked();
   });
+
+  it('renders BCF import button and file input in toolbar', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByTestId('tab-clash-btn'));
+    expect(screen.getByTestId('import-bcf-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('import-bcf-input')).toBeInTheDocument();
+  });
 });
