@@ -1,3 +1,9 @@
+/**
+ * @internal SPIKE CODE - Experimental & Verification Only
+ * This module is designed strictly for offline IFC loading spike & research.
+ * It is excluded from the production release bundle.
+ */
+
 import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 import * as WebIFC from 'web-ifc';

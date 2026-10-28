@@ -22,12 +22,16 @@ export default defineConfig({
     sourcemap: true,
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
-      input: {
-        main: path.resolve(import.meta.dirname, 'index.html'),
-        spike: path.resolve(import.meta.dirname, 'spike-ifc.html'),
-        spikeGeometry: path.resolve(import.meta.dirname, 'spike-geometry.html'),
-        spikeClash: path.resolve(import.meta.dirname, 'spike-clash.html'),
-      },
+      input: process.env.BUILD_SPIKES === 'true'
+        ? {
+            main: path.resolve(import.meta.dirname, 'index.html'),
+            spike: path.resolve(import.meta.dirname, 'spike-ifc.html'),
+            spikeGeometry: path.resolve(import.meta.dirname, 'spike-geometry.html'),
+            spikeClash: path.resolve(import.meta.dirname, 'spike-clash.html'),
+          }
+        : {
+            main: path.resolve(import.meta.dirname, 'index.html'),
+          },
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules/three')) return 'three';
