@@ -15,7 +15,7 @@ import {
 import { useApp } from '../state/AppContext';
 import type { ClashRecord, ClashStatus } from '../clash/clashResults';
 import type { ClashTestItem } from '../clash/clashState';
-import { exportClashCSV, downloadFile } from '../clash/clashExport';
+import { exportClashCSV, exportClashExcel, downloadFile } from '../clash/clashExport';
 import { cn } from '../lib/cn';
 
 interface ClashResultsTableProps {
@@ -186,9 +186,16 @@ export function ClashResultsTable({
     downloadFile(csv, filename, 'text/csv;charset=utf-8');
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     setIsExportOpen(false);
-    alert('Xuất Excel (.xlsx) sẽ sẵn sàng trong sub-task T15.2!');
+    try {
+      const blob = await exportClashExcel(currentTest);
+      const filename = `${(currentTest.name || 'clash_report').replace(/\s+/g, '_')}_${Date.now()}.xlsx`;
+      downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    } catch (err) {
+      console.error('Failed to export Excel:', err);
+      alert('Lỗi xuất Excel: ' + (err as Error).message);
+    }
   };
 
   const handleExportHTML = () => {

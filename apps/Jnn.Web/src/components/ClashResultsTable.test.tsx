@@ -262,5 +262,13 @@ describe('ClashResultsTable component & interactive review', () => {
     expect(revokeObjectURLMock).toHaveBeenCalled();
     // Dropdown should be closed after selection
     expect(screen.queryByTestId('export-dropdown-menu')).not.toBeInTheDocument();
+
+    // Re-open dropdown and click export Excel
+    await user.click(exportBtn);
+    expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument();
+    await user.click(screen.getByTestId('export-excel-btn'));
+    await vi.waitFor(() => {
+      expect(createObjectURLMock).toHaveBeenCalledTimes(2);
+    });
   });
 });
