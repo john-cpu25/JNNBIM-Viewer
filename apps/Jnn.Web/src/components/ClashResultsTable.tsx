@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   Box,
+  ChevronDown,
+  Download,
+  FileCode,
+  FileSpreadsheet,
+  FileText,
   Maximize2,
   MessageSquare,
   Search,
@@ -9,10 +14,13 @@ import {
 } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import type { ClashRecord, ClashStatus } from '../clash/clashResults';
+import type { ClashTestItem } from '../clash/clashState';
+import { exportClashCSV, downloadFile } from '../clash/clashExport';
 import { cn } from '../lib/cn';
 
 interface ClashResultsTableProps {
   testId: string;
+  test?: ClashTestItem;
   records: ClashRecord[];
   selectedClashId: string | null;
   onSelectClash: (clashId: string | null) => void;
@@ -20,7 +28,8 @@ interface ClashResultsTableProps {
 }
 
 export function ClashResultsTable({
-  testId: _testId,
+  testId,
+  test,
   records,
   selectedClashId,
   onSelectClash,
@@ -31,7 +40,24 @@ export function ClashResultsTable({
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [enableSectionBox, setEnableSectionBox] = useState<boolean>(false);
+  const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close export menu on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportOpen(false);
+      }
+    }
+    if (isExportOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isExportOpen]);
 
   // Filtered records
   const filteredRecords = useMemo(() => {
@@ -138,6 +164,38 @@ export function ClashResultsTable({
     }
   };
 
+  const currentTest = useMemo<ClashTestItem>(() => {
+    return (
+      test ?? {
+        id: testId,
+        name: 'Clash_Test',
+        type: 'Hard',
+        tolerance: 0,
+        selectionA: {},
+        selectionB: {},
+        status: 'completed',
+        records,
+      }
+    );
+  }, [test, testId, records]);
+
+  const handleExportCSV = () => {
+    setIsExportOpen(false);
+    const csv = exportClashCSV(currentTest);
+    const filename = `${(currentTest.name || 'clash_report').replace(/\s+/g, '_')}_${Date.now()}.csv`;
+    downloadFile(csv, filename, 'text/csv;charset=utf-8');
+  };
+
+  const handleExportExcel = () => {
+    setIsExportOpen(false);
+    alert('Xuất Excel (.xlsx) sẽ sẵn sàng trong sub-task T15.2!');
+  };
+
+  const handleExportHTML = () => {
+    setIsExportOpen(false);
+    alert('Xuất HTML (.html) sẽ sẵn sàng trong sub-task T15.3!');
+  };
+
   return (
     <div
       ref={tableRef}
@@ -186,6 +244,55 @@ export function ClashResultsTable({
             <option value="Clearance">Clearance</option>
             <option value="Duplicates">Duplicates</option>
           </select>
+
+          {/* Export dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsExportOpen(!isExportOpen)}
+              data-testid="export-dropdown-btn"
+              className="flex items-center gap-1 rounded border border-line bg-surface px-2 py-1 text-xs text-ink hover:bg-surface-2 hover:border-accent transition-colors"
+              title="Xuất báo cáo clash"
+            >
+              <Download size={12} className="text-muted" />
+              <span>Xuất</span>
+              <ChevronDown size={11} className={cn('text-muted transition-transform', isExportOpen && 'rotate-180')} />
+            </button>
+            {isExportOpen && (
+              <div
+                data-testid="export-dropdown-menu"
+                className="absolute right-0 top-full mt-1 z-30 w-44 rounded-md border border-line bg-surface p-1 shadow-xl text-xs"
+              >
+                <button
+                  type="button"
+                  data-testid="export-csv-btn"
+                  onClick={handleExportCSV}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
+                >
+                  <FileText size={13} className="text-muted" />
+                  <span>Xuất CSV (.csv)</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="export-excel-btn"
+                  onClick={handleExportExcel}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
+                >
+                  <FileSpreadsheet size={13} className="text-muted" />
+                  <span>Xuất Excel (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="export-html-btn"
+                  onClick={handleExportHTML}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
+                >
+                  <FileCode size={13} className="text-muted" />
+                  <span>Xuất HTML (.html)</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Section box toggle & shortcut hint */}

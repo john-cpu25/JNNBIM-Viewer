@@ -540,6 +540,7 @@ export function ClashPanel() {
         {activeTest && subTab === 'results' && (
           <ClashResultsTable
             testId={activeTest.id}
+            test={activeTest}
             records={activeTest.records ?? []}
             selectedClashId={clashState.selectedClashId}
             onSelectClash={(clashId) => dispatch({ type: 'selectClash', clashId })}

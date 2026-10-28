@@ -223,4 +223,44 @@ describe('ClashResultsTable component & interactive review', () => {
     fireEvent.keyDown(tableHost, { key: '3', code: 'Digit3' });
     expect(handleUpdate).toHaveBeenCalledWith(expect.any(String), { status: 'Reviewed' });
   });
+
+  it('toggles export dropdown and exports CSV on button click', async () => {
+    const user = userEvent.setup();
+    const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
+    const revokeObjectURLMock = vi.fn();
+    globalThis.URL.createObjectURL = createObjectURLMock;
+    globalThis.URL.revokeObjectURL = revokeObjectURLMock;
+
+    renderWithApp(
+      <ClashResultsTable
+        testId="t1"
+        records={mockRecords}
+        selectedClashId={null}
+        onSelectClash={vi.fn()}
+        onUpdateRecord={vi.fn()}
+      />,
+    );
+
+    // Dropdown initially not visible
+    expect(screen.queryByTestId('export-dropdown-menu')).not.toBeInTheDocument();
+
+    // Click export button to open dropdown
+    const exportBtn = screen.getByTestId('export-dropdown-btn');
+    await user.click(exportBtn);
+
+    // Dropdown is visible with 3 options
+    expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument();
+    expect(screen.getByTestId('export-csv-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('export-excel-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('export-html-btn')).toBeInTheDocument();
+
+    // Click export CSV
+    await user.click(screen.getByTestId('export-csv-btn'));
+
+    // Verify download triggered
+    expect(createObjectURLMock).toHaveBeenCalled();
+    expect(revokeObjectURLMock).toHaveBeenCalled();
+    // Dropdown should be closed after selection
+    expect(screen.queryByTestId('export-dropdown-menu')).not.toBeInTheDocument();
+  });
 });
