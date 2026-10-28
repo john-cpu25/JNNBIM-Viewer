@@ -2,8 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { Workbook } from 'exceljs';
 import {
   escapeCsvField,
+  escapeHtml,
   exportClashCSV,
   exportClashExcel,
+  exportClashHTML,
   downloadFile,
   CSV_HEADERS,
 } from './clashExport';
@@ -390,6 +392,88 @@ describe('clashExport - CSV & Excel Export (T15.1, T15.2)', () => {
       const sheetResults = readWb.getWorksheet('Kết quả');
       expect(sheetResults).toBeDefined();
       expect(sheetResults?.rowCount).toBe(1); // Only header row
+    });
+  });
+
+  describe('escapeHtml', () => {
+    it('escapes &, <, >, ", and single quotes', () => {
+      expect(escapeHtml('<script>alert("xss")&\'test\'</script>')).toBe(
+        '&lt;script&gt;alert(&quot;xss&quot;)&amp;&#039;test&#039;&lt;/script&gt;',
+      );
+      expect(escapeHtml(null)).toBe('');
+      expect(escapeHtml(undefined)).toBe('');
+      expect(escapeHtml(123)).toBe('123');
+    });
+  });
+
+  describe('exportClashHTML (T15.3)', () => {
+    it('generates a valid, self-contained HTML document with exact rows and components', () => {
+      const html = exportClashHTML(mockTest);
+
+      // 1. Structure checks
+      expect(html.trim().startsWith('<!DOCTYPE html>')).toBe(true);
+      expect(html.includes('</html>')).toBe(true);
+      expect(html.includes('<style>')).toBe(true);
+      expect(html.includes('<script>')).toBe(true);
+      // Ensure no external scripts or external CDNs
+      expect(html.includes('<script src=')).toBe(false);
+      expect(html.includes('<link rel="stylesheet"')).toBe(false);
+      expect(html.includes('@media print')).toBe(true);
+
+      // 2. Parse HTML using DOMParser
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Title & Header
+      expect(doc.title).toContain('Kiểm tra Kết cấu x MEP');
+      expect(doc.querySelector('h1')?.textContent).toBe('Kiểm tra Kết cấu x MEP');
+
+      // Summary Cards Counts
+      expect(doc.querySelector('.stat-total .count')?.textContent).toBe('5');
+      expect(doc.querySelector('.stat-new .count')?.textContent).toBe('1');
+      expect(doc.querySelector('.stat-active .count')?.textContent).toBe('1');
+      expect(doc.querySelector('.stat-reviewed .count')?.textContent).toBe('1');
+      expect(doc.querySelector('.stat-approved .count')?.textContent).toBe('1');
+      expect(doc.querySelector('.stat-resolved .count')?.textContent).toBe('1');
+
+      // Detailed Table Rows
+      const dataRows = doc.querySelectorAll('#tableBody tr.data-row');
+      expect(dataRows.length).toBe(5);
+
+      // Verify row 1 content
+      const firstRow = dataRows[0] as HTMLTableRowElement;
+      expect(firstRow.cells[0]?.textContent?.trim()).toBe('1');
+      expect(firstRow.cells[1]?.textContent?.trim()).toBe('c1');
+      expect(firstRow.cells[2]?.textContent?.trim()).toBe('New');
+      expect(firstRow.cells[3]?.textContent?.trim()).toBe('Hard');
+      expect(firstRow.cells[4]?.textContent?.trim()).toBe('0.000000');
+      expect(firstRow.cells[5]?.textContent?.trim()).toBe('guid-beam-1');
+      expect(firstRow.cells[6]?.textContent?.trim()).toBe('Dầm B200x400 Tầng 2');
+      expect(firstRow.cells[7]?.textContent?.trim()).toBe('IfcBeam');
+      expect(firstRow.cells[8]?.textContent?.trim()).toBe('guid-col-1');
+      expect(firstRow.cells[9]?.textContent?.trim()).toBe('Cột C300x300 Tầng 2');
+      expect(firstRow.cells[10]?.textContent?.trim()).toBe('IfcColumn');
+      expect(firstRow.cells[11]?.textContent?.trim()).toBe('Tầng 2');
+      expect(firstRow.cells[12]?.textContent?.trim()).toBe('10.500, 20.250, 3.800');
+
+      // Verify row 2 (multiline and special characters preserved)
+      const secondRow = dataRows[1] as HTMLTableRowElement;
+      expect(secondRow.cells[4]?.textContent?.trim()).toBe('0.045123');
+      expect(secondRow.cells[13]?.textContent).toContain('Khoảng hở 45mm < 50mm quy định.');
+    });
+
+    it('handles tests with 0 clash records cleanly (empty table body)', () => {
+      const emptyTest: ClashTestItem = {
+        ...mockTest,
+        records: [],
+      };
+      const html = exportClashHTML(emptyTest);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      expect(doc.querySelector('.stat-total .count')?.textContent).toBe('0');
+      const dataRows = doc.querySelectorAll('#tableBody tr.data-row');
+      expect(dataRows.length).toBe(0);
     });
   });
 });

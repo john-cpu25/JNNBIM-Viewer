@@ -15,7 +15,7 @@ import {
 import { useApp } from '../state/AppContext';
 import type { ClashRecord, ClashStatus } from '../clash/clashResults';
 import type { ClashTestItem } from '../clash/clashState';
-import { exportClashCSV, exportClashExcel, downloadFile } from '../clash/clashExport';
+import { exportClashCSV, exportClashExcel, exportClashHTML, downloadFile } from '../clash/clashExport';
 import { cn } from '../lib/cn';
 
 interface ClashResultsTableProps {
@@ -200,7 +200,14 @@ export function ClashResultsTable({
 
   const handleExportHTML = () => {
     setIsExportOpen(false);
-    alert('Xuất HTML (.html) sẽ sẵn sàng trong sub-task T15.3!');
+    try {
+      const html = exportClashHTML(currentTest);
+      const filename = `${(currentTest.name || 'clash_report').replace(/\s+/g, '_')}_${Date.now()}.html`;
+      downloadFile(html, filename, 'text/html;charset=utf-8');
+    } catch (err) {
+      console.error('Failed to export HTML:', err);
+      alert('Lỗi xuất HTML: ' + (err as Error).message);
+    }
   };
 
   return (

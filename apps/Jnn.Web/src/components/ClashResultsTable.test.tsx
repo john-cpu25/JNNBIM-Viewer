@@ -270,5 +270,11 @@ describe('ClashResultsTable component & interactive review', () => {
     await vi.waitFor(() => {
       expect(createObjectURLMock).toHaveBeenCalledTimes(2);
     });
+
+    // Re-open dropdown and click export HTML
+    await user.click(exportBtn);
+    expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument();
+    await user.click(screen.getByTestId('export-html-btn'));
+    expect(createObjectURLMock).toHaveBeenCalledTimes(3);
   });
 });
