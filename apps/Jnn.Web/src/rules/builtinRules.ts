@@ -15,13 +15,18 @@ export const REQUIRED_PROPERTIES_MAP: Record<string, string[]> = {
 /**
  * Helper to normalize IFC class names (e.g. 'wall' -> 'IfcWall', 'IfcWall' -> 'IfcWall').
  */
-function normalizeIfcClass(category: string): string {
-  const trimmed = (category || '').trim();
+function normalizeIfcClass(val: string): string {
+  const trimmed = (val || '').trim();
   if (!trimmed) return '';
   if (trimmed.toLowerCase().startsWith('ifc')) {
-    return 'Ifc' + trimmed.slice(3);
+    const raw = trimmed.slice(3);
+    return 'Ifc' + raw.charAt(0).toUpperCase() + raw.slice(1);
   }
-  return 'Ifc' + trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  let base = trimmed;
+  if (base.toLowerCase().endsWith('s') && !base.toLowerCase().endsWith('ss')) {
+    base = base.slice(0, -1);
+  }
+  return 'Ifc' + base.charAt(0).toUpperCase() + base.slice(1);
 }
 
 /**
@@ -38,18 +43,43 @@ export const ruleMissingGeometry: RuleDefinition = {
     const violations: RuleViolation[] = [];
 
     for (const el of ctx.elements) {
-      const bounds = elementBounds(el);
-      const isBoxEmpty = isEmpty(bounds);
-      const isPointBox =
-        !isBoxEmpty &&
-        bounds.min[0] === bounds.max[0] &&
-        bounds.min[1] === bounds.max[1] &&
-        bounds.min[2] === bounds.max[2];
+      // Chỉ kiểm tra các cấu kiện vật lý thông thường
+      const rawClass = (el as any).ifcClass || el.category || '';
+      if (
+        !el.category ||
+        rawClass === 'IfcProject' ||
+        rawClass === 'IfcSite' ||
+        rawClass === 'IfcBuilding' ||
+        rawClass === 'IfcBuildingStorey' ||
+        rawClass === 'IfcSpace'
+      ) {
+        continue;
+      }
+
+      let isBoxEmpty = false;
+      let isPointBox = false;
+
+      const rawBox = (el as any).box;
+      if (rawBox && Array.isArray(rawBox.min) && Array.isArray(rawBox.max)) {
+        const [minX, minY, minZ] = rawBox.min;
+        const [maxX, maxY, maxZ] = rawBox.max;
+        isBoxEmpty = minX > maxX || minY > maxY || minZ > maxZ;
+        isPointBox = !isBoxEmpty && minX === maxX && minY === maxY && minZ === maxZ;
+      } else if (el.meshRefs && el.meshRefs.length > 0) {
+        const bounds = elementBounds(el);
+        isBoxEmpty = isEmpty(bounds);
+        isPointBox =
+          !isBoxEmpty &&
+          bounds.min[0] === bounds.max[0] &&
+          bounds.min[1] === bounds.max[1] &&
+          bounds.min[2] === bounds.max[2];
+      } else {
+        isBoxEmpty = true;
+      }
 
       const isStatusMissing = el.geometryStatus === 'missing' || el.geometryStatus === 'failed';
-      const hasNoMesh = el.meshRefs.length === 0;
 
-      if (isStatusMissing || isBoxEmpty || isPointBox || hasNoMesh) {
+      if (isStatusMissing || isBoxEmpty || isPointBox) {
         violations.push({
           ruleId: 'R-GEO-01',
           severity: 'Error',
@@ -119,7 +149,7 @@ export const ruleDefaultNaming: RuleDefinition = {
   severity: 'Warning',
   check: async (ctx) => {
     const violations: RuleViolation[] = [];
-    const defaultPattern = /^(generic|default|unnamed|copy|mô hình mặc định|chưa đặt tên|wall:generic|floor:floor)/i;
+    const defaultPattern = /\b(generic|default|unnamed|copy)\b|^chưa đặt tên|^mô hình mặc định/i;
 
     for (const el of ctx.elements) {
       const name = (el.name || '').trim();
@@ -157,7 +187,7 @@ export const ruleMissingRequiredProperty: RuleDefinition = {
     const violations: RuleViolation[] = [];
 
     for (const el of ctx.elements) {
-      const ifcClass = normalizeIfcClass(el.category);
+      const ifcClass = normalizeIfcClass((el as any).ifcClass || el.category);
       const requiredProps = REQUIRED_PROPERTIES_MAP[ifcClass];
       if (!requiredProps || requiredProps.length === 0) continue;
 

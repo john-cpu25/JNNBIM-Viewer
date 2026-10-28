@@ -38,7 +38,7 @@ export interface AppState {
   theme: Theme;
   explorerOpen: boolean;
   propertiesOpen: boolean;
-  rightTab: 'properties' | 'clash';
+  rightTab: 'properties' | 'clash' | 'rules';
   mobilePane: MobilePane;
   notices: Notice[];
 }
@@ -62,7 +62,7 @@ export type Action =
   | { type: 'setProjection'; projection: AppState['projection'] }
   | { type: 'setTheme'; theme: Theme }
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
-  | { type: 'setRightTab'; tab: 'properties' | 'clash' }
+  | { type: 'setRightTab'; tab: 'properties' | 'clash' | 'rules' }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
   | { type: 'dismissNotice'; id: number }

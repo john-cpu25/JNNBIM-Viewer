@@ -1,7 +1,8 @@
-import { Zap } from 'lucide-react';
+import { Zap, ClipboardCheck } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { Properties } from './Properties';
 import { ClashPanel } from './ClashPanel';
+import { RulePanel } from './RulePanel';
 import { cn } from '../lib/cn';
 
 export function RightPanel() {
@@ -45,12 +46,32 @@ export function RightPanel() {
             <Zap size={13} className={activeTab === 'clash' ? 'text-accent' : 'text-muted'} />
             <span>Clash</span>
           </button>
+          <button
+            type="button"
+            data-testid="tab-rules-btn"
+            onClick={() => dispatch({ type: 'setRightTab', tab: 'rules' })}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide transition-colors',
+              activeTab === 'rules'
+                ? 'bg-surface-2 text-accent shadow-sm'
+                : 'text-muted hover:text-ink',
+            )}
+          >
+            <ClipboardCheck size={13} className={activeTab === 'rules' ? 'text-accent' : 'text-muted'} />
+            <span>Rules</span>
+          </button>
         </div>
       </div>
 
       {/* Tab Content */}
       <div className="min-h-0 flex-1 flex flex-col">
-        {activeTab === 'clash' ? <ClashPanel /> : <Properties hideHeader />}
+        {activeTab === 'clash' ? (
+          <ClashPanel />
+        ) : activeTab === 'rules' ? (
+          <RulePanel />
+        ) : (
+          <Properties hideHeader />
+        )}
       </div>
     </div>
   );
