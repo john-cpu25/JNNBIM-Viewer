@@ -113,6 +113,45 @@ export function clashToBcfTopic(
 }
 
 /**
+ * Options for BCF export.
+ */
+export interface ExportBcfOptions {
+  onlyActive?: boolean;
+  author?: string;
+}
+
+/**
+ * Exports all clash records in a ClashTestItem as a standard BCF 2.1 zip archive (.bcf).
+ */
+export async function exportClashTestToBCF(
+  test: ClashTestItem,
+  components?: OBC.Components,
+  options?: ExportBcfOptions,
+): Promise<Blob> {
+  const comps = components ?? new OBC.Components();
+  const bcf = setupBcfManager(comps, { author: options?.author });
+
+  let records = test.records ?? [];
+  if (options?.onlyActive) {
+    records = records.filter((r) => r.status !== 'Resolved');
+  }
+
+  if (records.length > 500) {
+    console.warn(
+      `[bcfExport] Số lượng va chạm lớn (${records.length} topics). Dung lượng file BCF có thể lớn.`,
+    );
+  }
+
+  const topics: OBC.Topic[] = [];
+  for (const record of records) {
+    const topic = clashToBcfTopic(record, test, comps);
+    topics.push(topic);
+  }
+
+  return bcf.export(topics);
+}
+
+/**
  * Exports a single clash record as a valid BCF zip Blob.
  */
 export async function exportSingleClashToBCF(

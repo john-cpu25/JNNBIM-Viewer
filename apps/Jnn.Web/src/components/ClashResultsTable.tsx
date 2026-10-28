@@ -6,6 +6,7 @@ import {
   FileCode,
   FileSpreadsheet,
   FileText,
+  FolderArchive,
   Maximize2,
   MessageSquare,
   Search,
@@ -16,6 +17,7 @@ import { useApp } from '../state/AppContext';
 import type { ClashRecord, ClashStatus } from '../clash/clashResults';
 import type { ClashTestItem } from '../clash/clashState';
 import { exportClashCSV, exportClashExcel, exportClashHTML, downloadFile } from '../clash/clashExport';
+import { exportClashTestToBCF } from '../clash/bcfExport';
 import { cn } from '../lib/cn';
 
 interface ClashResultsTableProps {
@@ -210,6 +212,18 @@ export function ClashResultsTable({
     }
   };
 
+  const handleExportBCF = async () => {
+    setIsExportOpen(false);
+    try {
+      const blob = await exportClashTestToBCF(currentTest);
+      const filename = `${(currentTest.name || 'clash_bcf').replace(/\s+/g, '_')}_${Date.now()}.bcf`;
+      downloadFile(blob, filename, 'application/zip');
+    } catch (err) {
+      console.error('Failed to export BCF:', err);
+      alert('Lỗi xuất BCF: ' + (err as Error).message);
+    }
+  };
+
   return (
     <div
       ref={tableRef}
@@ -303,6 +317,15 @@ export function ClashResultsTable({
                 >
                   <FileCode size={13} className="text-muted" />
                   <span>Xuất HTML (.html)</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="export-bcf-btn"
+                  onClick={handleExportBCF}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
+                >
+                  <FolderArchive size={13} className="text-muted" />
+                  <span>Xuất BCF (.bcf)</span>
                 </button>
               </div>
             )}

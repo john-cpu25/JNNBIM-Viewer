@@ -5,6 +5,7 @@ import {
   setupBcfManager,
   clashToBcfTopic,
   exportSingleClashToBCF,
+  exportClashTestToBCF,
 } from './bcfExport';
 import type { ClashRecord } from './clashResults';
 import type { ClashTestItem } from './clashState';
@@ -142,5 +143,80 @@ describe('bcfExport - BCFTopics API Survey & Export (T16.1)', () => {
     const selGuids = Array.from(importedVp.selectionComponents);
     expect(selGuids).toContain('1B_beam_guid_4567');
     expect(selGuids).toContain('2C_column_guid_8901');
+  });
+
+  describe('exportClashTestToBCF (T16.2)', () => {
+    const tenClashes: ClashRecord[] = Array.from({ length: 10 }, (_, i) => ({
+      clashId: `clash-${i + 1}`,
+      testId: 'test-1',
+      name: `Clash ${i + 1}`,
+      // 6 New/Active and 4 Resolved
+      status: i < 6 ? (i % 2 === 0 ? 'New' : 'Active') : 'Resolved',
+      type: i % 3 === 0 ? 'Hard' : i % 3 === 1 ? 'Clearance' : 'Duplicates',
+      distance: 0.01 * i,
+      aId: `el-a-${i}`,
+      bId: `el-b-${i}`,
+      aGuid: `guid-a-${i}`,
+      bGuid: `guid-b-${i}`,
+      aName: `Element A ${i}`,
+      bName: `Element B ${i}`,
+      point: [i, i * 2, 3] as [number, number, number],
+      firstFoundAt: 1000,
+      lastFoundAt: 2000,
+      comments: `Ghi chú cho clash ${i + 1}`,
+    }));
+
+    const testWithTenClashes: ClashTestItem = {
+      ...mockTest,
+      records: tenClashes,
+    };
+
+    it('exports all 10 clash records into BCF archive containing exactly 10 markup files', async () => {
+      const blob = await exportClashTestToBCF(testWithTenClashes);
+      expect(blob).toBeInstanceOf(Blob);
+
+      const arrayBuffer = await blob.arrayBuffer();
+      const zip = new JSZip();
+      await zip.loadAsync(arrayBuffer);
+
+      const filenames = Object.keys(zip.files);
+      const markups = filenames.filter((f) => f.endsWith('markup.bcf'));
+      expect(markups).toHaveLength(10);
+
+      const viewpoints = filenames.filter((f) => f.endsWith('.bcfv'));
+      expect(viewpoints).toHaveLength(10);
+    });
+
+    it('filters out Resolved clashes when onlyActive: true is requested (exports 6 topics)', async () => {
+      const blob = await exportClashTestToBCF(testWithTenClashes, undefined, { onlyActive: true });
+      const arrayBuffer = await blob.arrayBuffer();
+      const zip = new JSZip();
+      await zip.loadAsync(arrayBuffer);
+
+      const filenames = Object.keys(zip.files);
+      const markups = filenames.filter((f) => f.endsWith('markup.bcf'));
+      expect(markups).toHaveLength(6);
+    });
+
+    it('handles test with 0 clashes cleanly (produces valid BCF archive with 0 topics)', async () => {
+      const emptyTest: ClashTestItem = {
+        ...mockTest,
+        records: [],
+      };
+
+      const blob = await exportClashTestToBCF(emptyTest);
+      expect(blob).toBeInstanceOf(Blob);
+
+      const arrayBuffer = await blob.arrayBuffer();
+      const zip = new JSZip();
+      await zip.loadAsync(arrayBuffer);
+
+      const filenames = Object.keys(zip.files);
+      expect(filenames).toContain('bcf.version');
+      expect(filenames).toContain('extensions.xml');
+
+      const markups = filenames.filter((f) => f.endsWith('markup.bcf'));
+      expect(markups).toHaveLength(0);
+    });
   });
 });

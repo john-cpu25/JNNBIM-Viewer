@@ -276,5 +276,13 @@ describe('ClashResultsTable component & interactive review', () => {
     expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument();
     await user.click(screen.getByTestId('export-html-btn'));
     expect(createObjectURLMock).toHaveBeenCalledTimes(3);
+
+    // Re-open dropdown and click export BCF
+    await user.click(exportBtn);
+    expect(screen.getByTestId('export-dropdown-menu')).toBeInTheDocument();
+    await user.click(screen.getByTestId('export-bcf-btn'));
+    await vi.waitFor(() => {
+      expect(createObjectURLMock).toHaveBeenCalledTimes(4);
+    });
   });
 });
