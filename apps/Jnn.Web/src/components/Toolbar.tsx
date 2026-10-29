@@ -97,6 +97,7 @@ export function Toolbar({ compact }: { compact: boolean }) {
         shortcut="G"
         active={state.gridVisible}
         onClick={() => run('toggleGrid')}
+        data-testid="toggle-grid-btn"
       />
       {hasSel && (
         <>

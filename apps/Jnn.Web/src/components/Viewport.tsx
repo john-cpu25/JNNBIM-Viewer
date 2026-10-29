@@ -211,6 +211,16 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     }
   };
 
+  const handleLoadSample = async (samplePath: string) => {
+    setIsConverting(true);
+    setConvertStatus(t('viewport.converting'));
+    const url = new URL(samplePath, window.location.href).href;
+    await loadIfcFile(url, viewer, dispatch, {
+      onProgress: (pct, msg) => setConvertStatus(`${msg || t('viewport.converting')} (${pct.toFixed(0)}%)`),
+    });
+    setIsConverting(false);
+  };
+
   const hovered = state.hovered ? state.byId.get(state.hovered) : null;
   const showEmptyState = !sample && state.model.modelId === 'empty' && !isConverting;
 
@@ -357,6 +367,25 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                     <FolderOpen size={15} />
                     <span>{t('viewport.openButton')}</span>
                   </button>
+
+                  {debugEnabled() && (
+                    <div className="grid grid-cols-2 gap-2 mt-1 pt-2 border-t border-line" data-testid="debug-sample-buttons">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadSample('./samples/building-arch-2x3.ifc')}
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
+                      >
+                        <span>Kiến trúc (90 KB)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLoadSample('./samples/building-struct-2x3.ifc')}
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
+                      >
+                        <span>Kết cấu (106 KB)</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

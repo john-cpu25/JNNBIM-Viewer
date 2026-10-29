@@ -33,17 +33,17 @@ export const vi: Translations = {
   'viewport.pickFaceHint': 'Click vào bề mặt cấu kiện để đặt mặt phẳng cắt (Esc để hủy)',
 
   // Toolbar
-  'toolbar.fitAll': 'Vừa khung nhìn (F)',
+  'toolbar.fitAll': 'Vừa khung nhìn',
   'toolbar.fitSelection': 'Vừa vùng chọn',
-  'toolbar.hide': 'Ẩn cấu kiện (H)',
-  'toolbar.isolate': 'Cô lập cấu kiện (I)',
-  'toolbar.showAll': 'Hiện tất cả (A)',
-  'toolbar.sectionPlane': 'Mặt cắt phẳng (S)',
-  'toolbar.sectionBox': 'Mặt cắt hộp (B)',
-  'toolbar.xray': 'Chế độ X-Ray (X)',
-  'toolbar.projection': 'Phối cảnh / Trực giao (P)',
-  'toolbar.grid': 'Bật/tắt lưới (G)',
-  'toolbar.clearSelection': 'Bỏ chọn (Esc)',
+  'toolbar.hide': 'Ẩn cấu kiện',
+  'toolbar.isolate': 'Cô lập cấu kiện',
+  'toolbar.showAll': 'Hiện tất cả',
+  'toolbar.sectionPlane': 'Mặt cắt phẳng',
+  'toolbar.sectionBox': 'Mặt cắt hộp',
+  'toolbar.xray': 'Chế độ X-Ray',
+  'toolbar.projection': 'Phối cảnh / Trực giao',
+  'toolbar.grid': 'Bật/tắt lưới',
+  'toolbar.clearSelection': 'Bỏ chọn',
 
   // Navigation Help Popover
   'nav.helpTitle': 'Thao tác chuột',

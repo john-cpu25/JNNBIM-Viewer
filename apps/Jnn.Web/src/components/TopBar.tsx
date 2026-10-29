@@ -7,6 +7,10 @@ import { loadIfcFile } from '../lib/ifcLoaderHelper';
 import { SettingsModal } from './SettingsModal';
 import { useTranslation } from '../i18n';
 
+const debugEnabled = () =>
+  typeof window !== 'undefined' &&
+  (import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug'));
+
 export function TopBar({ layout }: { layout: Layout }) {
   const { state, dispatch, viewer } = useApp();
   const { t, locale, setLocale } = useTranslation();
@@ -14,6 +18,16 @@ export function TopBar({ layout }: { layout: Layout }) {
   const appendFileInputRef = useRef<HTMLInputElement>(null);
   const m = state.model;
   const narrow = layout === 'narrow';
+
+  const onLoadSample = () => {
+    const url = new URL('./samples/building-arch-2x3.ifc', window.location.href).href;
+    loadIfcFile(url, viewer, dispatch, { append: false });
+  };
+
+  const onAppendSampleStruct = () => {
+    const url = new URL('./samples/building-struct-2x3.ifc', window.location.href).href;
+    loadIfcFile(url, viewer, dispatch, { append: true });
+  };
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, append = false) => {
     const file = e.target.files?.[0];
@@ -94,6 +108,29 @@ export function TopBar({ layout }: { layout: Layout }) {
           <FolderPlus size={13} className="text-emerald-500" />
           <span className="hidden sm:inline">{t('topbar.appendModel')}</span>
         </button>
+
+        {debugEnabled() && (
+          <>
+            <button
+              type="button"
+              onClick={onLoadSample}
+              title="Mở mô hình IFC mẫu kiến trúc (debug)"
+              data-testid="open-sample-btn"
+              className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-accent transition-colors hover:border-accent hover:text-ink"
+            >
+              <span className="hidden md:inline">Mẫu KT</span>
+            </button>
+            <button
+              type="button"
+              onClick={onAppendSampleStruct}
+              title="Thêm mô hình IFC mẫu kết cấu (debug)"
+              data-testid="append-sample-struct-btn"
+              className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:border-accent hover:text-emerald-500"
+            >
+              <span className="hidden lg:inline">+ Mẫu KC</span>
+            </button>
+          </>
+        )}
 
         <IconButton
           icon={Settings}

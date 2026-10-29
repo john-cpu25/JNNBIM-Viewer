@@ -33,17 +33,17 @@ export const en: Translations = {
   'viewport.pickFaceHint': 'Click element surface to place cutting plane (Esc to cancel)',
 
   // Toolbar
-  'toolbar.fitAll': 'Fit view (F)',
+  'toolbar.fitAll': 'Fit all',
   'toolbar.fitSelection': 'Fit selection',
-  'toolbar.hide': 'Hide elements (H)',
-  'toolbar.isolate': 'Isolate elements (I)',
-  'toolbar.showAll': 'Show all (A)',
-  'toolbar.sectionPlane': 'Section plane (S)',
-  'toolbar.sectionBox': 'Section box (B)',
-  'toolbar.xray': 'X-Ray mode (X)',
-  'toolbar.projection': 'Perspective / Orthographic (P)',
-  'toolbar.grid': 'Toggle grid (G)',
-  'toolbar.clearSelection': 'Clear selection (Esc)',
+  'toolbar.hide': 'Hide selected',
+  'toolbar.isolate': 'Isolate selected',
+  'toolbar.showAll': 'Show all',
+  'toolbar.sectionPlane': 'Section plane',
+  'toolbar.sectionBox': 'Section box',
+  'toolbar.xray': 'X-ray',
+  'toolbar.projection': 'Switch projection',
+  'toolbar.grid': 'Toggle grid',
+  'toolbar.clearSelection': 'Clear selection',
 
   // Navigation Help Popover
   'nav.helpTitle': 'Mouse Navigation',
@@ -94,11 +94,11 @@ export const en: Translations = {
   'properties.storey': 'Storey',
 
   // Section Box / Plane
-  'section.boxTitle': 'Section Box',
-  'section.planeTitle': 'Section Plane',
+  'section.boxTitle': 'Section box',
+  'section.planeTitle': 'Section plane',
   'section.hideFrame': 'Hide Section Frame',
   'section.showFrame': 'Show Section Frame',
-  'section.close': 'Close Section',
+  'section.close': 'Remove section',
   'section.fitSelection': 'Fit Selection',
   'section.fitModel': 'Fit Model',
   'section.reset': 'Reset',

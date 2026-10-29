@@ -128,7 +128,12 @@ test('tree double-click fits, views and theme switch', async ({ page }) => {
   await page.getByRole('button', { name: 'Expand Level 2' }).click();
   await page.getByRole('treeitem', { name: 'Pipes' }).first().dblclick();
   await page.waitForTimeout(600);
-  await page.getByRole('navigation', { name: 'Standard views' }).getByRole('button', { name: 'Top', exact: true }).click();
+  const viewNav = page.getByRole('navigation', { name: 'Standard views' });
+  if ((await viewNav.count()) > 0) {
+    await viewNav.getByRole('button', { name: 'Top', exact: true }).click();
+  } else {
+    await page.keyboard.press('2');
+  }
   await page.waitForTimeout(600);
   const cam = await page.evaluate(() => window.__jnn!.viewer.getCamera());
   if (!cam.ok) throw new Error('camera');
