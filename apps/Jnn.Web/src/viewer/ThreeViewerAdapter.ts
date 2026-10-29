@@ -632,6 +632,14 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
+  setSectionFrameVisible(visible: boolean): AdapterResult {
+    if (this.sectionHelper) {
+      this.sectionHelper.visible = visible;
+      this.requestRender();
+    }
+    return okVoid;
+  }
+
   private buildSectionHelper(spec: SectionSpec, b: Bounds): THREE.Object3D {
     const color = THEMES[this.theme].plane;
     const group = new THREE.Group();

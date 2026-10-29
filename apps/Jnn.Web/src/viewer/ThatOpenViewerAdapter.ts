@@ -53,6 +53,8 @@ import {
   type GestureIntent,
   type HoverCache,
 } from './navigation';
+import { SectionGizmo, type HandleId } from './sectionGizmo';
+import { axisDragParam, clampBox, snapValue } from './sectionMath';
 
 // Global patch for WebIFC 0.0.78 StreamMeshes signature mismatch
 let webIfcPatched = false;
@@ -173,6 +175,21 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   });
   private pivotFadeRaf: number | null = null;
   private sectionHelper: THREE.Object3D | null = null;
+  private sectionGizmo: SectionGizmo | null = null;
+  private sectionFrameVisible = true;
+  private currentSection: SectionSpec | null = null;
+  private lastPlaneClickTime = 0;
+  private gizmoDrag: {
+    handle: HandleId;
+    pointerId: number;
+    t0: number;
+    v0: number;
+    p0: THREE.Vector3;
+    d: THREE.Vector3;
+    axisIdx: 0 | 1 | 2;
+    side: 'min' | 'max';
+    startSpec: SectionSpec;
+  } | null = null;
   private clipStyler: OBCF.ClipStyler | null = null;
   private activeClipEdges: any | null = null;
   private lastCachePromise: Promise<void> | null = null;
@@ -227,6 +244,104 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       return;
     }
 
+    // Gizmo handle interaction on section box or plane
+    if (this.sectionGizmo?.visible && ev.button === 0 && this.world && this.currentSection) {
+      const ndc = this.toNdc(ev.clientX, ev.clientY);
+      const handle = this.sectionGizmo.hitTest(ndc, this.world.camera.three);
+      if (handle) {
+        if (handle === 'plane') {
+          const now = performance.now();
+          if (now - this.lastPlaneClickTime < 300) {
+            this.lastPlaneClickTime = 0;
+            if (this.currentSection.kind === 'plane') {
+              const flippedSpec: SectionSpec = {
+                ...this.currentSection,
+                flipped: !this.currentSection.flipped,
+              };
+              this.setSection(flippedSpec);
+              this.events.emit('sectionEdit', { spec: flippedSpec, phase: 'end' });
+              ev.stopImmediatePropagation();
+              ev.preventDefault();
+              return;
+            }
+          }
+          this.lastPlaneClickTime = now;
+        }
+
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+        try {
+          this.boundContainer?.setPointerCapture(ev.pointerId);
+        } catch {}
+        this.world.camera.controls.enabled = false;
+        this.pointerDown = null;
+        this.sectionGizmo.setActive(handle);
+
+        const cam = this.world.camera.three;
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(ndc, cam);
+
+        if (this.currentSection.kind === 'box' && handle !== 'plane') {
+          const [axisName, sideName] = handle.split('-') as ['x' | 'y' | 'z', 'min' | 'max'];
+          const axisIdx = axisName === 'x' ? 0 : axisName === 'y' ? 1 : 2;
+          const v0 = this.currentSection[sideName][axisIdx];
+          const unitModel: Vec3 = axisName === 'x' ? [1, 0, 0] : axisName === 'y' ? [0, 1, 0] : [0, 0, 1];
+          const d = toThree(unitModel).normalize();
+          const min = this.currentSection.min;
+          const max = this.currentSection.max;
+          const midX = (min[0] + max[0]) / 2;
+          const midY = (min[1] + max[1]) / 2;
+          const midZ = (min[2] + max[2]) / 2;
+          const posModel: Vec3 = [
+            axisName === 'x' ? this.currentSection[sideName][0] : midX,
+            axisName === 'y' ? this.currentSection[sideName][1] : midY,
+            axisName === 'z' ? this.currentSection[sideName][2] : midZ,
+          ];
+          const p0 = toThree(posModel);
+          const t0 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, p0, d) ?? 0;
+
+          this.gizmoDrag = {
+            handle,
+            pointerId: ev.pointerId,
+            t0,
+            v0,
+            p0,
+            d,
+            axisIdx,
+            side: sideName,
+            startSpec: structuredClone(this.currentSection),
+          };
+        } else if (this.currentSection.kind === 'plane' && handle === 'plane') {
+          const axisName = this.currentSection.axis;
+          const axisIdx = axisName === 'x' ? 0 : axisName === 'y' ? 1 : 2;
+          const v0 = this.currentSection.offset;
+          const unitModel: Vec3 = axisName === 'x' ? [1, 0, 0] : axisName === 'y' ? [0, 1, 0] : [0, 0, 1];
+          const d = toThree(unitModel).normalize();
+          const bounds = this.modelBounds ?? { min: [-25, -25, -10], max: [25, 25, 25] };
+          const midX = (bounds.min[0] + bounds.max[0]) / 2;
+          const midY = (bounds.min[1] + bounds.max[1]) / 2;
+          const midZ = (bounds.min[2] + bounds.max[2]) / 2;
+          const posModel: Vec3 =
+            axisName === 'x' ? [v0, midY, midZ] : axisName === 'y' ? [midX, v0, midZ] : [midX, midY, v0];
+          const p0 = toThree(posModel);
+          const t0 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, p0, d) ?? 0;
+
+          this.gizmoDrag = {
+            handle,
+            pointerId: ev.pointerId,
+            t0,
+            v0,
+            p0,
+            d,
+            axisIdx,
+            side: 'max',
+            startSpec: structuredClone(this.currentSection),
+          };
+        }
+        return;
+      }
+    }
+
     // Double-click middle mouse -> Fit All
     if (ev.button === 1) {
       const now = performance.now();
@@ -249,6 +364,72 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   };
 
   private onNavPointerMove = (ev: PointerEvent) => {
+    if (this.gizmoDrag) {
+      if (ev.pointerId !== this.gizmoDrag.pointerId) return;
+      ev.stopImmediatePropagation();
+      ev.preventDefault();
+
+      if (!this.world) return;
+      const ndc = this.toNdc(ev.clientX, ev.clientY);
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, this.world.camera.three);
+
+      const t1 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, this.gizmoDrag.p0, this.gizmoDrag.d);
+      if (t1 !== null) {
+        const deltaT = t1 - this.gizmoDrag.t0;
+        const step = ev.altKey ? 0 : ev.shiftKey ? 0.01 : 0.1;
+        const rawVal = this.gizmoDrag.v0 + deltaT;
+        const newVal = snapValue(rawVal, step);
+
+        if (this.gizmoDrag.startSpec.kind === 'box') {
+          const min = [...this.gizmoDrag.startSpec.min] as Vec3;
+          const max = [...this.gizmoDrag.startSpec.max] as Vec3;
+          const limits = this.modelBounds ?? {
+            min: [-50, -50, -20],
+            max: [50, 50, 50],
+          };
+          const clampedVal = clampBox(
+            min,
+            max,
+            this.gizmoDrag.axisIdx,
+            this.gizmoDrag.side,
+            newVal,
+            limits,
+            0.1,
+          );
+          if (this.gizmoDrag.side === 'min') {
+            min[this.gizmoDrag.axisIdx] = clampedVal;
+          } else {
+            max[this.gizmoDrag.axisIdx] = clampedVal;
+          }
+          const nextSpec: SectionSpec = {
+            kind: 'box',
+            min,
+            max,
+          };
+          this.setSection(nextSpec);
+          this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
+        } else if (this.gizmoDrag.startSpec.kind === 'plane') {
+          const nextSpec: SectionSpec = {
+            ...this.gizmoDrag.startSpec,
+            offset: newVal,
+          };
+          this.setSection(nextSpec);
+          this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
+        }
+      }
+      return;
+    }
+
+    if (this.sectionGizmo?.visible && ev.buttons === 0 && this.world) {
+      const ndc = this.toNdc(ev.clientX, ev.clientY);
+      const hoverHandle = this.sectionGizmo.hitTest(ndc, this.world.camera.three);
+      this.sectionGizmo.setHover(hoverHandle);
+      if (this.boundContainer) {
+        this.boundContainer.style.cursor = hoverHandle ? 'pointer' : '';
+      }
+    }
+
     const g = this.gesture;
     if (!g || ev.pointerId !== g.pointerId) return;
     const moved = Math.hypot(ev.clientX - g.x, ev.clientY - g.y);
@@ -263,6 +444,24 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   };
 
   private onNavPointerUp = (ev: PointerEvent) => {
+    if (this.gizmoDrag && ev.pointerId === this.gizmoDrag.pointerId) {
+      ev.stopImmediatePropagation();
+      ev.preventDefault();
+      try {
+        this.boundContainer?.releasePointerCapture(ev.pointerId);
+      } catch {}
+      if (this.world) {
+        this.world.camera.controls.enabled = true;
+      }
+      this.sectionGizmo?.setActive(null);
+      const finalSpec = this.currentSection;
+      this.gizmoDrag = null;
+      if (finalSpec) {
+        this.events.emit('sectionEdit', { spec: finalSpec, phase: 'end' });
+      }
+      return;
+    }
+
     if (this.gesture?.pointerId !== ev.pointerId) return;
     this.gesture = null;
     this.applyMouseMapping(false);
@@ -424,9 +623,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.pivotMesh = pivotMesh;
     world.scene.three.add(pivotMesh);
 
+    // Section 3D gizmo
+    const sectionGizmo = new SectionGizmo();
+    this.sectionGizmo = sectionGizmo;
+    world.scene.three.add(sectionGizmo.group);
+
     world.camera.controls.addEventListener('update', () => {
       if (this.pivotMesh?.visible) {
         this.updatePivotScale();
+      }
+      if (this.sectionGizmo?.visible) {
+        this.sectionGizmo.updateScale(world.camera.three, container.clientHeight);
       }
     });
     world.camera.controls.addEventListener('controlend', () => {
@@ -589,6 +796,13 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.gridHelper.geometry?.dispose();
       (this.gridHelper.material as THREE.Material | undefined)?.dispose?.();
       this.gridHelper = null;
+    }
+    if (this.sectionGizmo) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.sectionGizmo.group);
+      }
+      this.sectionGizmo.dispose();
+      this.sectionGizmo = null;
     }
     if (this.sectionHelper) {
       if (this.world?.scene?.three) {
@@ -1279,6 +1493,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   setSection(spec: SectionSpec | null): AdapterResult {
+    this.currentSection = spec;
     if (this.sectionHelper) {
       if (this.world?.scene?.three) {
         this.world.scene.three.remove(this.sectionHelper);
@@ -1310,6 +1525,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
       if (this.fragments) {
         this.fragments.core.update(true);
+      }
+      if (this.sectionGizmo) {
+        this.sectionGizmo.visible = false;
       }
       return okVoid;
     }
@@ -1360,8 +1578,23 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     this.sectionHelper = this.buildSectionHelper(spec, this.modelBounds);
+    this.sectionHelper.visible = this.sectionFrameVisible;
     if (this.world?.scene?.three) {
       this.world.scene.three.add(this.sectionHelper);
+    }
+
+    if (this.sectionGizmo) {
+      if (spec.kind === 'box') {
+        this.sectionGizmo.setBox(spec.min, spec.max);
+      } else {
+        const bounds = this.modelBounds ?? { min: [-25, -25, -10], max: [25, 25, 25] };
+        this.sectionGizmo.setPlane(spec.axis, spec.offset, spec.flipped, bounds);
+      }
+      this.sectionGizmo.visible = this.sectionFrameVisible;
+      if (this.world) {
+        const h = this.world.renderer?.three?.domElement?.clientHeight || 600;
+        this.sectionGizmo.updateScale(this.world.camera.three, h);
+      }
     }
 
     // Generate section caps and edges for plane cuts
@@ -1380,6 +1613,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
     }
 
+    return okVoid;
+  }
+
+  setSectionFrameVisible(visible: boolean): AdapterResult {
+    this.sectionFrameVisible = visible;
+    if (this.sectionHelper) {
+      this.sectionHelper.visible = visible;
+    }
+    if (this.sectionGizmo) {
+      this.sectionGizmo.visible = visible && !!this.currentSection;
+    }
     return okVoid;
   }
 

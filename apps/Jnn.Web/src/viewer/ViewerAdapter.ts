@@ -109,6 +109,7 @@ export interface Bounds {
 export interface PickResult {
   elementId: string;
   point: Vec3;
+  normal?: Vec3;
 }
 
 export interface ViewerEvents {
@@ -117,6 +118,7 @@ export interface ViewerEvents {
   hover: { elementId: string | null };
   cameraChange: CameraState;
   navHint: { kind: 'holdShiftToOrbit' };
+  sectionEdit: { spec: SectionSpec; phase: 'drag' | 'end' };
 }
 
 export type ViewerEventName = keyof ViewerEvents;
@@ -160,6 +162,7 @@ export interface ViewerAdapter {
   orbitBy?(deltaAzimuth: number, deltaPolar: number, animate?: boolean): AdapterResult;
 
   setSection(spec: SectionSpec | null): AdapterResult;
+  setSectionFrameVisible?(visible: boolean): AdapterResult;
 
   /** Colour override; `null` clears highlights. Accepts array of IDs or Map of id->color. Colour is CSS hex. */
   highlight(ids: readonly string[] | Map<string, string> | null, color?: string): AdapterResult;
