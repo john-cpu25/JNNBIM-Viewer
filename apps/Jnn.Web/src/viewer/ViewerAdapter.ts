@@ -118,7 +118,7 @@ export interface ViewerEvents {
   hover: { elementId: string | null };
   cameraChange: CameraState;
   navHint: { kind: 'holdShiftToOrbit' };
-  sectionEdit: { spec: SectionSpec; phase: 'drag' | 'end' };
+  sectionEdit: { spec: SectionSpec; phase: 'drag' | 'end'; handle?: string };
 }
 
 export type ViewerEventName = keyof ViewerEvents;

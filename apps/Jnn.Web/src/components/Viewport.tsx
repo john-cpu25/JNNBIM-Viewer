@@ -40,8 +40,22 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   const [isConverting, setIsConverting] = useState(false);
   const [convertStatus, setConvertStatus] = useState<string>('');
   const [showNavHelp, setShowNavHelp] = useState(false);
+  const [dragValueLabel, setDragValueLabel] = useState<string | null>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
 
   const sample = isSampleMode();
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setIsNarrow(entry.contentRect.width < 400);
+      }
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
 
   // Create / dispose the adapter with the component.
   useEffect(() => {
@@ -139,7 +153,17 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   useEffect(() => {
     if (!viewer) return;
     return viewer.on('sectionEdit', (ev) => {
-      if (ev.phase === 'end') {
+      if (ev.phase === 'drag') {
+        if (ev.spec.kind === 'box' && ev.handle && ev.handle.includes('-')) {
+          const [axis, side] = ev.handle.split('-') as ['x' | 'y' | 'z', 'min' | 'max'];
+          const idx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+          const val = ev.spec[side][idx];
+          setDragValueLabel(`${axis.toUpperCase()} ${side}: ${val.toFixed(2)} m`);
+        } else if (ev.spec.kind === 'plane') {
+          setDragValueLabel(`${ev.spec.axis.toUpperCase()}: ${ev.spec.offset.toFixed(2)} m`);
+        }
+      } else if (ev.phase === 'end') {
+        setDragValueLabel(null);
         dispatch({ type: 'setSection', section: ev.spec });
       }
     });
@@ -272,8 +296,16 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
 
       {status === 'ready' && (
         <>
-          <ViewCube />
+          {!compact && !isNarrow && <ViewCube />}
           {state.section && <SectionPanel compact={compact} />}
+          {dragValueLabel && (
+            <div
+              data-testid="section-drag-tooltip"
+              className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 rounded-md bg-accent px-3 py-1 font-mono text-xs font-semibold text-accent-contrast shadow-float backdrop-blur z-30"
+            >
+              {dragValueLabel}
+            </div>
+          )}
           <Toolbar compact={compact} />
 
           {/* Mouse navigation help popover */}

@@ -414,14 +414,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
             max,
           };
           this.applySectionPlanesFast(nextSpec);
-          this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
+          this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag', handle: this.gizmoDrag.handle });
         } else if (this.gizmoDrag.startSpec.kind === 'plane') {
           const nextSpec: SectionSpec = {
             ...this.gizmoDrag.startSpec,
             offset: newVal,
           };
           this.applySectionPlanesFast(nextSpec);
-          this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
+          this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag', handle: this.gizmoDrag.handle });
         }
       return;
     }
