@@ -178,6 +178,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private sectionGizmo: SectionGizmo | null = null;
   private sectionFrameVisible = true;
   private currentSection: SectionSpec | null = null;
+  private pendingFastSpec: SectionSpec | null = null;
+  private sectionFastRafId: number | null = null;
   private lastPlaneClickTime = 0;
   private gizmoDrag: {
     handle: HandleId;
@@ -407,14 +409,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
             min,
             max,
           };
-          this.setSection(nextSpec);
+          this.applySectionPlanesFast(nextSpec);
           this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
         } else if (this.gizmoDrag.startSpec.kind === 'plane') {
           const nextSpec: SectionSpec = {
             ...this.gizmoDrag.startSpec,
             offset: newVal,
           };
-          this.setSection(nextSpec);
+          this.applySectionPlanesFast(nextSpec);
           this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
         }
       }
@@ -453,10 +455,16 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       if (this.world) {
         this.world.camera.controls.enabled = true;
       }
+      if (this.sectionFastRafId !== null) {
+        cancelAnimationFrame(this.sectionFastRafId);
+        this.sectionFastRafId = null;
+      }
+      this.pendingFastSpec = null;
       this.sectionGizmo?.setActive(null);
       const finalSpec = this.currentSection;
       this.gizmoDrag = null;
       if (finalSpec) {
+        this.setSection(finalSpec, true);
         this.events.emit('sectionEdit', { spec: finalSpec, phase: 'end' });
       }
       return;
@@ -1492,9 +1500,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
-  setSection(spec: SectionSpec | null): AdapterResult {
-    if (this.currentSection === spec) return okVoid;
-    if (this.currentSection && spec && this.currentSection.kind === spec.kind) {
+  setSection(spec: SectionSpec | null, force = false): AdapterResult {
+    if (!force && this.currentSection === spec) return okVoid;
+    if (!force && this.currentSection && spec && this.currentSection.kind === spec.kind) {
       if (spec.kind === 'plane' && this.currentSection.kind === 'plane') {
         if (
           spec.axis === this.currentSection.axis &&
@@ -1664,9 +1672,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       const sizeY = spec.max[1] - spec.min[1];
       const sizeZ = spec.max[2] - spec.min[2];
       const box = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(sizeX, sizeZ, sizeY)),
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
         new THREE.LineBasicMaterial({ color }),
       );
+      box.scale.set(sizeX, sizeZ, sizeY);
       box.raycast = () => {};
       const centerModel: Vec3 = [
         (spec.min[0] + spec.max[0]) / 2,
@@ -1710,6 +1719,73 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     obj.add(fill, outline);
     group.add(obj);
     return group;
+  }
+
+  private applySectionPlanesFast(spec: SectionSpec): void {
+    this.pendingFastSpec = spec;
+    this.currentSection = spec;
+    if (this.sectionFastRafId !== null) return;
+
+    this.sectionFastRafId = requestAnimationFrame(() => {
+      this.sectionFastRafId = null;
+      const targetSpec = this.pendingFastSpec;
+      if (!targetSpec) return;
+
+      if (targetSpec.kind === 'box' && this.clipPlanes.length === 6) {
+        this.clipPlanes[0]!.constant = -targetSpec.min[0];
+        this.clipPlanes[1]!.constant = targetSpec.max[0];
+        this.clipPlanes[2]!.constant = -targetSpec.min[1];
+        this.clipPlanes[3]!.constant = targetSpec.max[1];
+        this.clipPlanes[4]!.constant = -targetSpec.min[2];
+        this.clipPlanes[5]!.constant = targetSpec.max[2];
+
+        if (this.sectionHelper && this.sectionHelper.children[0]) {
+          const sizeX = targetSpec.max[0] - targetSpec.min[0];
+          const sizeY = targetSpec.max[1] - targetSpec.min[1];
+          const sizeZ = targetSpec.max[2] - targetSpec.min[2];
+          const centerModel: Vec3 = [
+            (targetSpec.min[0] + targetSpec.max[0]) / 2,
+            (targetSpec.min[1] + targetSpec.max[1]) / 2,
+            (targetSpec.min[2] + targetSpec.max[2]) / 2,
+          ];
+          const box = this.sectionHelper.children[0];
+          box.scale.set(sizeX, sizeZ, sizeY);
+          box.position.copy(toThree(centerModel));
+        }
+
+        if (this.sectionGizmo) {
+          this.sectionGizmo.setBox(targetSpec.min, targetSpec.max);
+          if (this.world) {
+            const h = this.world.renderer?.three?.domElement?.clientHeight || 600;
+            this.sectionGizmo.updateScale(this.world.camera.three, h);
+          }
+        }
+      } else if (targetSpec.kind === 'plane' && this.clipPlanes.length === 1) {
+        this.clipPlanes[0]!.constant = targetSpec.flipped ? -targetSpec.offset : targetSpec.offset;
+        if (this.sectionHelper && this.modelBounds) {
+          const c = boundsCenter(this.modelBounds);
+          if (targetSpec.axis === 'x') {
+            this.sectionHelper.position.set(targetSpec.offset, c[2], -c[1]);
+          } else if (targetSpec.axis === 'y') {
+            this.sectionHelper.position.set(c[0], c[2], -targetSpec.offset);
+          } else {
+            this.sectionHelper.position.set(c[0], targetSpec.offset, -c[1]);
+          }
+        }
+        if (this.sectionGizmo) {
+          const bounds = this.modelBounds ?? { min: [-25, -25, -10], max: [25, 25, 25] };
+          this.sectionGizmo.setPlane(targetSpec.axis, targetSpec.offset, targetSpec.flipped, bounds);
+          if (this.world) {
+            const h = this.world.renderer?.three?.domElement?.clientHeight || 600;
+            this.sectionGizmo.updateScale(this.world.camera.three, h);
+          }
+        }
+      }
+
+      if (this.fragments) {
+        this.fragments.core.update();
+      }
+    });
   }
 
   highlight(ids: readonly string[] | Map<string, string> | null, color = '#2f9e44'): AdapterResult {
