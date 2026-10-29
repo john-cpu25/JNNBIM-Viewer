@@ -719,7 +719,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
   // ----------------------------------------------------------------- picking
   private readonly raycaster = new THREE.Raycaster();
 
-  pickAt(clientX: number, clientY: number): { elementId: string; point: Vec3 } | null {
+  pickAt(clientX: number, clientY: number): { elementId: string; point: Vec3; normal?: Vec3 } | null {
     const el = this.renderer?.domElement;
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -730,7 +730,16 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     const hits = this.raycaster.intersectObjects(candidates, false);
     for (const h of hits) {
       if (this.clipPlanes.some((p) => p.distanceToPoint(h.point) < -1e-6)) continue;
-      return { elementId: h.object.userData.elementId as string, point: toModel(h.point) };
+      let normal: Vec3 | undefined = undefined;
+      if (h.face?.normal) {
+        const nThree = h.face.normal.clone();
+        if (h.object) {
+          nThree.transformDirection(h.object.matrixWorld);
+        }
+        nThree.normalize();
+        normal = toModel(nThree);
+      }
+      return { elementId: h.object.userData.elementId as string, point: toModel(h.point), normal };
     }
     return null;
   }

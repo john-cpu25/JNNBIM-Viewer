@@ -71,6 +71,12 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
       return;
     case 'sectionPlane': {
       if (s.section?.kind === 'plane') return dispatch({ type: 'setSection', section: null });
+      const modelKey = s.model.modelId || 'default';
+      const lastPlane = s.lastSectionPlane?.[modelKey];
+      if (lastPlane) {
+        dispatch({ type: 'setSection', section: lastPlane });
+        return;
+      }
       let b = boundsOf(s.model.elements);
       if (isEmpty(b)) {
         const vb = v?.getModelBounds();
@@ -84,8 +90,27 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
     }
     case 'sectionBox': {
       if (s.section?.kind === 'box') return dispatch({ type: 'setSection', section: null });
-      const els = sel.length ? sel.map((id) => s.byId.get(id)!).filter(Boolean) : s.model.elements;
-      let b = boundsOf(els);
+      if (sel.length) {
+        const els = sel.map((id) => s.byId.get(id)!).filter(Boolean);
+        let b = boundsOf(els);
+        if (isEmpty(b)) {
+          const vb = v?.getModelBounds();
+          if (vb?.ok) b = vb.value;
+        }
+        if (isEmpty(b)) {
+          b = { min: [-10, -10, 0], max: [10, 10, 10] };
+        }
+        const pb = pad(b, 0.6);
+        dispatch({ type: 'setSection', section: { kind: 'box', min: pb.min, max: pb.max } });
+        return;
+      }
+      const modelKey = s.model.modelId || 'default';
+      const lastBox = s.lastSectionBox?.[modelKey];
+      if (lastBox) {
+        dispatch({ type: 'setSection', section: { kind: 'box', min: lastBox.min, max: lastBox.max } });
+        return;
+      }
+      let b = boundsOf(s.model.elements);
       if (isEmpty(b)) {
         const vb = v?.getModelBounds();
         if (vb?.ok) b = vb.value;
@@ -93,7 +118,7 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
       if (isEmpty(b)) {
         b = { min: [-10, -10, 0], max: [10, 10, 10] };
       }
-      const pb = pad(b, sel.length ? 0.6 : 0.01);
+      const pb = pad(b, 0.01);
       dispatch({ type: 'setSection', section: { kind: 'box', min: pb.min, max: pb.max } });
       return;
     }
@@ -104,6 +129,10 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
       dispatch({ type: 'toggleGrid' });
       return;
     case 'clear':
+      if (s.sectionPickMode) {
+        dispatch({ type: 'setSectionPickMode', on: false });
+        return;
+      }
       dispatch({ type: 'clearSelection' });
       return;
   }

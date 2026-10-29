@@ -1969,7 +1969,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       if (!isVisible(elementId, this.visibility)) return null;
 
       const point = hit.point ? toModel(hit.point) : ([0, 0, 0] as Vec3);
-      return { elementId, point };
+      let normal: Vec3 | undefined = undefined;
+      const rawNormal = hit.normal ?? hit.face?.normal;
+      if (rawNormal) {
+        const nThree = new THREE.Vector3(rawNormal.x, rawNormal.y, rawNormal.z);
+        if (hit.object) {
+          nThree.transformDirection(hit.object.matrixWorld);
+        }
+        nThree.normalize();
+        normal = toModel(nThree);
+      }
+      return { elementId, point, normal };
     } catch (err) {
       console.warn('pickAt failed:', err);
       return null;

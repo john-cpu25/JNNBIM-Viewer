@@ -37,7 +37,7 @@ export function ClashResultsTable({
   onSelectClash,
   onUpdateRecord,
 }: ClashResultsTableProps) {
-  const { viewer } = useApp();
+  const { viewer, dispatch } = useApp();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -90,7 +90,7 @@ export function ClashResultsTable({
     if (!selectedRecord) {
       viewer.highlight(null);
       if (enableSectionBox) {
-        viewer.setSection(null);
+        dispatch({ type: 'setSection', section: null });
       }
       return;
     }
@@ -112,15 +112,18 @@ export function ClashResultsTable({
     if (enableSectionBox && selectedRecord.point) {
       const [px, py, pz] = selectedRecord.point;
       const radius = 1.2; // 2.4m cube
-      viewer.setSection({
-        kind: 'box',
-        min: [px - radius, py - radius, pz - radius],
-        max: [px + radius, py + radius, pz + radius],
+      dispatch({
+        type: 'setSection',
+        section: {
+          kind: 'box',
+          min: [px - radius, py - radius, pz - radius],
+          max: [px + radius, py + radius, pz + radius],
+        },
       });
     } else {
-      viewer.setSection(null);
+      dispatch({ type: 'setSection', section: null });
     }
-  }, [selectedRecord, viewer, enableSectionBox]);
+  }, [selectedRecord, viewer, dispatch, enableSectionBox]);
 
   // Handle keyboard navigation: Up/Down arrow and 1-5 for status
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

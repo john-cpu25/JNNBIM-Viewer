@@ -3,7 +3,8 @@ import { FolderOpen, HelpCircle, Loader2, UploadCloud } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
 import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
-import type { AdapterResult, ViewerAdapter } from '../viewer/ViewerAdapter';
+import type { AdapterResult, Vec3, ViewerAdapter } from '../viewer/ViewerAdapter';
+import { planeFromHit } from '../viewer/sectionMath';
 import { useApp } from '../state/AppContext';
 import { Toolbar } from './Toolbar';
 import { ViewCube } from './ViewCube';
@@ -60,6 +61,22 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     }
 
     const offPick = adapter.on('pick', ({ result, additive }) => {
+      if (stateRef.current.sectionPickMode) {
+        if (result) {
+          const camRes = adapter.getCamera();
+          const cam = camRes.ok ? camRes.value : null;
+          const viewDir: Vec3 = cam
+            ? [cam.target[0] - cam.position[0], cam.target[1] - cam.position[1], cam.target[2] - cam.position[2]]
+            : [0, 0, -1];
+          const planeSpec = planeFromHit(result.point, result.normal ?? null, viewDir);
+          dispatch({
+            type: 'setSection',
+            section: { kind: 'plane', ...planeSpec },
+          });
+        }
+        dispatch({ type: 'setSectionPickMode', on: false });
+        return;
+      }
       if (!result) {
         if (!additive) dispatch({ type: 'clearSelection' });
         return;
@@ -144,6 +161,20 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     });
   }, [viewer, dispatch]);
   useEffect(() => viewer?.setTheme(state.theme), [viewer, state.theme]);
+  useEffect(() => {
+    if (state.sectionPickMode) {
+      dispatch({
+        type: 'notify',
+        tone: 'info',
+        text: 'Click vào bề mặt cấu kiện để đặt mặt phẳng cắt (Esc để hủy)',
+      });
+      if (hostRef.current) {
+        hostRef.current.style.cursor = 'crosshair';
+      }
+    } else if (hostRef.current) {
+      hostRef.current.style.cursor = '';
+    }
+  }, [state.sectionPickMode, dispatch]);
 
   // Drag and drop handler
   const handleDragOver = (e: React.DragEvent) => {
