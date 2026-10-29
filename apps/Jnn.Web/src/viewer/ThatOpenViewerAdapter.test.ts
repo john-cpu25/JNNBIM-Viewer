@@ -234,4 +234,45 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('anchors pivot at cursor using hover cache or plane fallback', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const fakeControls = {
+      setOrbitPoint: () => {},
+      getTarget: (v: any) => v.set(0, 0, 0),
+      setFocalOffset: () => {},
+    };
+
+    (adapter as any).world = {
+      camera: {
+        controls: fakeControls,
+        three: {
+          getWorldDirection: (v: any) => v.set(0, 0, -1),
+          position: { distanceTo: () => 10 },
+        },
+      },
+      renderer: {
+        three: {
+          domElement: {
+            getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+            clientHeight: 600,
+          },
+        },
+      },
+    };
+
+    // Fast-path with hover cache
+    const testPoint = { x: 5, y: 5, z: 5 };
+    (adapter as any).lastHover = {
+      x: 100,
+      y: 100,
+      t: performance.now(),
+      point: testPoint,
+    };
+
+    adapter.anchorPivotAt(102, 101);
+    expect((adapter as any).lastHover?.point).toBe(testPoint);
+
+    adapter.dispose();
+  });
 });

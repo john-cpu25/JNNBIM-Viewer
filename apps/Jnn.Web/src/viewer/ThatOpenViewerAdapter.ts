@@ -43,6 +43,7 @@ import {
   type NavigationSettings,
   DEFAULT_NAV,
 } from './ViewerAdapter';
+import { shouldUseHoverCache, worldUnitsPerPixel, type HoverCache } from './navigation';
 
 // Global patch for WebIFC 0.0.78 StreamMeshes signature mismatch
 let webIfcPatched = false;
@@ -128,6 +129,16 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private gridHelper: THREE.GridHelper | null = null;
   private gridVisible = true;
   private nav: NavigationSettings = structuredClone(DEFAULT_NAV);
+  private anchorRequestId = 0;
+  private lastHover: HoverCache | null = null;
+  private pivotMesh: THREE.Mesh | null = null;
+  private readonly pivotMaterial = new THREE.MeshBasicMaterial({
+    color: 0xf08c2e,
+    depthTest: false,
+    transparent: true,
+    opacity: 0.9,
+  });
+  private pivotFadeRaf: number | null = null;
   private sectionHelper: THREE.Object3D | null = null;
   private clipStyler: OBCF.ClipStyler | null = null;
   private activeClipEdges: any | null = null;
@@ -159,6 +170,102 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     c.dollyToCursor = true;
     c.infinityDolly = true;
     c.maxDistance = Infinity;
+  }
+
+  private showPivot(point: THREE.Vector3) {
+    if (!this.pivotMesh || !this.nav.showPivot) return;
+    if (this.pivotFadeRaf) {
+      cancelAnimationFrame(this.pivotFadeRaf);
+      this.pivotFadeRaf = null;
+    }
+    this.pivotMesh.position.copy(point);
+    this.updatePivotScale();
+    this.pivotMaterial.opacity = 0.9;
+    this.pivotMesh.visible = true;
+  }
+
+  private updatePivotScale() {
+    if (!this.pivotMesh || !this.world) return;
+    const dom = this.world.renderer?.three?.domElement;
+    const h = dom?.clientHeight || window.innerHeight;
+    const cam = this.world.camera.three;
+    const dist = cam.position.distanceTo(this.pivotMesh.position);
+    const wupp = worldUnitsPerPixel(cam, dist, h);
+    const s = Math.max(1e-4, wupp * 4); // 8px diameter screen-space
+    this.pivotMesh.scale.set(s, s, s);
+  }
+
+  private hidePivot() {
+    if (this.pivotFadeRaf) {
+      cancelAnimationFrame(this.pivotFadeRaf);
+      this.pivotFadeRaf = null;
+    }
+    if (!this.pivotMesh || !this.pivotMesh.visible) return;
+    const startTime = performance.now();
+    const startOpacity = this.pivotMaterial.opacity;
+    const duration = 300;
+    const fade = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      this.pivotMaterial.opacity = startOpacity * (1 - progress);
+      if (progress < 1) {
+        this.pivotFadeRaf = requestAnimationFrame(fade);
+      } else {
+        if (this.pivotMesh) this.pivotMesh.visible = false;
+        this.pivotFadeRaf = null;
+      }
+    };
+    this.pivotFadeRaf = requestAnimationFrame(fade);
+  }
+
+  private toNdc(clientX: number, clientY: number): THREE.Vector2 {
+    const dom = this.world?.renderer?.three?.domElement;
+    if (!dom) return new THREE.Vector2();
+    const rect = dom.getBoundingClientRect();
+    return new THREE.Vector2(
+      ((clientX - rect.left) / (rect.width || 1)) * 2 - 1,
+      -((clientY - rect.top) / (rect.height || 1)) * 2 + 1,
+    );
+  }
+
+  anchorPivotAt(clientX: number, clientY: number) {
+    if (!this.nav.orbitAroundCursor || !this.world) return;
+    const controls = this.world.camera.controls;
+
+    // (a) Fast path: reuse recent hover if fresh (< 150ms) and close (< 4px)
+    const now = performance.now();
+    if (shouldUseHoverCache(this.lastHover, clientX, clientY, now)) {
+      OBC.setOrbitPoint(controls, this.lastHover!.point);
+      this.showPivot(this.lastHover!.point);
+      return;
+    }
+
+    // (b) Plane anchor synchronous fallback
+    const ndc = this.toNdc(clientX, clientY);
+    const caster = this.components?.get(OBC.Raycasters)?.get(this.world);
+    if (caster) {
+      caster.three.setFromCamera(ndc, this.world.camera.three);
+      const target = controls.getTarget(new THREE.Vector3());
+      const normal = this.world.camera.three.getWorldDirection(new THREE.Vector3());
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, target);
+      const planePoint = caster.three.ray.intersectPlane(plane, new THREE.Vector3());
+      if (planePoint) {
+        OBC.setOrbitPoint(controls, planePoint);
+        this.showPivot(planePoint);
+      }
+
+      // (c) Async raycast surface hit
+      const id = ++this.anchorRequestId;
+      caster
+        .castRay({ position: ndc })
+        .then((hit: any) => {
+          if (id !== this.anchorRequestId || this.disposed || !hit?.point) return;
+          if (this.clipPlanes.some((p) => p.distanceToPoint(hit.point) < -1e-6)) return;
+          OBC.setOrbitPoint(controls, hit.point);
+          this.showPivot(hit.point);
+        })
+        .catch(() => {});
+    }
   }
 
   mount(container: HTMLElement): void {
@@ -194,6 +301,24 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     gridHelper.visible = this.gridVisible;
     this.gridHelper = gridHelper;
     world.scene.three.add(gridHelper);
+
+    // Pivot dot indicator
+    const pivotGeom = new THREE.SphereGeometry(1, 16, 12);
+    const pivotMesh = new THREE.Mesh(pivotGeom, this.pivotMaterial);
+    pivotMesh.renderOrder = 999;
+    pivotMesh.raycast = () => {};
+    pivotMesh.visible = false;
+    this.pivotMesh = pivotMesh;
+    world.scene.three.add(pivotMesh);
+
+    world.camera.controls.addEventListener('update', () => {
+      if (this.pivotMesh?.visible) {
+        this.updatePivotScale();
+      }
+    });
+    world.camera.controls.addEventListener('controlend', () => {
+      this.hidePivot();
+    });
 
     // Setup local worker & wasm
     this.initializedPromise = this.initEngine();
@@ -324,6 +449,18 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   dispose(): void {
     this.disposed = true;
+    if (this.pivotFadeRaf) {
+      cancelAnimationFrame(this.pivotFadeRaf);
+      this.pivotFadeRaf = null;
+    }
+    if (this.pivotMesh) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.pivotMesh);
+      }
+      this.pivotMesh.geometry?.dispose();
+      this.pivotMaterial.dispose();
+      this.pivotMesh = null;
+    }
     if (this.gridHelper) {
       if (this.world?.scene?.three) {
         this.world.scene.three.remove(this.gridHelper);
@@ -1462,6 +1599,16 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (now - this.lastHoverAt < 40) return;
     this.lastHoverAt = now;
     const hit = await this.pickAt(ev.clientX, ev.clientY);
+    if (hit) {
+      this.lastHover = {
+        x: ev.clientX,
+        y: ev.clientY,
+        t: performance.now(),
+        point: toThree(hit.point),
+      };
+    } else {
+      this.lastHover = null;
+    }
     const id = hit?.elementId ?? null;
     if (id !== this.hovered) {
       this.hovered = id;
