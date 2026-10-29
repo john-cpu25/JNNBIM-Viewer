@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Settings, Sparkles, Sun } from 'lucide-react';
+import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Settings, Sun } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import type { Layout } from '../lib/useLayout';
 import { IconButton } from './ui';
@@ -20,16 +20,6 @@ export function TopBar({ layout }: { layout: Layout }) {
       loadIfcFile(file, viewer, dispatch, { append });
       e.target.value = '';
     }
-  };
-
-  const onLoadSample = () => {
-    const url = new URL('./samples/building-arch-2x3.ifc', window.location.href).href;
-    loadIfcFile(url, viewer, dispatch, { append: false });
-  };
-
-  const onAppendSampleStruct = () => {
-    const url = new URL('./samples/building-struct-2x3.ifc', window.location.href).href;
-    loadIfcFile(url, viewer, dispatch, { append: true });
   };
 
   return (
@@ -102,26 +92,6 @@ export function TopBar({ layout }: { layout: Layout }) {
         >
           <FolderPlus size={13} className="text-emerald-500" />
           <span className="hidden sm:inline">Thêm model</span>
-        </button>
-        <button
-          type="button"
-          onClick={onLoadSample}
-          title="Mở mô hình IFC mẫu kiến trúc (Building-Architecture) — Bản quyền buildingSMART Simple-Scene (CC BY 4.0)"
-          data-testid="open-sample-btn"
-          className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-muted transition-colors hover:border-accent hover:text-ink"
-        >
-          <Sparkles size={13} className="text-accent-ink" />
-          <span className="hidden md:inline">Mẫu KT</span>
-        </button>
-        <button
-          type="button"
-          onClick={onAppendSampleStruct}
-          title="Thêm mô hình IFC mẫu kết cấu (Building-Structure federated) — Bản quyền buildingSMART Simple-Scene (CC BY 4.0)"
-          data-testid="append-sample-struct-btn"
-          className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:border-accent hover:text-emerald-500"
-        >
-          <Sparkles size={13} className="text-emerald-500" />
-          <span className="hidden lg:inline">+ Mẫu KC</span>
         </button>
 
         <IconButton

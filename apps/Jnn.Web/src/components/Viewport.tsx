@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, FolderOpen, Loader2, Sparkles, UploadCloud } from 'lucide-react';
+import { FolderOpen, Loader2, UploadCloud } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
 import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
@@ -152,16 +152,6 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     }
   };
 
-  const handleLoadSample = async (samplePath: string) => {
-    setIsConverting(true);
-    setConvertStatus('Đang tải mô hình mẫu...');
-    const url = new URL(samplePath, window.location.href).href;
-    await loadIfcFile(url, viewer, dispatch, {
-      onProgress: (pct, msg) => setConvertStatus(`${msg || 'Đang xử lý'} (${pct.toFixed(0)}%)`),
-    });
-    setIsConverting(false);
-  };
-
   const hovered = state.hovered ? state.byId.get(state.hovered) : null;
   const showEmptyState = !sample && state.model.modelId === 'empty' && !isConverting;
 
@@ -242,32 +232,6 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                     <FolderOpen size={15} />
                     <span>Chọn file IFC từ máy</span>
                   </button>
-
-                  <div className="relative my-1 flex items-center justify-center">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-line"></div>
-                    </div>
-                    <span className="relative bg-surface px-2 text-[11px] uppercase tracking-wider text-faint">hoặc thử file mẫu</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleLoadSample('./samples/building-arch-2x3.ifc')}
-                      className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
-                    >
-                      <Sparkles size={13} className="text-accent" />
-                      <span>Kiến trúc (90 KB)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLoadSample('./samples/building-struct-2x3.ifc')}
-                      className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
-                    >
-                      <Box size={13} className="text-accent" />
-                      <span>Kết cấu (106 KB)</span>
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
