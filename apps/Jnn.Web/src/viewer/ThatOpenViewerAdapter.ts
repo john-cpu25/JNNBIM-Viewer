@@ -123,6 +123,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private boundCanvas: HTMLCanvasElement | null = null;
 
   private clipPlanes: THREE.Plane[] = [];
+  private gridHelper: THREE.GridHelper | null = null;
+  private gridVisible = true;
   private sectionHelper: THREE.Object3D | null = null;
   private clipStyler: OBCF.ClipStyler | null = null;
   private activeClipEdges: any | null = null;
@@ -167,6 +169,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     // Subtle ground grid
     const gridHelper = new THREE.GridHelper(50, 50, 0xf97316, 0x2d333b);
     gridHelper.position.y = -0.01;
+    gridHelper.visible = this.gridVisible;
+    this.gridHelper = gridHelper;
     world.scene.three.add(gridHelper);
 
     // Setup local worker & wasm
@@ -297,6 +301,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   dispose(): void {
     this.disposed = true;
+    if (this.gridHelper) {
+      if (this.world?.scene?.three) {
+        this.world.scene.three.remove(this.gridHelper);
+      }
+      this.gridHelper.geometry?.dispose();
+      (this.gridHelper.material as THREE.Material | undefined)?.dispose?.();
+      this.gridHelper = null;
+    }
     if (this.sectionHelper) {
       if (this.world?.scene?.three) {
         this.world.scene.three.remove(this.sectionHelper);
@@ -1171,6 +1183,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   setXray(enabled: boolean): AdapterResult {
     this.xray = enabled;
     this.applyXray();
+    return okVoid;
+  }
+
+  setGridVisible(visible: boolean): AdapterResult {
+    this.gridVisible = visible;
+    if (this.gridHelper) {
+      this.gridHelper.visible = visible;
+    }
     return okVoid;
   }
 

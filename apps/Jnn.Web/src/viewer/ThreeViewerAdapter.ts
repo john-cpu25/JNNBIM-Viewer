@@ -111,6 +111,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
   private readonly unitEdges = new THREE.EdgesGeometry(this.unitBox);
   private readonly edgeMaterial = new THREE.LineBasicMaterial({ transparent: true });
   private grid: THREE.GridHelper | null = null;
+  private gridVisible = true;
   private sectionHelper: THREE.Object3D | null = null;
   private modelBounds: Bounds | null = null;
 
@@ -300,6 +301,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     grid.position.copy(toThree([c[0], c[1], b.min[2] - 0.01]));
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.6;
+    grid.visible = this.gridVisible;
     this.grid = grid;
     this.helpers.add(grid);
   }
@@ -348,6 +350,15 @@ export class ThreeViewerAdapter implements ViewerAdapter {
   setXray(enabled: boolean): AdapterResult {
     this.xray = enabled;
     this.refreshAll();
+    return okVoid;
+  }
+
+  setGridVisible(visible: boolean): AdapterResult {
+    this.gridVisible = visible;
+    if (this.grid) {
+      this.grid.visible = visible;
+      this.requestRender();
+    }
     return okVoid;
   }
 

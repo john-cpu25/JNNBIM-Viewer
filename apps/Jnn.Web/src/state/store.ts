@@ -39,6 +39,7 @@ export interface AppState {
   explorerOpen: boolean;
   propertiesOpen: boolean;
   rightTab: 'properties' | 'clash' | 'rules';
+  gridVisible: boolean;
   mobilePane: MobilePane;
   notices: Notice[];
 }
@@ -63,6 +64,8 @@ export type Action =
   | { type: 'setTheme'; theme: Theme }
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
   | { type: 'setRightTab'; tab: 'properties' | 'clash' | 'rules' }
+  | { type: 'toggleGrid' }
+  | { type: 'setGridVisible'; visible: boolean }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
   | { type: 'dismissNotice'; id: number }
@@ -103,6 +106,7 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     explorerOpen: true,
     propertiesOpen: true,
     rightTab: 'properties',
+    gridVisible: true,
     mobilePane: 'viewer',
     notices: [],
   };
@@ -176,6 +180,10 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, xray: !state.xray };
     case 'setProjection':
       return { ...state, projection: action.projection };
+    case 'toggleGrid':
+      return { ...state, gridVisible: !state.gridVisible };
+    case 'setGridVisible':
+      return { ...state, gridVisible: action.visible };
     case 'setTheme':
       return { ...state, theme: action.theme };
     case 'togglePanel': {
@@ -199,6 +207,7 @@ export function reducer(state: AppState, action: Action): AppState {
         propertiesOpen: state.propertiesOpen,
         rightTab: state.rightTab,
         mobilePane: state.mobilePane,
+        gridVisible: state.gridVisible,
       };
     }
     case 'appendModel': {

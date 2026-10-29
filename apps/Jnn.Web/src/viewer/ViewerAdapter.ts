@@ -115,6 +115,7 @@ export interface ViewerAdapter {
   /** Colour override; `null` clears highlights. Accepts array of IDs or Map of id->color. Colour is CSS hex. */
   highlight(ids: readonly string[] | Map<string, string> | null, color?: string): AdapterResult;
   setXray(enabled: boolean): AdapterResult;
+  setGridVisible?(visible: boolean): AdapterResult;
   setTheme(theme: 'light' | 'dark'): void;
 
   /** Screen-space position (CSS px, relative to the container) of an element's centre. */

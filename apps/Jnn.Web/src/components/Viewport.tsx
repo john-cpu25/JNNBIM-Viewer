@@ -116,6 +116,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   }, [viewer, state.visibility]);
   useEffect(() => report(viewer?.setSection(state.section)), [viewer, state.section]);
   useEffect(() => report(viewer?.setXray(state.xray)), [viewer, state.xray]);
+  useEffect(() => report(viewer?.setGridVisible?.(state.gridVisible)), [viewer, state.gridVisible]);
   useEffect(() => report(viewer?.setProjection(state.projection)), [viewer, state.projection]);
   useEffect(() => viewer?.setTheme(state.theme), [viewer, state.theme]);
 

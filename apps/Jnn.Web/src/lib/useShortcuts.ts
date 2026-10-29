@@ -12,6 +12,7 @@ const KEYMAP: Record<string, CommandId> = {
   s: 'sectionPlane',
   b: 'sectionBox',
   p: 'projection',
+  g: 'toggleGrid',
   escape: 'clear',
 };
 

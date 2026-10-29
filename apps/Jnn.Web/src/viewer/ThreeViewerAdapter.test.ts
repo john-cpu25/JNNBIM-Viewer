@@ -112,6 +112,15 @@ describe('ThreeViewerAdapter (no WebGL)', () => {
     v.dispose();
   });
 
+  it('toggles grid visibility', async () => {
+    const { v } = await setup();
+    const resOff = v.setGridVisible(false);
+    expect(resOff.ok).toBe(true);
+    const resOn = v.setGridVisible(true);
+    expect(resOn.ok).toBe(true);
+    v.dispose();
+  });
+
   it('fails clearly before a model is loaded', () => {
     const v = new ThreeViewerAdapter({ createRenderer: fakeRenderer, manualRender: true });
     const r = v.fitToView();

@@ -14,6 +14,7 @@ export type CommandId =
   | 'sectionPlane'
   | 'sectionBox'
   | 'projection'
+  | 'toggleGrid'
   | 'clear';
 
 export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = {
@@ -98,6 +99,9 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
     }
     case 'projection':
       dispatch({ type: 'setProjection', projection: s.projection === 'perspective' ? 'orthographic' : 'perspective' });
+      return;
+    case 'toggleGrid':
+      dispatch({ type: 'toggleGrid' });
       return;
     case 'clear':
       dispatch({ type: 'clearSelection' });

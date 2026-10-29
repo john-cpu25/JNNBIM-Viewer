@@ -98,6 +98,20 @@ describe('reducer', () => {
     expect(s.model.elements.length).toBe(initialCount);
     expect(s.byId.has('struct-002:beam-1')).toBe(false);
   });
+
+  it('toggles and sets grid visibility', () => {
+    let s = init();
+    expect(s.gridVisible).toBe(true);
+    s = reducer(s, { type: 'toggleGrid' });
+    expect(s.gridVisible).toBe(false);
+    s = reducer(s, { type: 'toggleGrid' });
+    expect(s.gridVisible).toBe(true);
+    s = reducer(s, { type: 'setGridVisible', visible: false });
+    expect(s.gridVisible).toBe(false);
+    // Preserves gridVisible on setModel
+    s = reducer(s, { type: 'setModel', model });
+    expect(s.gridVisible).toBe(false);
+  });
 });
 
 describe('defaultPlane', () => {

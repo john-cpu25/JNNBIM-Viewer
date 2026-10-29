@@ -5,6 +5,7 @@ import {
   EyeOff,
   Focus,
   Ghost,
+  Grid3x3,
   Maximize,
   Scissors,
   SquareDashed,
@@ -93,6 +94,13 @@ export function Toolbar({ compact }: { compact: boolean }) {
         shortcut="P"
         active={state.projection === 'orthographic'}
         onClick={() => run('projection')}
+      />
+      <IconButton
+        icon={Grid3x3}
+        label={state.gridVisible ? 'Hide grid' : 'Show grid'}
+        shortcut="G"
+        active={state.gridVisible}
+        onClick={() => run('toggleGrid')}
       />
       {hasSel && (
         <>
