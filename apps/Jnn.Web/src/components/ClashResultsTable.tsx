@@ -121,6 +121,7 @@ export function ClashResultsTable({
           min: [px - radius, py - radius, pz - radius],
           max: [px + radius, py + radius, pz + radius],
         },
+        origin: 'clash',
       });
     } else {
       dispatch({ type: 'setSection', section: null });

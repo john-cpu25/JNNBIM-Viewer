@@ -34,8 +34,8 @@ JNN BIM Viewer hỗ trợ 2 sơ đồ điều khiển chuột linh hoạt: **Rev
 |---|---|---|---|
 | **Xoay góc nhìn (Orbit)** | `Shift` + kéo chuột trái **HOẶC** `Shift` + kéo chuột giữa | Kéo chuột trái | — |
 | **Xoay quanh đối tượng chọn** | `Shift` + kéo chuột trái (khi đã chọn cấu kiện) | `Shift` + kéo chuột trái | — |
-| **Xoay quanh điểm dưới con trỏ** | `Shift` + kéo chuột trái (tự động bắt điểm bề mặt mô hình kèm chấm pivot) | — | — |
-| **Di chuyển góc nhìn (Pan)** | Kéo chuột giữa **HOẶC** Kéo chuột phải | Kéo chuột phải | — |
+| **Xoay quanh điểm dưới con trỏ** | `Shift` + kéo chuột trái (tự động bắt điểm bề mặt mô hình kèm chấm pivot) | Kéo chuột trái (tự động bắt điểm bề mặt mô hình kèm chấm pivot) | — |
+| **Di chuyển góc nhìn (Pan)** | Kéo chuột giữa **HOẶC** Kéo chuột phải | Kéo chuột giữa **HOẶC** Kéo chuột phải | — |
 | **Thu phóng (Zoom)** | Cuộn bánh xe chuột (Zoom mượt về vị trí con trỏ) | Cuộn bánh xe chuột | — |
 | **Chọn phần tử (Select)** | Click chuột trái | Click chuột trái | — |
 | **Chọn thêm/bớt cấu kiện** | `Ctrl` + click **HOẶC** `Shift` + click (ngưỡng kéo > 4px) | `Ctrl` + click | — |
@@ -52,7 +52,7 @@ JNN BIM Viewer hỗ trợ 2 sơ đồ điều khiển chuột linh hoạt: **Rev
 | **Hủy thao tác / Đóng công cụ** | — | — | `Esc` |
 
 ### 2.2. Khối Điều Hướng ViewCube 3D (Mốc 4)
-- **Tương tác trực quan góc trên bên phải:** Khối ViewCube 3D hiển thị la bàn và định hướng góc nhìn thời gian thực theo mô hình.
+- **Tương tác trực quan góc trên bên phải:** Khối ViewCube 3D định hướng góc nhìn thời gian thực theo mô hình.
 - **Bấm mặt lập phương:** Bấm mặt TOP, FRONT, BACK, LEFT, RIGHT, BOTTOM để xoay camera mượt mà về hình chiếu tương ứng.
 - **Bấm cạnh & góc:** Bấm vào các cạnh viền hoặc 8 góc của khối lập phương để chuyển sang các góc nhìn trục đo đẳng cự (Isometric).
 - **Kéo xoay tự do:** Giữ chuột trái trên ViewCube và kéo để xoay camera trực tiếp mà không ảnh hưởng tới vùng chọn trong mô hình.

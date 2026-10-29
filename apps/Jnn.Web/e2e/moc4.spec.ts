@@ -122,6 +122,7 @@ test.describe('Mốc 4 ThatOpen Adapter: Revit navigation, section gizmo, projec
 
     await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 50_000 });
     await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
+    await page.waitForTimeout(1000);
 
     const canvas = page.getByTestId('viewer-host').locator('canvas');
     await expect(canvas).toBeVisible();

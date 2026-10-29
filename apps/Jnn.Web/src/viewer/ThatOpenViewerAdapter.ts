@@ -156,7 +156,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private hovered: string | null = null;
   private boundCanvas: HTMLCanvasElement | null = null;
   private boundContainer: HTMLElement | null = null;
-  private gesture: { intent: GestureIntent; x: number; y: number; button: number; pointerId: number } | null = null;
+  private gesture: {
+    intent: GestureIntent;
+    x: number;
+    y: number;
+    currentX: number;
+    currentY: number;
+    button: number;
+    pointerId: number;
+  } | null = null;
   private hintShown = false;
   private lastMiddleDown = 0;
 
@@ -358,7 +366,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     const intent = intentOnDown(this.nav.preset, ev.button, ev.shiftKey);
-    this.gesture = { intent, x: ev.clientX, y: ev.clientY, button: ev.button, pointerId: ev.pointerId };
+    this.gesture = {
+      intent,
+      x: ev.clientX,
+      y: ev.clientY,
+      currentX: ev.clientX,
+      currentY: ev.clientY,
+      button: ev.button,
+      pointerId: ev.pointerId,
+    };
     this.applyMouseMapping(false);
     if (intent === 'orbit-pending') {
       this.anchorPivotAt(ev.clientX, ev.clientY);
@@ -437,6 +453,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
     const g = this.gesture;
     if (!g || ev.pointerId !== g.pointerId) return;
+    g.currentX = ev.clientX;
+    g.currentY = ev.clientY;
     const moved = Math.hypot(ev.clientX - g.x, ev.clientY - g.y);
     if (g.intent === 'orbit-pending' && moved > DRAG_THRESHOLD_PX) {
       g.intent = 'orbit';
@@ -481,7 +499,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private onWindowKeyDown = (ev: KeyboardEvent) => {
     if (ev.key === 'Shift' && this.gesture && (this.gesture.button === 0 || this.gesture.button === 1)) {
       this.applyMouseMapping(true);
-      this.anchorPivotAt(this.lastHover?.x ?? 0, this.lastHover?.y ?? 0);
+      const targetX = this.gesture.currentX ?? this.gesture.x;
+      const targetY = this.gesture.currentY ?? this.gesture.y;
+      this.anchorPivotAt(targetX, targetY);
     }
   };
 
@@ -1339,9 +1359,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   getCamera(): AdapterResult<CameraState> {
     if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
-    const posThree = new THREE.Vector3();
+    const posThree = this.world.camera.three.position.clone();
     const targetThree = new THREE.Vector3();
-    this.world.camera.controls.getPosition(posThree);
     this.world.camera.controls.getTarget(targetThree);
 
     return ok({

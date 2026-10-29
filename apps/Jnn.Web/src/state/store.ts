@@ -65,7 +65,7 @@ export type Action =
   | { type: 'expandAll' }
   | { type: 'collapseAll' }
   | { type: 'setSearch'; query: string }
-  | { type: 'setSection'; section: SectionSpec | null }
+  | { type: 'setSection'; section: SectionSpec | null; origin?: 'clash' | 'user' }
   | { type: 'setSectionFrameVisible'; visible: boolean }
   | { type: 'setSectionPickMode'; on: boolean }
   | { type: 'toggleXray' }
@@ -214,7 +214,9 @@ export function reducer(state: AppState, action: Action): AppState {
         if (!initialSectionBox || state.section?.kind !== 'box') {
           initialSectionBox = { min: section.min, max: section.max };
         }
-        lastSectionBox[modelKey] = { min: section.min, max: section.max };
+        if (action.origin !== 'clash') {
+          lastSectionBox[modelKey] = { min: section.min, max: section.max };
+        }
       } else if (section.kind === 'plane') {
         lastSectionPlane[modelKey] = section;
       }

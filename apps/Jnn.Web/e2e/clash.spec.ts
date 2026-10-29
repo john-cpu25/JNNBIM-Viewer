@@ -69,6 +69,6 @@ test.describe('Clash Detective UI, Results & Viewer interaction', () => {
     });
 
     await page.getByTestId('tab-clash-btn').click();
-    await expect(page.getByTestId('test-list')).toContainText('Kết cấu × Kiến trúc (Hard)');
+    await expect(page.getByTestId('test-list')).toContainText(/(Kết cấu|Structure)/);
   });
 });

@@ -77,11 +77,23 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
   const { t } = useTranslation();
   const [localMin, setLocalMin] = useState<Vec3>(spec.min);
   const [localMax, setLocalMax] = useState<Vec3>(spec.max);
+  const [textMin, setTextMin] = useState<[string, string, string]>([
+    spec.min[0].toFixed(2),
+    spec.min[1].toFixed(2),
+    spec.min[2].toFixed(2),
+  ]);
+  const [textMax, setTextMax] = useState<[string, string, string]>([
+    spec.max[0].toFixed(2),
+    spec.max[1].toFixed(2),
+    spec.max[2].toFixed(2),
+  ]);
   const [inputErrors, setInputErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setLocalMin(spec.min);
     setLocalMax(spec.max);
+    setTextMin([spec.min[0].toFixed(2), spec.min[1].toFixed(2), spec.min[2].toFixed(2)]);
+    setTextMax([spec.max[0].toFixed(2), spec.max[1].toFixed(2), spec.max[2].toFixed(2)]);
   }, [spec.min, spec.max]);
 
   useEffect(() => {
@@ -90,6 +102,8 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
       if (ev.spec.kind === 'box') {
         setLocalMin(ev.spec.min);
         setLocalMax(ev.spec.max);
+        setTextMin([ev.spec.min[0].toFixed(2), ev.spec.min[1].toFixed(2), ev.spec.min[2].toFixed(2)]);
+        setTextMax([ev.spec.max[0].toFixed(2), ev.spec.max[1].toFixed(2), ev.spec.max[2].toFixed(2)]);
       }
     });
   }, [viewer]);
@@ -105,31 +119,82 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
   };
 
   const handleInputChange = (axis: 0 | 1 | 2, side: 'min' | 'max', rawValue: string) => {
+    if (side === 'min') {
+      setTextMin((prev) => {
+        const copy: [string, string, string] = [...prev];
+        copy[axis] = rawValue;
+        return copy;
+      });
+    } else {
+      setTextMax((prev) => {
+        const copy: [string, string, string] = [...prev];
+        copy[axis] = rawValue;
+        return copy;
+      });
+    }
+  };
+
+  const commitInput = (axis: 0 | 1 | 2, side: 'min' | 'max') => {
+    const rawValue = side === 'min' ? textMin[axis] : textMax[axis];
     const val = parseFloat(rawValue);
     const key = `${axis}-${side}`;
     if (isNaN(val)) {
       setInputErrors((prev) => ({ ...prev, [key]: true }));
+      if (side === 'min') {
+        setTextMin((prev) => {
+          const copy: [string, string, string] = [...prev];
+          copy[axis] = localMin[axis].toFixed(2);
+          return copy;
+        });
+      } else {
+        setTextMax((prev) => {
+          const copy: [string, string, string] = [...prev];
+          copy[axis] = localMax[axis].toFixed(2);
+          return copy;
+        });
+      }
       return;
     }
     const currentMin = [...localMin] as Vec3;
     const currentMax = [...localMax] as Vec3;
+    const rounded = Math.round(val * 100) / 100;
     if (side === 'min') {
-      if (val >= currentMax[axis]) {
+      if (rounded >= currentMax[axis]) {
         setInputErrors((prev) => ({ ...prev, [key]: true }));
+        setTextMin((prev) => {
+          const copy: [string, string, string] = [...prev];
+          copy[axis] = localMin[axis].toFixed(2);
+          return copy;
+        });
         return;
       }
       setInputErrors((prev) => ({ ...prev, [key]: false }));
-      currentMin[axis] = Math.round(val * 100) / 100;
+      currentMin[axis] = rounded;
       setLocalMin(currentMin);
+      setTextMin((prev) => {
+        const copy: [string, string, string] = [...prev];
+        copy[axis] = rounded.toFixed(2);
+        return copy;
+      });
       commitBox(currentMin, currentMax);
     } else {
-      if (val <= currentMin[axis]) {
+      if (rounded <= currentMin[axis]) {
         setInputErrors((prev) => ({ ...prev, [key]: true }));
+        setTextMax((prev) => {
+          const copy: [string, string, string] = [...prev];
+          copy[axis] = localMax[axis].toFixed(2);
+          return copy;
+        });
         return;
       }
       setInputErrors((prev) => ({ ...prev, [key]: false }));
-      currentMax[axis] = Math.round(val * 100) / 100;
+      currentMax[axis] = rounded;
       setLocalMax(currentMax);
+      setTextMax((prev) => {
+        const copy: [string, string, string] = [...prev];
+        copy[axis] = rounded.toFixed(2);
+        return copy;
+      });
       commitBox(currentMin, currentMax);
     }
   };
@@ -138,10 +203,22 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
     const [minVal, maxVal] = range;
     const nextMin = [...localMin] as Vec3;
     const nextMax = [...localMax] as Vec3;
-    nextMin[axis] = minVal;
-    nextMax[axis] = maxVal;
+    const roundedMin = Math.round(minVal * 100) / 100;
+    const roundedMax = Math.round(maxVal * 100) / 100;
+    nextMin[axis] = roundedMin;
+    nextMax[axis] = roundedMax;
     setLocalMin(nextMin);
     setLocalMax(nextMax);
+    setTextMin((prev) => {
+      const copy: [string, string, string] = [...prev];
+      copy[axis] = roundedMin.toFixed(2);
+      return copy;
+    });
+    setTextMax((prev) => {
+      const copy: [string, string, string] = [...prev];
+      copy[axis] = roundedMax.toFixed(2);
+      return copy;
+    });
     commitBox(nextMin, nextMax);
   };
 
@@ -193,8 +270,15 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
                   step="0.1"
                   aria-label={`${axis.toUpperCase()} Min`}
                   data-testid={`section-box-min-${axis}`}
-                  value={localMin[idx]}
+                  value={textMin[idx]}
                   onChange={(e) => handleInputChange(idx, 'min', e.target.value)}
+                  onBlur={() => commitInput(idx, 'min')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      commitInput(idx, 'min');
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   className={`w-16 rounded border px-1.5 py-0.5 text-right bg-surface ${
                     inputErrors[`${idx}-min`] ? 'border-red-500 text-red-500' : 'border-line text-ink'
                   }`}
@@ -205,8 +289,15 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
                   step="0.1"
                   aria-label={`${axis.toUpperCase()} Max`}
                   data-testid={`section-box-max-${axis}`}
-                  value={localMax[idx]}
+                  value={textMax[idx]}
                   onChange={(e) => handleInputChange(idx, 'max', e.target.value)}
+                  onBlur={() => commitInput(idx, 'max')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      commitInput(idx, 'max');
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   className={`w-16 rounded border px-1.5 py-0.5 text-right bg-surface ${
                     inputErrors[`${idx}-max`] ? 'border-red-500 text-red-500' : 'border-line text-ink'
                   }`}
@@ -302,6 +393,22 @@ function PlaneControls({
   const i = AXIS_INDEX[axis];
   const min = Math.floor(Math.min(b.min[i], offset - 1) * 10) / 10;
   const max = Math.ceil(Math.max(b.max[i], offset + 1) * 10) / 10;
+  const [textOffset, setTextOffset] = useState<string>(offset.toFixed(2));
+
+  useEffect(() => {
+    setTextOffset(offset.toFixed(2));
+  }, [offset]);
+
+  const commitOffset = () => {
+    const val = parseFloat(textOffset);
+    if (!isNaN(val)) {
+      const rounded = Math.round(val * 100) / 100;
+      set({ offset: rounded });
+      setTextOffset(rounded.toFixed(2));
+    } else {
+      setTextOffset(offset.toFixed(2));
+    }
+  };
 
   const set = (patch: Partial<{ axis: SectionAxis; offset: number; flipped: boolean }>) =>
     dispatch({ type: 'setSection', section: { kind: 'plane', axis, offset, flipped, ...patch } });
@@ -329,10 +436,14 @@ function PlaneControls({
             <input
               type="number"
               step="0.1"
-              value={offset}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val)) set({ offset: Math.round(val * 100) / 100 });
+              value={textOffset}
+              onChange={(e) => setTextOffset(e.target.value)}
+              onBlur={commitOffset}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  commitOffset();
+                  (e.target as HTMLInputElement).blur();
+                }
               }}
               className="w-16 rounded border border-line bg-surface px-1.5 py-0.5 text-right text-ink"
             />
@@ -347,7 +458,11 @@ function PlaneControls({
           max={max}
           step={0.05}
           value={offset}
-          onChange={(e) => set({ offset: Number(e.target.value) })}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            set({ offset: v });
+            setTextOffset(v.toFixed(2));
+          }}
         />
         <div className="hidden" data-testid="section-offset">
           {offset.toFixed(2)} m
