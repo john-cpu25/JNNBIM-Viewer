@@ -33,6 +33,11 @@ export interface AppState {
   hovered: string | null;
   visibility: VisibilityState;
   section: SectionSpec | null;
+  sectionFrameVisible: boolean;
+  sectionPickMode: boolean;
+  initialSectionBox: { min: Vec3; max: Vec3 } | null;
+  lastSectionBox: Record<string, { min: Vec3; max: Vec3 }>;
+  lastSectionPlane: Record<string, Extract<SectionSpec, { kind: 'plane' }>>;
   xray: boolean;
   projection: 'perspective' | 'orthographic';
   theme: Theme;
@@ -61,6 +66,8 @@ export type Action =
   | { type: 'collapseAll' }
   | { type: 'setSearch'; query: string }
   | { type: 'setSection'; section: SectionSpec | null }
+  | { type: 'setSectionFrameVisible'; visible: boolean }
+  | { type: 'setSectionPickMode'; on: boolean }
   | { type: 'toggleXray' }
   | { type: 'setProjection'; projection: AppState['projection'] }
   | { type: 'setTheme'; theme: Theme }
@@ -113,6 +120,11 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     hovered: null,
     visibility: EMPTY_VISIBILITY,
     section: null,
+    sectionFrameVisible: true,
+    sectionPickMode: false,
+    initialSectionBox: null,
+    lastSectionBox: {},
+    lastSectionPlane: {},
     xray: false,
     projection: 'perspective',
     theme,
@@ -189,8 +201,36 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case 'setSearch':
       return { ...state, search: action.query };
-    case 'setSection':
-      return { ...state, section: action.section };
+    case 'setSection': {
+      const section = action.section;
+      let initialSectionBox = state.initialSectionBox;
+      const lastSectionBox = { ...state.lastSectionBox };
+      const lastSectionPlane = { ...state.lastSectionPlane };
+      const modelKey = state.model.modelId || 'default';
+
+      if (!section) {
+        initialSectionBox = null;
+      } else if (section.kind === 'box') {
+        if (!initialSectionBox || state.section?.kind !== 'box') {
+          initialSectionBox = { min: section.min, max: section.max };
+        }
+        lastSectionBox[modelKey] = { min: section.min, max: section.max };
+      } else if (section.kind === 'plane') {
+        lastSectionPlane[modelKey] = section;
+      }
+
+      return {
+        ...state,
+        section,
+        initialSectionBox,
+        lastSectionBox,
+        lastSectionPlane,
+      };
+    }
+    case 'setSectionFrameVisible':
+      return { ...state, sectionFrameVisible: action.visible };
+    case 'setSectionPickMode':
+      return { ...state, sectionPickMode: action.on };
     case 'toggleXray':
       return { ...state, xray: !state.xray };
     case 'setProjection':
@@ -241,6 +281,7 @@ export function reducer(state: AppState, action: Action): AppState {
         gridVisible: state.gridVisible,
         navigation: state.navigation,
         settingsOpen: state.settingsOpen,
+        sectionFrameVisible: state.sectionFrameVisible,
       };
     }
     case 'appendModel': {

@@ -116,6 +116,15 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     report(viewer.isolate([...state.visibility.isolated]));
   }, [viewer, state.visibility]);
   useEffect(() => report(viewer?.setSection(state.section)), [viewer, state.section]);
+  useEffect(() => report(viewer?.setSectionFrameVisible?.(state.sectionFrameVisible)), [viewer, state.sectionFrameVisible]);
+  useEffect(() => {
+    if (!viewer) return;
+    return viewer.on('sectionEdit', (ev) => {
+      if (ev.phase === 'end') {
+        dispatch({ type: 'setSection', section: ev.spec });
+      }
+    });
+  }, [viewer, dispatch]);
   useEffect(() => report(viewer?.setXray(state.xray)), [viewer, state.xray]);
   useEffect(() => report(viewer?.setGridVisible?.(state.gridVisible)), [viewer, state.gridVisible]);
   useEffect(() => report(viewer?.setProjection(state.projection)), [viewer, state.projection]);

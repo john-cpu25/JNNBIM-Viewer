@@ -133,6 +133,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
   private readonly unitEdges = new THREE.EdgesGeometry(this.unitBox);
   private readonly edgeMaterial = new THREE.LineBasicMaterial({ transparent: true });
   private grid: THREE.GridHelper | null = null;
+  private currentSection: SectionSpec | null = null;
   private gridVisible = true;
   private sectionHelper: THREE.Object3D | null = null;
   private modelBounds: Bounds | null = null;
@@ -590,6 +591,31 @@ export class ThreeViewerAdapter implements ViewerAdapter {
 
   // ----------------------------------------------------------------- section
   setSection(spec: SectionSpec | null): AdapterResult {
+    if (this.currentSection === spec) return okVoid;
+    if (this.currentSection && spec && this.currentSection.kind === spec.kind) {
+      if (spec.kind === 'plane' && this.currentSection.kind === 'plane') {
+        if (
+          spec.axis === this.currentSection.axis &&
+          spec.flipped === this.currentSection.flipped &&
+          Math.abs(spec.offset - this.currentSection.offset) < 1e-6
+        ) {
+          return okVoid;
+        }
+      } else if (spec.kind === 'box' && this.currentSection.kind === 'box') {
+        const cur = this.currentSection;
+        if (
+          Math.abs(spec.min[0] - cur.min[0]) < 1e-6 &&
+          Math.abs(spec.min[1] - cur.min[1]) < 1e-6 &&
+          Math.abs(spec.min[2] - cur.min[2]) < 1e-6 &&
+          Math.abs(spec.max[0] - cur.max[0]) < 1e-6 &&
+          Math.abs(spec.max[1] - cur.max[1]) < 1e-6 &&
+          Math.abs(spec.max[2] - cur.max[2]) < 1e-6
+        ) {
+          return okVoid;
+        }
+      }
+    }
+    this.currentSection = spec;
     if (this.sectionHelper) {
       this.modelRoot.remove(this.sectionHelper);
       this.sectionHelper.traverse((o) => {
