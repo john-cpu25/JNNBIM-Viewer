@@ -184,7 +184,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private gizmoDrag: {
     handle: HandleId;
     pointerId: number;
-    t0: number;
+    t0: number | null;
     v0: number;
     p0: THREE.Vector3;
     d: THREE.Vector3;
@@ -300,7 +300,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
             axisName === 'z' ? this.currentSection[sideName][2] : midZ,
           ];
           const p0 = toThree(posModel);
-          const t0 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, p0, d) ?? 0;
+          const t0 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, p0, d);
 
           this.gizmoDrag = {
             handle,
@@ -326,7 +326,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
           const posModel: Vec3 =
             axisName === 'x' ? [v0, midY, midZ] : axisName === 'y' ? [midX, v0, midZ] : [midX, midY, v0];
           const p0 = toThree(posModel);
-          const t0 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, p0, d) ?? 0;
+          const t0 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, p0, d);
 
           this.gizmoDrag = {
             handle,
@@ -377,11 +377,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       raycaster.setFromCamera(ndc, this.world.camera.three);
 
       const t1 = axisDragParam(raycaster.ray.origin, raycaster.ray.direction, this.gizmoDrag.p0, this.gizmoDrag.d);
-      if (t1 !== null) {
-        const deltaT = t1 - this.gizmoDrag.t0;
-        const step = ev.altKey ? 0 : ev.shiftKey ? 0.01 : 0.1;
-        const rawVal = this.gizmoDrag.v0 + deltaT;
-        const newVal = snapValue(rawVal, step);
+      if (t1 === null) return;
+      if (this.gizmoDrag.t0 === null) {
+        this.gizmoDrag.t0 = t1;
+        return;
+      }
+      const deltaT = t1 - this.gizmoDrag.t0;
+      const step = ev.altKey ? 0 : ev.shiftKey ? 0.01 : 0.1;
+      const rawVal = this.gizmoDrag.v0 + deltaT;
+      const newVal = snapValue(rawVal, step);
 
         if (this.gizmoDrag.startSpec.kind === 'box') {
           const min = [...this.gizmoDrag.startSpec.min] as Vec3;
@@ -419,7 +423,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
           this.applySectionPlanesFast(nextSpec);
           this.events.emit('sectionEdit', { spec: nextSpec, phase: 'drag' });
         }
-      }
       return;
     }
 
