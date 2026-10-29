@@ -190,4 +190,48 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('manages navigation settings, orbitBy, and resets focal offset', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const setNavRes = adapter.setNavigationSettings({
+      preset: 'classic',
+      rotateSpeed: 0.6,
+      zoomSpeed: 1.2,
+      orbitAroundCursor: false,
+      showPivot: false,
+    });
+    expect(setNavRes.ok).toBe(true);
+
+    let focalOffsetCalled = false;
+    let rotateCalled = false;
+    (adapter as any).world = {
+      camera: {
+        controls: {
+          setFocalOffset: (x: number, y: number, z: number, enableTransition: boolean) => {
+            focalOffsetCalled = true;
+            expect(x).toBe(0);
+            expect(y).toBe(0);
+            expect(z).toBe(0);
+            expect(enableTransition).toBe(false);
+          },
+          rotate: (az: number, pol: number, anim: boolean) => {
+            rotateCalled = true;
+            expect(az).toBe(0.5);
+            expect(pol).toBe(0.2);
+            expect(anim).toBe(true);
+          },
+          setLookAt: () => {},
+        },
+      },
+    };
+
+    const orbitRes = adapter.orbitBy(0.5, 0.2, true);
+    expect(orbitRes.ok).toBe(true);
+    expect(rotateCalled).toBe(true);
+
+    (adapter as any).resetPivotOffset();
+    expect(focalOffsetCalled).toBe(true);
+
+    adapter.dispose();
+  });
 });

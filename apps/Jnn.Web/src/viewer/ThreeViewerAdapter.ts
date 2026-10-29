@@ -25,6 +25,8 @@ import {
   type ViewerCapability,
   type ViewerEvents,
   type ViewPreset,
+  type NavigationSettings,
+  DEFAULT_NAV,
 } from './ViewerAdapter';
 
 /** Minimal renderer surface so unit tests can run without WebGL. */
@@ -122,6 +124,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
   private xray = false;
   private clipPlanes: THREE.Plane[] = [];
   private theme: 'light' | 'dark' = 'light';
+  private nav: NavigationSettings = { ...DEFAULT_NAV };
 
   private tween: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t0: number; ms: number; zoom?: [number, number] } | null = null;
   private pointerDown: { x: number; y: number } | null = null;
@@ -450,6 +453,31 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     }
     this.resize();
     this.requestRender();
+    return okVoid;
+  }
+
+  setNavigationSettings(s: NavigationSettings): AdapterResult {
+    this.nav = { ...s };
+    if (this.controls) {
+      this.controls.rotateSpeed = this.nav.rotateSpeed * 2.5;
+    }
+    return okVoid;
+  }
+
+  orbitBy(deltaAzimuth: number, deltaPolar: number, _animate = false): AdapterResult {
+    if (!this.controls) return fail('not-loaded', 'Viewer is not mounted.');
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.theta += deltaAzimuth;
+    spherical.phi += deltaPolar;
+    spherical.phi = Math.max(1e-4, Math.min(Math.PI - 1e-4, spherical.phi));
+    spherical.makeSafe();
+    offset.setFromSpherical(spherical);
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.camera.lookAt(this.controls.target);
+    this.controls.update();
+    this.requestRender();
+    this.events.emit('cameraChange', this.cameraState());
     return okVoid;
   }
 

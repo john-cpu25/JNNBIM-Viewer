@@ -43,6 +43,24 @@ export interface CameraState {
   projection: 'perspective' | 'orthographic';
 }
 
+export type NavigationPreset = 'revit' | 'classic';
+
+export interface NavigationSettings {
+  preset: NavigationPreset;        // default 'revit'
+  rotateSpeed: number;             // 0.1–1.0, default 0.4
+  zoomSpeed: number;               // 0.3–2.0, default 1.0
+  orbitAroundCursor: boolean;      // default true
+  showPivot: boolean;              // default true
+}
+
+export const DEFAULT_NAV: NavigationSettings = {
+  preset: 'revit',
+  rotateSpeed: 0.4,
+  zoomSpeed: 1.0,
+  orbitAroundCursor: true,
+  showPivot: true,
+};
+
 export type SectionAxis = 'x' | 'y' | 'z';
 
 export type SectionSpec =
@@ -71,6 +89,7 @@ export interface ViewerEvents {
   pick: { result: PickResult | null; additive: boolean };
   hover: { elementId: string | null };
   cameraChange: CameraState;
+  navHint: { kind: 'holdShiftToOrbit' };
 }
 
 export type ViewerEventName = keyof ViewerEvents;
@@ -109,6 +128,9 @@ export interface ViewerAdapter {
   setCamera(camera: CameraState): AdapterResult;
   getCamera(): AdapterResult<CameraState>;
   setProjection(projection: CameraState['projection']): AdapterResult;
+  setNavigationSettings?(s: NavigationSettings): AdapterResult;
+  /** Rotate camera around current pivot in radians. Used for ViewCube drag. */
+  orbitBy?(deltaAzimuth: number, deltaPolar: number, animate?: boolean): AdapterResult;
 
   setSection(spec: SectionSpec | null): AdapterResult;
 

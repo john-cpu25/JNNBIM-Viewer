@@ -40,6 +40,8 @@ import {
   type ViewerCapability,
   type ViewerEvents,
   type ViewPreset,
+  type NavigationSettings,
+  DEFAULT_NAV,
 } from './ViewerAdapter';
 
 // Global patch for WebIFC 0.0.78 StreamMeshes signature mismatch
@@ -125,6 +127,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private clipPlanes: THREE.Plane[] = [];
   private gridHelper: THREE.GridHelper | null = null;
   private gridVisible = true;
+  private nav: NavigationSettings = structuredClone(DEFAULT_NAV);
   private sectionHelper: THREE.Object3D | null = null;
   private clipStyler: OBCF.ClipStyler | null = null;
   private activeClipEdges: any | null = null;
@@ -138,6 +141,24 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   async getCacheStats(): Promise<any> {
     return getIfcCacheStats();
+  }
+
+  private resetPivotOffset() {
+    this.world?.camera.controls.setFocalOffset(0, 0, 0, false);
+  }
+
+  private configureControls() {
+    if (!this.world) return;
+    const c = this.world.camera.controls;
+    c.azimuthRotateSpeed = this.nav.rotateSpeed;
+    c.polarRotateSpeed = this.nav.rotateSpeed;
+    c.dollySpeed = this.nav.zoomSpeed;
+    c.truckSpeed = 2.0;
+    c.smoothTime = 0.2;
+    c.draggingSmoothTime = 0.05;
+    c.dollyToCursor = true;
+    c.infinityDolly = true;
+    c.maxDistance = Infinity;
   }
 
   mount(container: HTMLElement): void {
@@ -165,6 +186,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     });
 
     world.camera.controls.setLookAt(15, 15, 15, 0, 0, 0);
+    this.configureControls();
 
     // Subtle ground grid
     const gridHelper = new THREE.GridHelper(50, 50, 0xf97316, 0x2d333b);
@@ -292,6 +314,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         max: [combined.max.x, -combined.min.z, combined.max.y],
       };
       if (fitCamera) {
+        this.resetPivotOffset();
         this.world.camera.controls.fitToBox(combined, true);
       }
       return this.modelBounds;
@@ -578,6 +601,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.modelsMap.set(name, { model, jnnModel });
       this.parsedModel = jnnModel;
       this.updateCombinedBoundsAndFit(true);
+      this.configureControls();
+      if (this.modelBounds && this.world) {
+        const sizeX = this.modelBounds.max[0] - this.modelBounds.min[0];
+        const sizeY = this.modelBounds.max[1] - this.modelBounds.min[1];
+        const sizeZ = this.modelBounds.max[2] - this.modelBounds.min[2];
+        const diagonal = Math.hypot(sizeX, sizeY, sizeZ);
+        this.world.camera.controls.minDistance = Math.max(0.3, diagonal * 0.001);
+      }
       if (this.selection.size > 0) {
         this.select([...this.selection]);
       }
@@ -681,6 +712,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
     const box = entry.model.box;
     if (box && !box.isEmpty()) {
+      this.resetPivotOffset();
       this.world.camera.controls.fitToBox(box, true);
       return okVoid;
     }
@@ -725,6 +757,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         }
       }
       if (hasItems && this.highlighter) {
+        this.resetPivotOffset();
         (this.highlighter as any).zoomSelection(modelIdMap).catch(console.error);
         return okVoid;
       }
@@ -737,6 +770,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
     }
     if (!combined.isEmpty()) {
+      this.resetPivotOffset();
       this.world.camera.controls.fitToBox(combined, true);
       return okVoid;
     }
@@ -748,21 +782,32 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     const dirModel = PRESET_DIRS[preset];
     if (!dirModel) return fail('invalid-argument', `Unknown preset: ${preset}`);
 
+    this.resetPivotOffset();
+
+    const combined = new THREE.Box3();
+    for (const entry of this.modelsMap.values()) {
+      if (entry.model.object.visible && entry.model.box && !entry.model.box.isEmpty()) {
+        combined.union(entry.model.box);
+      }
+    }
+
     const targetThree = new THREE.Vector3();
-    if (this.activeModel?.box && !this.activeModel.box.isEmpty()) {
+    let distance = 25;
+    if (!combined.isEmpty()) {
+      combined.getCenter(targetThree);
+      const size = new THREE.Vector3();
+      combined.getSize(size);
+      distance = Math.max(size.x, size.y, size.z) * 1.8;
+    } else if (this.activeModel?.box && !this.activeModel.box.isEmpty()) {
       this.activeModel.box.getCenter(targetThree);
+      const size = new THREE.Vector3();
+      this.activeModel.box.getSize(size);
+      distance = Math.max(size.x, size.y, size.z) * 1.8;
     } else {
       targetThree.set(0, 0, 0);
     }
 
     const dirThree = toThree(dirModel).normalize();
-    let distance = 25;
-    if (this.activeModel?.box && !this.activeModel.box.isEmpty()) {
-      const size = new THREE.Vector3();
-      this.activeModel.box.getSize(size);
-      distance = Math.max(size.x, size.y, size.z) * 1.8;
-    }
-
     const posThree = targetThree.clone().addScaledVector(dirThree, distance);
     this.world.camera.controls.setLookAt(
       posThree.x,
@@ -778,12 +823,25 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   setCamera(state: CameraState): AdapterResult {
     if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    this.resetPivotOffset();
     const pos = toThree(state.position);
     const target = toThree(state.target);
     this.world.camera.controls.setLookAt(pos.x, pos.y, pos.z, target.x, target.y, target.z, false);
     if (state.projection !== this.currentProjection) {
       this.setProjection(state.projection);
     }
+    return okVoid;
+  }
+
+  setNavigationSettings(s: NavigationSettings): AdapterResult {
+    this.nav = { ...s };
+    this.configureControls();
+    return okVoid;
+  }
+
+  orbitBy(deltaAzimuth: number, deltaPolar: number, animate = false): AdapterResult {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    this.world.camera.controls.rotate(deltaAzimuth, deltaPolar, animate);
     return okVoid;
   }
 
