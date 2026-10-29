@@ -254,6 +254,10 @@ export interface Translations {
   'clash.commentsPlaceholder': string;
 
   // Explorer Extra
+  'explorer.modelsTitle': string;
+  'explorer.singleModel': string;
+  'explorer.federatedModels': string;
+  'explorer.appendIfc': string;
   'explorer.modelRemoved': string;
   'explorer.elementCount': string;
   'explorer.storeyCount': string;
@@ -266,6 +270,7 @@ export interface Translations {
   'properties.offlineDesc': string;
 
   // Rules Extra
+  'rules.unnamedElement': string;
   'rules.checking': string;
   'rules.applicableRules': string;
   'rules.unselectAll': string;

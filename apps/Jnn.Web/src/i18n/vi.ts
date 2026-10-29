@@ -254,6 +254,10 @@ export const vi: Translations = {
   'clash.commentsPlaceholder': 'Ghi chú đánh giá...',
 
   // Explorer Extra
+  'explorer.modelsTitle': 'Danh sách các mô hình federated',
+  'explorer.singleModel': 'mô hình',
+  'explorer.federatedModels': 'mô hình federated',
+  'explorer.appendIfc': 'Thêm IFC',
   'explorer.modelRemoved': 'Đã gỡ mô hình "{name}".',
   'explorer.elementCount': '{count} cấu kiện',
   'explorer.storeyCount': '{count} tầng',
@@ -266,6 +270,7 @@ export const vi: Translations = {
   'properties.offlineDesc': 'Mô hình IFC nạp từ tệp qua That Open Engine (WASM offline).',
 
   // Rules Extra
+  'rules.unnamedElement': '(Không tên)',
   'rules.checking': 'Đang kiểm tra quy tắc...',
   'rules.applicableRules': 'Quy tắc áp dụng ({count}/{total})',
   'rules.unselectAll': 'Bỏ chọn hết',

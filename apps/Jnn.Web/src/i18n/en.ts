@@ -254,6 +254,10 @@ export const en: Translations = {
   'clash.commentsPlaceholder': 'Evaluation notes...',
 
   // Explorer Extra
+  'explorer.modelsTitle': 'List of federated models',
+  'explorer.singleModel': 'model',
+  'explorer.federatedModels': 'federated models',
+  'explorer.appendIfc': 'Add IFC',
   'explorer.modelRemoved': 'Model "{name}" removed.',
   'explorer.elementCount': '{count} elements',
   'explorer.storeyCount': '{count} storeys',
@@ -266,6 +270,7 @@ export const en: Translations = {
   'properties.offlineDesc': 'IFC model parsed from file via That Open Engine (offline WASM).',
 
   // Rules Extra
+  'rules.unnamedElement': '(Unnamed)',
   'rules.checking': 'Checking rules...',
   'rules.applicableRules': 'Applicable Rules ({count}/{total})',
   'rules.unselectAll': 'Unselect all',

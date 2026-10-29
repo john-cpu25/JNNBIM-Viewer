@@ -1784,14 +1784,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         }
       } else if (targetSpec.kind === 'plane' && this.clipPlanes.length === 1) {
         this.clipPlanes[0]!.constant = targetSpec.flipped ? -targetSpec.offset : targetSpec.offset;
-        if (this.sectionHelper && this.modelBounds) {
+        if (this.sectionHelper && this.sectionHelper.children[0] && this.modelBounds) {
           const c = boundsCenter(this.modelBounds);
           if (targetSpec.axis === 'x') {
-            this.sectionHelper.position.set(targetSpec.offset, c[2], -c[1]);
+            this.sectionHelper.children[0]!.position.set(targetSpec.offset, c[2], -c[1]);
           } else if (targetSpec.axis === 'y') {
-            this.sectionHelper.position.set(c[0], c[2], -targetSpec.offset);
+            this.sectionHelper.children[0]!.position.set(c[0], c[2], -targetSpec.offset);
           } else {
-            this.sectionHelper.position.set(c[0], targetSpec.offset, -c[1]);
+            this.sectionHelper.children[0]!.position.set(c[0], targetSpec.offset, -c[1]);
           }
         }
         if (this.sectionGizmo) {

@@ -75,7 +75,7 @@ export function Explorer() {
             {
               value: 'models',
               label: `${t('explorer.models')}${state.models.length > 1 ? ` (${state.models.length})` : ''}`,
-              title: 'Danh sách các mô hình federated',
+              title: t('explorer.modelsTitle'),
             },
           ]}
         />
@@ -186,7 +186,7 @@ function ModelsPanel() {
     <div className="flex min-h-0 flex-1 flex-col overflow-auto p-3 space-y-3" data-testid="models-panel">
       <div className="flex items-center justify-between pb-1">
         <span className="text-xs font-medium text-muted">
-          {state.models.length} {state.models.length === 1 ? 'mô hình' : 'mô hình federated'}
+          {state.models.length} {state.models.length === 1 ? t('explorer.singleModel') : t('explorer.federatedModels')}
         </span>
         <input
           ref={appendInputRef}
@@ -203,7 +203,7 @@ function ModelsPanel() {
           data-testid="models-panel-append-btn"
         >
           <FolderPlus size={13} />
-          <span>Thêm IFC</span>
+          <span>{t('explorer.appendIfc')}</span>
         </button>
       </div>
 

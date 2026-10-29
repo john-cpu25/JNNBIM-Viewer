@@ -399,7 +399,7 @@ export function RulePanel() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span className="font-semibold text-ink truncate">
-                            {issue.elementName || '(Không tên)'}
+                            {issue.elementName || t('rules.unnamedElement')}
                           </span>
                           <span className="font-mono text-[10px] text-muted shrink-0">
                             {rule.id}
