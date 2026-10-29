@@ -34,7 +34,34 @@ export type ViewerCapability =
   | 'highlight'
   | 'xray';
 
-export type ViewPreset = 'iso' | 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right';
+export type ViewPreset =
+  | 'iso'
+  | 'top'
+  | 'bottom'
+  | 'front'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'top-front'
+  | 'top-back'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-front'
+  | 'bottom-back'
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'front-left'
+  | 'front-right'
+  | 'back-left'
+  | 'back-right'
+  | 'top-front-left'
+  | 'top-front-right'
+  | 'top-back-left'
+  | 'top-back-right'
+  | 'bottom-front-left'
+  | 'bottom-front-right'
+  | 'bottom-back-left'
+  | 'bottom-back-right';
 
 /** Camera in model coordinates (+Z up). */
 export interface CameraState {

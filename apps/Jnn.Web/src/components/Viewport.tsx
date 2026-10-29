@@ -6,7 +6,7 @@ import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
 import type { AdapterResult, ViewerAdapter } from '../viewer/ViewerAdapter';
 import { useApp } from '../state/AppContext';
 import { Toolbar } from './Toolbar';
-import { ViewPresets } from './ViewPresets';
+import { ViewCube } from './ViewCube';
 import { SectionPanel } from './SectionPanel';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
 import { cn } from '../lib/cn';
@@ -220,7 +220,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
 
       {status === 'ready' && (
         <>
-          <ViewPresets />
+          <ViewCube />
           {state.section && <SectionPanel compact={compact} />}
           <Toolbar compact={compact} />
 
