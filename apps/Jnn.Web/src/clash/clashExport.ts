@@ -36,16 +36,35 @@ export const CSV_HEADERS = [
   'Người phụ trách',
 ];
 
+export const CSV_HEADERS_EN = [
+  'No.',
+  'Clash ID',
+  'Status',
+  'Type',
+  'Distance (m)',
+  'GlobalId A',
+  'Name A',
+  'IFC Class A',
+  'GlobalId B',
+  'Name B',
+  'IFC Class B',
+  'Storey',
+  'Clash Point (X,Y,Z)',
+  'Comments',
+  'Assigned To',
+];
+
 /**
  * Exports clash test records to a CSV string with UTF-8 BOM (\uFEFF)
  * for proper display in Excel with Vietnamese characters.
  */
-export function exportClashCSV(test: ClashTestItem): string {
+export function exportClashCSV(test: ClashTestItem, locale: 'vi' | 'en' = 'vi'): string {
   const records: ClashRecord[] = test.records ?? [];
   const lines: string[] = [];
 
   // 1. Header row
-  lines.push(CSV_HEADERS.map(escapeCsvField).join(','));
+  const headers = locale === 'en' ? CSV_HEADERS_EN : CSV_HEADERS;
+  lines.push(headers.map(escapeCsvField).join(','));
 
   // 2. Data rows
   records.forEach((r, idx) => {
@@ -96,16 +115,17 @@ export function exportClashCSV(test: ClashTestItem): string {
  * Exports clash test details to a stylized Microsoft Excel (.xlsx) workbook Blob
  * with 2 sheets: "Tổng quan" (Overview & Statistics) and "Kết quả" (Detailed Records).
  */
-export async function exportClashExcel(test: ClashTestItem): Promise<Blob> {
+export async function exportClashExcel(test: ClashTestItem, locale: 'vi' | 'en' = 'vi'): Promise<Blob> {
   const records: ClashRecord[] = test.records ?? [];
+  const isEn = locale === 'en';
   const workbook = new Workbook();
   workbook.creator = 'JNN BIM Viewer';
   workbook.created = new Date();
 
   // ----------------------------------------------------
-  // Sheet 1: Tổng quan
+  // Sheet 1: Tổng quan / Overview
   // ----------------------------------------------------
-  const sheetOverview = workbook.addWorksheet('Tổng quan');
+  const sheetOverview = workbook.addWorksheet(isEn ? 'Overview' : 'Tổng quan');
   sheetOverview.columns = [
     { key: 'param', width: 28 },
     { key: 'value', width: 40 },
@@ -113,28 +133,43 @@ export async function exportClashExcel(test: ClashTestItem): Promise<Blob> {
   ];
 
   // Title
-  sheetOverview.addRow(['BÁO CÁO TỔNG QUAN CLASH DETECTION', '']);
+  sheetOverview.addRow([isEn ? 'CLASH DETECTION OVERVIEW REPORT' : 'BÁO CÁO TỔNG QUAN CLASH DETECTION', '']);
   const titleCell = sheetOverview.getCell('A1');
   titleCell.font = { bold: true, size: 14, color: { argb: 'FF1E3A8A' } };
   sheetOverview.addRow([]);
 
   // Test information metadata
   const runDateStr = test.lastRunTime
-    ? new Date(test.lastRunTime).toLocaleString('vi-VN')
-    : new Date().toLocaleString('vi-VN');
+    ? new Date(test.lastRunTime).toLocaleString(isEn ? 'en-US' : 'vi-VN')
+    : new Date().toLocaleString(isEn ? 'en-US' : 'vi-VN');
 
-  const criteriaA = `Model: ${test.selectionA?.modelId || 'Tất cả'} | Phân loại: ${test.selectionA?.ifcClass || 'Tất cả'}`;
-  const criteriaB = `Model: ${test.selectionB?.modelId || 'Tất cả'} | Phân loại: ${test.selectionB?.ifcClass || 'Tất cả'}`;
+  const allStr = isEn ? 'All' : 'Tất cả';
+  const criteriaA = isEn
+    ? `Model: ${test.selectionA?.modelId || allStr} | Class: ${test.selectionA?.ifcClass || allStr}`
+    : `Model: ${test.selectionA?.modelId || allStr} | Phân loại: ${test.selectionA?.ifcClass || allStr}`;
+  const criteriaB = isEn
+    ? `Model: ${test.selectionB?.modelId || allStr} | Class: ${test.selectionB?.ifcClass || allStr}`
+    : `Model: ${test.selectionB?.modelId || allStr} | Phân loại: ${test.selectionB?.ifcClass || allStr}`;
 
-  const metaRows: [string, string | number][] = [
-    ['Tên kiểm tra (Test Name):', test.name],
-    ['Ngày xuất báo cáo:', runDateStr],
-    ['Loại kiểm tra:', test.type],
-    ['Dung sai (Tolerance):', `${test.tolerance} m`],
-    ['Tiêu chí chọn A:', criteriaA],
-    ['Tiêu chí chọn B:', criteriaB],
-    ['Tổng số va chạm:', records.length],
-  ];
+  const metaRows: [string, string | number][] = isEn
+    ? [
+        ['Test Name:', test.name],
+        ['Report Date:', runDateStr],
+        ['Check Type:', test.type],
+        ['Tolerance:', `${test.tolerance} m`],
+        ['Selection Criteria A:', criteriaA],
+        ['Selection Criteria B:', criteriaB],
+        ['Total Clashes:', records.length],
+      ]
+    : [
+        ['Tên kiểm tra (Test Name):', test.name],
+        ['Ngày xuất báo cáo:', runDateStr],
+        ['Loại kiểm tra:', test.type],
+        ['Dung sai (Tolerance):', `${test.tolerance} m`],
+        ['Tiêu chí chọn A:', criteriaA],
+        ['Tiêu chí chọn B:', criteriaB],
+        ['Tổng số va chạm:', records.length],
+      ];
 
   for (const [param, val] of metaRows) {
     const r = sheetOverview.addRow([param, val]);
@@ -144,7 +179,9 @@ export async function exportClashExcel(test: ClashTestItem): Promise<Blob> {
   sheetOverview.addRow([]);
 
   // Status statistics table
-  const statHeader = sheetOverview.addRow(['Trạng thái', 'Số lượng', 'Tỷ lệ (%)']);
+  const statHeader = sheetOverview.addRow(
+    isEn ? ['Status', 'Count', 'Ratio (%)'] : ['Trạng thái', 'Số lượng', 'Tỷ lệ (%)'],
+  );
   statHeader.eachCell((c) => {
     c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     c.fill = {
@@ -180,36 +217,37 @@ export async function exportClashExcel(test: ClashTestItem): Promise<Blob> {
     row.getCell(3).alignment = { horizontal: 'right' };
   }
 
-  const summaryRow = sheetOverview.addRow(['Tổng cộng', totalClashes, '100%']);
+  const summaryRow = sheetOverview.addRow([isEn ? 'Total' : 'Tổng cộng', totalClashes, '100%']);
   summaryRow.font = { bold: true };
   summaryRow.getCell(2).alignment = { horizontal: 'right' };
   summaryRow.getCell(3).alignment = { horizontal: 'right' };
 
   // ----------------------------------------------------
-  // Sheet 2: Kết quả
+  // Sheet 2: Kết quả / Results
   // ----------------------------------------------------
-  const sheetResults = workbook.addWorksheet('Kết quả');
+  const sheetResults = workbook.addWorksheet(isEn ? 'Results' : 'Kết quả');
 
   // Freeze pane: Freeze column A (STT) and row 1 (Header)
   sheetResults.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
 
   // Column headers & dimensions
+  const resHeaders = isEn ? CSV_HEADERS_EN : CSV_HEADERS;
   sheetResults.columns = [
-    { header: 'STT', key: 'stt', width: 8 },
-    { header: 'Clash ID', key: 'clashId', width: 16 },
-    { header: 'Trạng thái', key: 'status', width: 14 },
-    { header: 'Loại', key: 'type', width: 14 },
-    { header: 'Khoảng cách (m)', key: 'distance', width: 18 },
-    { header: 'GlobalId A', key: 'aGuid', width: 26 },
-    { header: 'Tên A', key: 'aName', width: 28 },
-    { header: 'IFC Class A', key: 'aClass', width: 16 },
-    { header: 'GlobalId B', key: 'bGuid', width: 26 },
-    { header: 'Tên B', key: 'bName', width: 28 },
-    { header: 'IFC Class B', key: 'bClass', width: 16 },
-    { header: 'Tầng', key: 'storey', width: 14 },
-    { header: 'Điểm clash (X,Y,Z)', key: 'point', width: 25 },
-    { header: 'Ghi chú', key: 'comments', width: 35 },
-    { header: 'Người phụ trách', key: 'assignedTo', width: 20 },
+    { header: resHeaders[0], key: 'stt', width: 8 },
+    { header: resHeaders[1], key: 'clashId', width: 16 },
+    { header: resHeaders[2], key: 'status', width: 14 },
+    { header: resHeaders[3], key: 'type', width: 14 },
+    { header: resHeaders[4], key: 'distance', width: 18 },
+    { header: resHeaders[5], key: 'aGuid', width: 26 },
+    { header: resHeaders[6], key: 'aName', width: 28 },
+    { header: resHeaders[7], key: 'aClass', width: 16 },
+    { header: resHeaders[8], key: 'bGuid', width: 26 },
+    { header: resHeaders[9], key: 'bName', width: 28 },
+    { header: resHeaders[10], key: 'bClass', width: 16 },
+    { header: resHeaders[11], key: 'storey', width: 14 },
+    { header: resHeaders[12], key: 'point', width: 25 },
+    { header: resHeaders[13], key: 'comments', width: 35 },
+    { header: resHeaders[14], key: 'assignedTo', width: 20 },
   ];
 
   // Header row formatting
@@ -362,13 +400,15 @@ export function escapeHtml(str: string | number | undefined | null): string {
  * with inline CSS, responsive layout, printable stylesheet (@media print),
  * summary breakdown metrics, and vanilla JavaScript for client-side sorting & search filtering.
  */
-export function exportClashHTML(test: ClashTestItem): string {
+export function exportClashHTML(test: ClashTestItem, locale: 'vi' | 'en' = 'vi'): string {
   const records: ClashRecord[] = test.records ?? [];
-  const testName = escapeHtml(test.name || 'Báo cáo va chạm');
+  const isEn = locale === 'en';
+  const defaultTitle = isEn ? 'Clash Detection Report' : 'Báo cáo va chạm';
+  const testName = escapeHtml(test.name || defaultTitle);
   const runDateStr = test.lastRunTime
-    ? new Date(test.lastRunTime).toLocaleString('vi-VN')
-    : new Date().toLocaleString('vi-VN');
-  const nowStr = new Date().toLocaleString('vi-VN');
+    ? new Date(test.lastRunTime).toLocaleString(isEn ? 'en-US' : 'vi-VN')
+    : new Date().toLocaleString(isEn ? 'en-US' : 'vi-VN');
+  const nowStr = new Date().toLocaleString(isEn ? 'en-US' : 'vi-VN');
 
   // Count by status
   const statusCounts: Record<string, number> = {
@@ -601,29 +641,29 @@ export function exportClashHTML(test: ClashTestItem): string {
         </div>
         <div class="header-title">
           <h1>${testName}</h1>
-          <p>Báo Cáo Kiểm Tra Va Chạm (Clash Detection Report) • JNN BIM Viewer</p>
+          <p>${isEn ? 'Clash Detection Report • JNN BIM Viewer' : 'Báo Cáo Kiểm Tra Va Chạm (Clash Detection Report) • JNN BIM Viewer'}</p>
         </div>
       </div>
-      <button class="btn-print" onclick="window.print()">In báo cáo / Xuất PDF</button>
+      <button class="btn-print" onclick="window.print()">${isEn ? 'Print Report / Export PDF' : 'In báo cáo / Xuất PDF'}</button>
     </div>
 
     <!-- Metadata Grid -->
     <div class="meta-grid">
       <div class="meta-card">
-        <div class="label">Thời gian xuất báo cáo</div>
+        <div class="label">${isEn ? 'Report Date' : 'Thời gian xuất báo cáo'}</div>
         <div class="val">${nowStr}</div>
       </div>
       <div class="meta-card">
-        <div class="label">Loại kiểm tra & Dung sai</div>
+        <div class="label">${isEn ? 'Check Type & Tolerance' : 'Loại kiểm tra & Dung sai'}</div>
         <div class="val">${escapeHtml(test.type)} (${test.tolerance} m)</div>
       </div>
       <div class="meta-card">
-        <div class="label">Tiêu chí đối tượng A</div>
-        <div class="val">${escapeHtml(test.selectionA?.modelId || 'Mọi Model')} / ${escapeHtml(test.selectionA?.ifcClass || 'Mọi Phân loại')}</div>
+        <div class="label">${isEn ? 'Selection Criteria A' : 'Tiêu chí đối tượng A'}</div>
+        <div class="val">${escapeHtml(test.selectionA?.modelId || (isEn ? 'All Models' : 'Mọi Model'))} / ${escapeHtml(test.selectionA?.ifcClass || (isEn ? 'All Classes' : 'Mọi Phân loại'))}</div>
       </div>
       <div class="meta-card">
-        <div class="label">Tiêu chí đối tượng B</div>
-        <div class="val">${escapeHtml(test.selectionB?.modelId || 'Mọi Model')} / ${escapeHtml(test.selectionB?.ifcClass || 'Mọi Phân loại')}</div>
+        <div class="label">${isEn ? 'Selection Criteria B' : 'Tiêu chí đối tượng B'}</div>
+        <div class="val">${escapeHtml(test.selectionB?.modelId || (isEn ? 'All Models' : 'Mọi Model'))} / ${escapeHtml(test.selectionB?.ifcClass || (isEn ? 'All Classes' : 'Mọi Phân loại'))}</div>
       </div>
     </div>
 
@@ -631,36 +671,36 @@ export function exportClashHTML(test: ClashTestItem): string {
     <div class="summary-cards">
       <div class="stat-card stat-total">
         <div class="count">${records.length}</div>
-        <div class="desc">Tổng số va chạm</div>
+        <div class="desc">${isEn ? 'Total Clashes' : 'Tổng số va chạm'}</div>
       </div>
       <div class="stat-card stat-new">
         <div class="count">${statusCounts['New'] ?? 0}</div>
-        <div class="desc">Mới (New)</div>
+        <div class="desc">${isEn ? 'New' : 'Mới (New)'}</div>
       </div>
       <div class="stat-card stat-active">
         <div class="count">${statusCounts['Active'] ?? 0}</div>
-        <div class="desc">Đang xử lý (Active)</div>
+        <div class="desc">${isEn ? 'Active' : 'Đang xử lý (Active)'}</div>
       </div>
       <div class="stat-card stat-reviewed">
         <div class="count">${statusCounts['Reviewed'] ?? 0}</div>
-        <div class="desc">Đã xem (Reviewed)</div>
+        <div class="desc">${isEn ? 'Reviewed' : 'Đã xem (Reviewed)'}</div>
       </div>
       <div class="stat-card stat-approved">
         <div class="count">${statusCounts['Approved'] ?? 0}</div>
-        <div class="desc">Đã duyệt (Approved)</div>
+        <div class="desc">${isEn ? 'Approved' : 'Đã duyệt (Approved)'}</div>
       </div>
       <div class="stat-card stat-resolved">
         <div class="count">${statusCounts['Resolved'] ?? 0}</div>
-        <div class="desc">Đã xử lý (Resolved)</div>
+        <div class="desc">${isEn ? 'Resolved' : 'Đã xử lý (Resolved)'}</div>
       </div>
     </div>
 
     <!-- Interactive Filter Toolbar -->
     <div class="controls">
       <div class="controls-left">
-        <input type="text" id="searchInput" class="search-input" placeholder="Tìm kiếm theo ID, tên, GUID, tầng, ghi chú..." oninput="applyFilters()">
+        <input type="text" id="searchInput" class="search-input" placeholder="${isEn ? 'Search by ID, name, GUID, storey, comments...' : 'Tìm kiếm theo ID, tên, GUID, tầng, ghi chú...'}" oninput="applyFilters()">
         <select id="statusFilter" class="filter-select" onchange="applyFilters()">
-          <option value="ALL">Mọi trạng thái (${records.length})</option>
+          <option value="ALL">${isEn ? `All Statuses (${records.length})` : `Mọi trạng thái (${records.length})`}</option>
           <option value="New">New</option>
           <option value="Active">Active</option>
           <option value="Reviewed">Reviewed</option>
@@ -668,14 +708,14 @@ export function exportClashHTML(test: ClashTestItem): string {
           <option value="Resolved">Resolved</option>
         </select>
         <select id="typeFilter" class="filter-select" onchange="applyFilters()">
-          <option value="ALL">Mọi loại va chạm</option>
+          <option value="ALL">${isEn ? 'All Clash Types' : 'Mọi loại va chạm'}</option>
           <option value="Hard">Hard</option>
           <option value="Clearance">Clearance</option>
           <option value="Duplicates">Duplicates</option>
         </select>
       </div>
       <div id="resultsCount" class="text-xs font-semibold text-secondary">
-        Hiển thị ${records.length} / ${records.length} va chạm
+        ${isEn ? `Showing ${records.length} / ${records.length} clashes` : `Hiển thị ${records.length} / ${records.length} va chạm`}
       </div>
     </div>
 
@@ -684,21 +724,21 @@ export function exportClashHTML(test: ClashTestItem): string {
       <table id="clashTable">
         <thead>
           <tr>
-            <th onclick="sortTable(0)">STT ↕</th>
+            <th onclick="sortTable(0)">${isEn ? 'No. ↕' : 'STT ↕'}</th>
             <th onclick="sortTable(1)">Clash ID ↕</th>
-            <th onclick="sortTable(2)">Trạng thái ↕</th>
-            <th onclick="sortTable(3)">Loại ↕</th>
-            <th onclick="sortTable(4)">Khoảng cách (m) ↕</th>
+            <th onclick="sortTable(2)">${isEn ? 'Status ↕' : 'Trạng thái ↕'}</th>
+            <th onclick="sortTable(3)">${isEn ? 'Type ↕' : 'Loại ↕'}</th>
+            <th onclick="sortTable(4)">${isEn ? 'Distance (m) ↕' : 'Khoảng cách (m) ↕'}</th>
             <th onclick="sortTable(5)">GlobalId A ↕</th>
-            <th onclick="sortTable(6)">Tên A ↕</th>
+            <th onclick="sortTable(6)">${isEn ? 'Name A ↕' : 'Tên A ↕'}</th>
             <th onclick="sortTable(7)">IFC Class A ↕</th>
             <th onclick="sortTable(8)">GlobalId B ↕</th>
-            <th onclick="sortTable(9)">Tên B ↕</th>
+            <th onclick="sortTable(9)">${isEn ? 'Name B ↕' : 'Tên B ↕'}</th>
             <th onclick="sortTable(10)">IFC Class B ↕</th>
-            <th onclick="sortTable(11)">Tầng ↕</th>
-            <th onclick="sortTable(12)">Điểm clash ↕</th>
-            <th onclick="sortTable(13)">Ghi chú ↕</th>
-            <th onclick="sortTable(14)">Phụ trách ↕</th>
+            <th onclick="sortTable(11)">${isEn ? 'Storey ↕' : 'Tầng ↕'}</th>
+            <th onclick="sortTable(12)">${isEn ? 'Clash Point ↕' : 'Điểm clash ↕'}</th>
+            <th onclick="sortTable(13)">${isEn ? 'Comments ↕' : 'Ghi chú ↕'}</th>
+            <th onclick="sortTable(14)">${isEn ? 'Assigned To ↕' : 'Phụ trách ↕'}</th>
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -709,7 +749,7 @@ export function exportClashHTML(test: ClashTestItem): string {
 
     <!-- Footer -->
     <div class="footer">
-      Báo cáo được khởi tạo tự động bởi JNN BIM Viewer • ${runDateStr}
+      ${isEn ? `Automatically generated by JNN BIM Viewer • ${runDateStr}` : `Báo cáo được khởi tạo tự động bởi JNN BIM Viewer • ${runDateStr}`}
     </div>
   </div>
 
@@ -743,7 +783,7 @@ export function exportClashHTML(test: ClashTestItem): string {
 
       const countEl = document.getElementById('resultsCount');
       if (countEl) {
-        countEl.innerText = 'Hiển thị ' + visibleCount + ' / ${records.length} va chạm';
+        countEl.innerText = '${isEn ? 'Showing ' : 'Hiển thị '}' + visibleCount + ' / ${records.length}' + '${isEn ? ' clashes' : ' va chạm'}';
       }
     }
 

@@ -6,16 +6,22 @@ import { categoryStyle } from '../viewer/categoryStyle';
 import { aggregateQuantities, formatNumber, formatValue } from '../lib/format';
 import { IconButton, SectionLabel } from './ui';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 export function Properties({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const { state } = useApp();
+  const { t } = useTranslation();
   const sel = state.selection;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {!hideHeader && (
         <div className="flex h-[41px] items-center border-b border-line px-3">
-          <h2 className="text-xs font-semibold tracking-wide">Properties</h2>
-          {sel.length > 1 && <span className="ml-2 rounded bg-surface-3 px-1.5 text-[11px] text-muted tabular">{sel.length} selected</span>}
+          <h2 className="text-xs font-semibold tracking-wide">{t('properties.title')}</h2>
+          {sel.length > 1 && (
+            <span className="ml-2 rounded bg-surface-3 px-1.5 text-[11px] text-muted tabular">
+              {t('properties.selectionCount', { count: sel.length })}
+            </span>
+          )}
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-auto scroll-thin" data-testid="properties-body">
@@ -29,6 +35,7 @@ export function Properties({ hideHeader = false }: { hideHeader?: boolean } = {}
 
 function ModelSummary() {
   const { state } = useApp();
+  const { t } = useTranslation();
   const m = state.model;
   const byCat = useMemo(() => {
     const c = new Map<string, number>();
@@ -40,7 +47,7 @@ function ModelSummary() {
     <div className="space-y-5 p-3">
       <div className="flex items-start gap-2 rounded-md border border-dashed border-line-strong p-3 text-xs text-muted">
         <MousePointerClick size={16} className="mt-0.5 shrink-0" />
-        <span>Click an element in the viewer or the model tree to inspect it. Ctrl/Shift-click adds to the selection.</span>
+        <span>{t('properties.noSelection')}</span>
       </div>
       <Block title="Model">
         <KV k="Name" v={m.name} />
@@ -102,6 +109,7 @@ function ElementActions({ ids }: { ids: string[] }) {
 
 function ElementProperties({ element: initialElement }: { element: JnnElement }) {
   const { viewer } = useApp();
+  const { t } = useTranslation();
   const [lazyData, setLazyData] = useState<{ element: JnnElement; propertySets: PropertySet[] } | null>(null);
 
   useEffect(() => {
@@ -149,7 +157,7 @@ function ElementProperties({ element: initialElement }: { element: JnnElement })
         </div>
       </div>
 
-      <Group title="Identity" defaultOpen>
+      <Group title={t('properties.attributes')} defaultOpen>
         <KV k="GlobalId" v={e.globalId ? <Copyable text={e.globalId} /> : '—'} />
         <KV k="Source ID" v={<Mono>{e.sourceElementId}</Mono>} />
         <KV k="Source format" v={<Badge>{e.sourceFormat}</Badge>} />
@@ -161,7 +169,7 @@ function ElementProperties({ element: initialElement }: { element: JnnElement })
       </Group>
 
       {e.quantities.length > 0 && (
-        <Group title="Quantities" defaultOpen>
+        <Group title={t('properties.quantities')} defaultOpen>
           {e.quantities.map((q) => (
             <KV
               key={q.name}
@@ -214,6 +222,7 @@ function ElementProperties({ element: initialElement }: { element: JnnElement })
 
 function MultiSummary({ ids }: { ids: string[] }) {
   const { state } = useApp();
+  const { t } = useTranslation();
   const els = ids.map((id) => state.byId.get(id)!).filter(Boolean);
   const byCat = useMemo(() => {
     const m = new Map<string, number>();
@@ -224,7 +233,7 @@ function MultiSummary({ ids }: { ids: string[] }) {
   return (
     <div className="pb-6" data-testid="multi-properties">
       <div className="flex items-center justify-between border-b border-line p-3">
-        <div className="text-sm font-semibold">{ids.length} elements</div>
+        <div className="text-sm font-semibold">{t('properties.selectionCount', { count: ids.length })}</div>
         <ElementActions ids={ids} />
       </div>
       <Group title="By category" defaultOpen>
@@ -241,7 +250,7 @@ function MultiSummary({ ids }: { ids: string[] }) {
           />
         ))}
       </Group>
-      <Group title="Quantity totals" defaultOpen>
+      <Group title={t('properties.aggregateTitle')} defaultOpen>
         {totals.map((t) => (
           <KV
             key={`${t.name}|${t.unit}`}

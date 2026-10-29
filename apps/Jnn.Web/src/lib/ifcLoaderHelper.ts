@@ -2,6 +2,15 @@ import type { Dispatch } from 'react';
 import type { Action } from '../state/store';
 import type { ViewerAdapter } from '../viewer/ViewerAdapter';
 import { JNN_SCHEMA_VERSION, type JnnModel } from '../domain/model';
+import { translate, type Locale } from '../i18n';
+
+function getCurrentLocale(): Locale {
+  try {
+    const saved = localStorage.getItem('jnn-locale');
+    if (saved === 'vi' || saved === 'en') return saved;
+  } catch {}
+  return 'vi';
+}
 
 export interface LoadIfcOptions {
   onProgress?: (percent: number, status?: string) => void;
@@ -14,8 +23,10 @@ export async function loadIfcFile(
   dispatch: Dispatch<Action>,
   options?: LoadIfcOptions,
 ): Promise<boolean> {
+  const loc = getCurrentLocale();
+
   if (!viewer) {
-    dispatch({ type: 'notify', tone: 'error', text: 'Viewer chưa sẵn sàng để nạp file.' });
+    dispatch({ type: 'notify', tone: 'error', text: translate('loader.notReady', undefined, loc) });
     return false;
   }
 
@@ -26,7 +37,7 @@ export async function loadIfcFile(
     if (typeof fileOrUrl === 'string') {
       const url = fileOrUrl;
       filename = url.split('/').pop()?.split('?')[0] || 'model.ifc';
-      dispatch({ type: 'notify', tone: 'info', text: `Đang tải file mẫu ${filename}...` });
+      dispatch({ type: 'notify', tone: 'info', text: translate('loader.downloadingSample', { filename }, loc) });
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
       const arrayBuffer = await res.arrayBuffer();
@@ -35,23 +46,29 @@ export async function loadIfcFile(
       const file = fileOrUrl;
       filename = file.name;
       if (!filename.toLowerCase().endsWith('.ifc')) {
-        dispatch({ type: 'notify', tone: 'error', text: `File "${filename}" không phải định dạng IFC.` });
+        dispatch({ type: 'notify', tone: 'error', text: translate('loader.notIfc', { filename }, loc) });
         return false;
       }
-      dispatch({ type: 'notify', tone: 'info', text: `Đang đọc file ${filename} (${(file.size / 1024).toFixed(1)} KB)...` });
+      dispatch({
+        type: 'notify',
+        tone: 'info',
+        text: translate('loader.readingFile', { filename, size: (file.size / 1024).toFixed(1) }, loc),
+      });
       const arrayBuffer = await file.arrayBuffer();
       buffer = new Uint8Array(arrayBuffer);
     }
 
     if (!viewer.loadIfc) {
-      dispatch({ type: 'notify', tone: 'error', text: 'Viewer hiện tại không hỗ trợ đọc file IFC.' });
+      dispatch({ type: 'notify', tone: 'error', text: translate('loader.notSupported', undefined, loc) });
       return false;
     }
 
     dispatch({
       type: 'notify',
       tone: 'info',
-      text: `${options?.append ? 'Đang thêm' : 'Đang nạp'} mô hình IFC: ${filename}...`,
+      text: options?.append
+        ? translate('loader.addingModel', { filename }, loc)
+        : translate('loader.loadingModel', { filename }, loc),
     });
 
     const result = await viewer.loadIfc(
@@ -83,26 +100,38 @@ export async function loadIfcFile(
       elements: [],
     };
 
-    const fromCacheNote = result.value.fromCache ? ' [từ cache IndexedDB]' : '';
+    const fromCacheNote = result.value.fromCache ? translate('loader.fromCache', undefined, loc) : '';
     if (options?.append) {
       dispatch({ type: 'appendModel', model: ifcModel });
       dispatch({
         type: 'notify',
         tone: 'info',
-        text: `Đã thêm mô hình "${filename}" với ${result.value.elementCount} cấu kiện${fromCacheNote}.`,
+        text: translate(
+          'loader.appendedSuccess',
+          { filename, count: result.value.elementCount, cache: fromCacheNote },
+          loc,
+        ),
       });
     } else {
       dispatch({ type: 'setModel', model: ifcModel });
       dispatch({
         type: 'notify',
         tone: 'info',
-        text: `Mở thành công "${filename}" với ${result.value.elementCount} cấu kiện${fromCacheNote}.`,
+        text: translate(
+          'loader.openedSuccess',
+          { filename, count: result.value.elementCount, cache: fromCacheNote },
+          loc,
+        ),
       });
     }
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    dispatch({ type: 'notify', tone: 'error', text: `Lỗi khi mở IFC: ${message}` });
+    dispatch({
+      type: 'notify',
+      tone: 'error',
+      text: loc === 'en' ? `Error opening IFC: ${message}` : `Lỗi khi mở IFC: ${message}`,
+    });
     return false;
   }
 }

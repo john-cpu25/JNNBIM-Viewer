@@ -77,34 +77,34 @@ export function TopBar({ layout }: { layout: Layout }) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          title="Mở file IFC mới (thay thế cảnh hiện tại)"
+          title={t('topbar.openIfc')}
           data-testid="open-ifc-btn"
           className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
         >
           <FolderOpen size={13} className="text-accent" />
-          <span className="hidden sm:inline">Mở IFC</span>
+          <span className="hidden sm:inline">{t('topbar.openIfc')}</span>
         </button>
         <button
           type="button"
           onClick={() => appendFileInputRef.current?.click()}
-          title="Thêm mô hình IFC vào cảnh hiện tại (Append federated)"
+          title={t('topbar.appendModel')}
           data-testid="append-ifc-btn"
           className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
         >
           <FolderPlus size={13} className="text-emerald-500" />
-          <span className="hidden sm:inline">Thêm model</span>
+          <span className="hidden sm:inline">{t('topbar.appendModel')}</span>
         </button>
 
         <IconButton
           icon={Settings}
-          label="Cài đặt & Quản lý Cache"
+          label={t('topbar.settings')}
           onClick={() => dispatch({ type: 'setSettingsOpen', open: true })}
           data-testid="settings-btn"
         />
         <button
           type="button"
           onClick={() => setLocale(locale === 'vi' ? 'en' : 'vi')}
-          title={locale === 'vi' ? 'Chuyển sang tiếng Anh (Switch to English)' : 'Chuyển sang tiếng Việt'}
+          title={locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'}
           aria-label={t('topbar.language')}
           data-testid="language-toggle"
           className="flex h-7 items-center justify-center rounded-md border border-line bg-surface-2 px-2 text-xs font-semibold text-ink transition-colors hover:border-accent hover:text-accent"
@@ -113,7 +113,7 @@ export function TopBar({ layout }: { layout: Layout }) {
         </button>
         <IconButton
           icon={state.theme === 'dark' ? Sun : Moon}
-          label={state.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          label={t('topbar.theme')}
           onClick={() => dispatch({ type: 'setTheme', theme: state.theme === 'dark' ? 'light' : 'dark' })}
           data-testid="theme-toggle"
         />

@@ -22,8 +22,10 @@ export function exportRuleReportHTML(
   rules: RuleDefinition[],
   totalChecked: number,
   modelName = 'Mô hình BIM',
+  locale: 'vi' | 'en' = 'vi',
 ): string {
-  const generatedAt = new Date().toLocaleString('vi-VN', {
+  const isEn = locale === 'en';
+  const generatedAt = new Date().toLocaleString(isEn ? 'en-US' : 'vi-VN', {
     dateStyle: 'full',
     timeStyle: 'medium',
   });
@@ -40,21 +42,23 @@ export function exportRuleReportHTML(
       const issues = result.byRule.get(r.id) || [];
       const isPass = issues.length === 0;
       const statusBadge = isPass
-        ? '<span class="badge badge-pass">✓ ĐẠT (PASS)</span>'
-        : `<span class="badge badge-fail">⚠ ${issues.length} VI PHẠM</span>`;
+        ? (isEn ? '<span class="badge badge-pass">✓ PASS</span>' : '<span class="badge badge-pass">✓ ĐẠT (PASS)</span>')
+        : (isEn ? `<span class="badge badge-fail">⚠ ${issues.length} VIOLATIONS</span>` : `<span class="badge badge-fail">⚠ ${issues.length} VI PHẠM</span>`);
 
       const sevBadge =
         r.severity === 'Error'
-          ? '<span class="badge badge-error">Lỗi (Error)</span>'
+          ? (isEn ? '<span class="badge badge-error">Error</span>' : '<span class="badge badge-error">Lỗi (Error)</span>')
           : r.severity === 'Warning'
-            ? '<span class="badge badge-warning">Cảnh báo (Warning)</span>'
-            : '<span class="badge badge-info">Thông tin (Info)</span>';
+            ? (isEn ? '<span class="badge badge-warning">Warning</span>' : '<span class="badge badge-warning">Cảnh báo (Warning)</span>')
+            : (isEn ? '<span class="badge badge-info">Info</span>' : '<span class="badge badge-info">Thông tin (Info)</span>');
+
+      const rName = isEn && r.nameEn ? r.nameEn : r.name;
 
       return `
         <tr>
           <td style="text-align: center; font-weight: 500;">${idx + 1}</td>
           <td><code>${escapeHtml(r.id)}</code></td>
-          <td style="font-weight: 600;">${escapeHtml(r.name)}</td>
+          <td style="font-weight: 600;">${escapeHtml(rName)}</td>
           <td>${sevBadge}</td>
           <td>${statusBadge}</td>
           <td style="text-align: right; font-weight: 600;">${issues.length}</td>
@@ -67,8 +71,9 @@ export function exportRuleReportHTML(
   const allIssues: Array<{ issue: RuleViolation; ruleName: string }> = [];
   for (const r of rules) {
     const list = result.byRule.get(r.id) || [];
+    const rName = isEn && r.nameEn ? r.nameEn : r.name;
     for (const item of list) {
-      allIssues.push({ issue: item, ruleName: r.name });
+      allIssues.push({ issue: item, ruleName: rName });
     }
   }
 
@@ -84,33 +89,35 @@ export function exportRuleReportHTML(
 
       const sevText =
         issue.severity === 'Error'
-          ? 'Lỗi'
+          ? (isEn ? 'Error' : 'Lỗi')
           : issue.severity === 'Warning'
-            ? 'Cảnh báo'
-            : 'Thông tin';
+            ? (isEn ? 'Warning' : 'Cảnh báo')
+            : (isEn ? 'Info' : 'Thông tin');
+
+      const msg = isEn && issue.messageEn ? issue.messageEn : issue.message;
 
       return `
         <tr data-severity="${escapeHtml(issue.severity)}" data-search="${escapeHtml(
-          `${issue.ruleId} ${ruleName} ${issue.elementName ?? ''} ${issue.elementId} ${issue.message}`,
+          `${issue.ruleId} ${ruleName} ${issue.elementName ?? ''} ${issue.elementId} ${msg}`,
         ).toLowerCase()}">
           <td style="text-align: center; font-weight: 500;">${idx + 1}</td>
           <td><code>${escapeHtml(issue.ruleId)}</code></td>
           <td style="font-weight: 500;">${escapeHtml(ruleName)}</td>
           <td><span class="badge ${sevClass}">${sevText}</span></td>
           <td style="font-family: monospace; font-size: 12px; color: #0284c7;">${escapeHtml(issue.elementId)}</td>
-          <td style="font-weight: 500;">${escapeHtml(issue.elementName || '(Không tên)')}</td>
-          <td style="color: #334155;">${escapeHtml(issue.message)}</td>
+          <td style="font-weight: 500;">${escapeHtml(issue.elementName || (isEn ? '(Unnamed)' : '(Không tên)'))}</td>
+          <td style="color: #334155;">${escapeHtml(msg)}</td>
         </tr>
       `;
     })
     .join('');
 
   return `<!DOCTYPE html>
-<html lang="vi">
+<html lang="${isEn ? 'en' : 'vi'}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Báo cáo Kiểm tra Quy tắc Mô hình BIM - ${escapeHtml(modelName)}</title>
+  <title>${isEn ? 'BIM Model Rule Check Report' : 'Báo cáo Kiểm tra Quy tắc Mô hình BIM'} - ${escapeHtml(modelName)}</title>
   <style>
     :root {
       --primary: #0284c7;
@@ -332,49 +339,49 @@ export function exportRuleReportHTML(
   <div class="container">
     <header>
       <div class="header-info">
-        <h1>Báo cáo Kiểm tra Chất lượng Mô hình BIM</h1>
-        <p><strong>Mô hình:</strong> ${escapeHtml(modelName)} | <strong>Ngày tạo:</strong> ${generatedAt} | <strong>Thời gian chạy:</strong> ${durationStr}</p>
+        <h1>${isEn ? 'BIM Model Quality Rule Report' : 'Báo cáo Kiểm tra Chất lượng Mô hình BIM'}</h1>
+        <p><strong>${isEn ? 'Model:' : 'Mô hình:'}</strong> ${escapeHtml(modelName)} | <strong>${isEn ? 'Date:' : 'Ngày tạo:'}</strong> ${generatedAt} | <strong>${isEn ? 'Duration:' : 'Thời gian chạy:'}</strong> ${durationStr}</p>
       </div>
       <div class="actions">
-        <button class="btn btn-primary" onclick="window.print()">In / Xuất PDF</button>
+        <button class="btn btn-primary" onclick="window.print()">${isEn ? 'Print / Export PDF' : 'In / Xuất PDF'}</button>
       </div>
     </header>
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Tổng cấu kiện đã duyệt</div>
+        <div class="stat-label">${isEn ? 'Total Checked Elements' : 'Tổng cấu kiện đã duyệt'}</div>
         <div class="stat-value">${totalChecked.toLocaleString()}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Tổng số vi phạm</div>
+        <div class="stat-label">${isEn ? 'Total Violations' : 'Tổng số vi phạm'}</div>
         <div class="stat-value ${totalViolations === 0 ? 'success' : 'error'}">${totalViolations}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Lỗi nghiêm trọng (Error)</div>
+        <div class="stat-label">${isEn ? 'Errors' : 'Lỗi nghiêm trọng (Error)'}</div>
         <div class="stat-value error">${errorCount}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Cảnh báo (Warning)</div>
+        <div class="stat-label">${isEn ? 'Warnings' : 'Cảnh báo (Warning)'}</div>
         <div class="stat-value warning">${warningCount}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Thông tin (Info)</div>
+        <div class="stat-label">${isEn ? 'Info' : 'Thông tin (Info)'}</div>
         <div class="stat-value info">${infoCount}</div>
       </div>
     </div>
 
     <div class="section">
-      <h2 class="section-title">1. Tổng hợp theo Quy tắc Kiểm tra</h2>
+      <h2 class="section-title">${isEn ? '1. Summary by Rule' : '1. Tổng hợp theo Quy tắc Kiểm tra'}</h2>
       <div style="overflow-x: auto;">
         <table>
           <thead>
             <tr>
-              <th style="width: 45px; text-align: center;">STT</th>
-              <th style="width: 120px;">Mã Quy tắc</th>
-              <th>Tên Quy tắc</th>
-              <th style="width: 130px;">Mức độ</th>
-              <th style="width: 140px;">Kết quả</th>
-              <th style="width: 100px; text-align: right;">Số vi phạm</th>
+              <th style="width: 45px; text-align: center;">${isEn ? '#' : 'STT'}</th>
+              <th style="width: 120px;">${isEn ? 'Rule ID' : 'Mã Quy tắc'}</th>
+              <th>${isEn ? 'Rule Name' : 'Tên Quy tắc'}</th>
+              <th style="width: 130px;">${isEn ? 'Severity' : 'Mức độ'}</th>
+              <th style="width: 140px;">${isEn ? 'Result' : 'Kết quả'}</th>
+              <th style="width: 100px; text-align: right;">${isEn ? 'Violations' : 'Số vi phạm'}</th>
             </tr>
           </thead>
           <tbody>
@@ -385,14 +392,14 @@ export function exportRuleReportHTML(
     </div>
 
     <div class="section">
-      <h2 class="section-title">2. Danh sách Chi tiết Vi phạm (${allIssues.length})</h2>
+      <h2 class="section-title">${isEn ? `2. Detailed Issues List (${allIssues.length})` : `2. Danh sách Chi tiết Vi phạm (${allIssues.length})`}</h2>
       <div class="controls-bar">
-        <input type="text" id="searchInput" class="search-input" placeholder="Tìm theo tên phần tử, ID, mã quy tắc hoặc mô tả..." oninput="applyFilters()">
+        <input type="text" id="searchInput" class="search-input" placeholder="${isEn ? 'Search element name, ID, rule code or message...' : 'Tìm theo tên phần tử, ID, mã quy tắc hoặc mô tả...'}" oninput="applyFilters()">
         <select id="severityFilter" class="filter-select" onchange="applyFilters()">
-          <option value="ALL">Tất cả mức độ</option>
-          <option value="Error">Chỉ Lỗi (Error)</option>
-          <option value="Warning">Chỉ Cảnh báo (Warning)</option>
-          <option value="Info">Chỉ Thông tin (Info)</option>
+          <option value="ALL">${isEn ? 'All Severities' : 'Tất cả mức độ'}</option>
+          <option value="Error">${isEn ? 'Errors Only' : 'Chỉ Lỗi (Error)'}</option>
+          <option value="Warning">${isEn ? 'Warnings Only' : 'Chỉ Cảnh báo (Warning)'}</option>
+          <option value="Info">${isEn ? 'Info Only' : 'Chỉ Thông tin (Info)'}</option>
         </select>
       </div>
 
@@ -400,17 +407,17 @@ export function exportRuleReportHTML(
         <table id="issuesTable">
           <thead>
             <tr>
-              <th style="width: 45px; text-align: center;">STT</th>
-              <th style="width: 110px;">Mã QT</th>
-              <th style="width: 180px;">Tên Quy tắc</th>
-              <th style="width: 100px;">Mức độ</th>
-              <th style="width: 160px;">Element ID</th>
-              <th style="width: 200px;">Tên phần tử</th>
-              <th>Mô tả chi tiết vi phạm</th>
+              <th style="width: 45px; text-align: center;">${isEn ? '#' : 'STT'}</th>
+              <th style="width: 110px;">${isEn ? 'Rule ID' : 'Mã QT'}</th>
+              <th style="width: 180px;">${isEn ? 'Rule Name' : 'Tên Quy tắc'}</th>
+              <th style="width: 100px;">${isEn ? 'Severity' : 'Mức độ'}</th>
+              <th style="width: 160px;">${isEn ? 'Element ID' : 'Element ID'}</th>
+              <th style="width: 200px;">${isEn ? 'Element Name' : 'Tên phần tử'}</th>
+              <th>${isEn ? 'Violation Details' : 'Mô tả chi tiết vi phạm'}</th>
             </tr>
           </thead>
           <tbody>
-            ${issueRows.length > 0 ? issueRows : '<tr><td colspan="7" style="text-align: center; padding: 24px; color: #10b981; font-weight: 600;">✓ Tuyệt vời! Không phát hiện vi phạm nào trong mô hình.</td></tr>'}
+            ${issueRows.length > 0 ? issueRows : `<tr><td colspan="7" style="text-align: center; padding: 24px; color: #10b981; font-weight: 600;">${isEn ? '✓ Clean model! No rule violations detected.' : '✓ Tuyệt vời! Không phát hiện vi phạm nào trong mô hình.'}</td></tr>`}
           </tbody>
         </table>
       </div>

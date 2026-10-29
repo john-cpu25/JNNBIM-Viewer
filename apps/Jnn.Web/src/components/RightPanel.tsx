@@ -4,9 +4,11 @@ import { Properties } from './Properties';
 import { ClashPanel } from './ClashPanel';
 import { RulePanel } from './RulePanel';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 export function RightPanel() {
   const { state, dispatch } = useApp();
+  const { t } = useTranslation();
   const activeTab = state.rightTab;
 
   return (
@@ -25,7 +27,7 @@ export function RightPanel() {
                 : 'text-muted hover:text-ink',
             )}
           >
-            <span>Properties</span>
+            <span>{t('tab.properties')}</span>
             {state.selection.length > 1 && (
               <span className="rounded bg-surface-3 px-1.5 text-[10.5px] text-muted tabular">
                 {state.selection.length}
@@ -44,7 +46,7 @@ export function RightPanel() {
             )}
           >
             <Zap size={13} className={activeTab === 'clash' ? 'text-accent' : 'text-muted'} />
-            <span>Clash</span>
+            <span>{t('tab.clash')}</span>
           </button>
           <button
             type="button"
@@ -58,6 +60,7 @@ export function RightPanel() {
             )}
           >
             <ClipboardCheck size={13} className={activeTab === 'rules' ? 'text-accent' : 'text-muted'} />
+            <span>{t('tab.rules')}</span>
             <span>Rules</span>
           </button>
         </div>

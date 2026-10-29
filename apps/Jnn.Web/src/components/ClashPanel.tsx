@@ -36,6 +36,7 @@ import type { JnnElement } from '../domain/model';
 import { elementBounds, isEmpty } from '../domain/bounds';
 import { ClashResultsTable } from './ClashResultsTable';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 function normalizeCategory(cat: string): string {
   let s = (cat || '').toLowerCase().trim();
@@ -88,6 +89,7 @@ const PRESET_TEMPLATES: Array<{
 
 export function ClashPanel() {
   const { state, viewer } = useApp();
+  const { t } = useTranslation();
   const [clashState, dispatch] = useReducer(clashReducer, initialClashState);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<'config' | 'results'>('config');
@@ -168,9 +170,9 @@ export function ClashPanel() {
       return;
     }
     if (isNaN(activeTest.tolerance) || activeTest.tolerance < 0) {
-      setValidationError('Dung sai (tolerance) không được là số âm hoặc rỗng');
+      setValidationError(t('clash.errorToleranceNegative'));
     } else if (activeTest.type === 'Clearance' && activeTest.tolerance <= 0) {
-      setValidationError('Kiểm tra Clearance yêu cầu dung sai lớn hơn 0');
+      setValidationError(t('clash.errorClearanceZero'));
     } else {
       setValidationError(null);
     }
@@ -235,7 +237,7 @@ export function ClashPanel() {
           dispatch({ type: 'loadTests', tests: imported });
         }
       } catch (err) {
-        alert('File JSON cấu hình không hợp lệ: ' + (err as Error).message);
+        alert(t('clash.jsonInvalidError', { error: (err as Error).message }));
       }
     };
     reader.readAsText(file);
@@ -264,7 +266,7 @@ export function ClashPanel() {
       });
 
       if (importedResults.length === 0) {
-        alert('File BCF không chứa va chạm (topic) nào.');
+        alert(t('clash.bcfNoTopics'));
         return;
       }
 
@@ -297,13 +299,13 @@ export function ClashPanel() {
         setSubTab('results');
       }
 
-      let msg = `Đã nhập thành công ${importedRecords.length} va chạm từ file BCF!`;
+      let msg = t('clash.bcfImportSuccess', { count: importedRecords.length });
       if (warnings.length > 0) {
-        msg += `\nLưu ý: Có ${warnings.length} cấu kiện không tìm thấy trong mô hình hiện tại.`;
+        msg += '\n' + t('clash.bcfMissingElementsWarning', { count: warnings.length });
       }
       alert(msg);
     } catch (err) {
-      alert('Lỗi nhập BCF: ' + (err as Error).message);
+      alert(t('clash.bcfImportError', { error: (err as Error).message }));
     } finally {
       e.target.value = '';
     }
@@ -415,9 +417,9 @@ export function ClashPanel() {
         });
         setSubTab('results');
       } else if (summary.status === 'cancelled') {
-        dispatch({ type: 'setTestError', id: activeTest.id, error: 'Đã hủy kiểm tra' });
+        dispatch({ type: 'setTestError', id: activeTest.id, error: t('clash.testCancelled') });
       } else {
-        dispatch({ type: 'setTestError', id: activeTest.id, error: 'Kiểm tra thất bại' });
+        dispatch({ type: 'setTestError', id: activeTest.id, error: t('clash.testFailed') });
       }
     } catch (err) {
       dispatch({ type: 'setTestError', id: activeTest.id, error: (err as Error).message });
@@ -433,7 +435,7 @@ export function ClashPanel() {
       workerClientRef.current?.cancel();
       workerClientRef.current?.terminate();
       workerClientRef.current = null;
-      dispatch({ type: 'setTestError', id: activeTest.id, error: 'Đã hủy kiểm tra' });
+      dispatch({ type: 'setTestError', id: activeTest.id, error: t('clash.testCancelled') });
     }
   };
 
@@ -452,17 +454,17 @@ export function ClashPanel() {
           <button
             type="button"
             onClick={onAddTest}
-            title="Thêm bài kiểm tra va chạm mới"
+            title={t('clash.addTest')}
             data-testid="add-test-btn"
             className="flex items-center gap-1 rounded border border-line bg-surface-2 px-2 py-1 text-[11px] font-medium text-ink hover:border-accent hover:text-accent transition-colors"
           >
             <Plus size={12} />
-            <span>Thêm</span>
+            <span>{t('clash.addTest')}</span>
           </button>
           <button
             type="button"
             onClick={onExportJson}
-            title="Xuất danh sách test ra JSON"
+            title={t('clash.exportJson')}
             data-testid="export-tests-btn"
             className="rounded p-1 text-muted hover:bg-surface-2 hover:text-ink transition-colors"
           >
@@ -471,7 +473,7 @@ export function ClashPanel() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            title="Nhập danh sách test từ JSON"
+            title={t('clash.importJson')}
             data-testid="import-tests-btn"
             className="rounded p-1 text-muted hover:bg-surface-2 hover:text-ink transition-colors"
           >
@@ -488,7 +490,7 @@ export function ClashPanel() {
           <button
             type="button"
             onClick={() => bcfInputRef.current?.click()}
-            title="Nhập va chạm từ file BCF (.bcf)"
+            title={t('clash.importBcf')}
             data-testid="import-bcf-btn"
             className="rounded p-1 text-muted hover:bg-surface-2 hover:text-ink transition-colors"
           >
@@ -509,16 +511,16 @@ export function ClashPanel() {
         {/* Test List */}
         <div className="border-b border-line p-2">
           <div className="mb-1 text-[11px] font-semibold text-muted uppercase tracking-wider px-1">
-            Danh sách bài kiểm tra
+            {t('clash.testList')}
           </div>
           <div className="space-y-1" data-testid="test-list">
-            {clashState.tests.map((t) => {
-              const isActive = t.id === activeTest?.id;
+            {clashState.tests.map((tItem) => {
+              const isActive = tItem.id === activeTest?.id;
               return (
                 <div
-                  key={t.id}
-                  onClick={() => dispatch({ type: 'setActiveTest', id: t.id })}
-                  data-testid={`test-item-${t.id}`}
+                  key={tItem.id}
+                  onClick={() => dispatch({ type: 'setActiveTest', id: tItem.id })}
+                  data-testid={`test-item-${tItem.id}`}
                   className={cn(
                     'group flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs cursor-pointer transition-colors',
                     isActive
@@ -527,34 +529,36 @@ export function ClashPanel() {
                   )}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate">{t.name}</span>
+                    <span className="truncate">{tItem.name}</span>
                     {/* Status badge */}
-                    {t.status === 'idle' && (
+                    {tItem.status === 'idle' && (
                       <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-muted">
-                        Chưa chạy
+                        {t('clash.statusNew')}
                       </span>
                     )}
-                    {t.status === 'running' && (
+                    {tItem.status === 'running' && (
                       <span className="flex items-center gap-1 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent animate-pulse font-medium">
                         <Clock size={10} className="animate-spin" />
-                        {t.progressPercent ?? 0}%
+                        {tItem.progressPercent ?? 0}%
                       </span>
                     )}
-                    {t.status === 'completed' && (
+                    {tItem.status === 'completed' && (
                       <span
                         className={cn(
                           'rounded px-1.5 py-0.5 text-[10px] font-medium',
-                          (t.clashesCount ?? 0) > 0
+                          (tItem.clashesCount ?? 0) > 0
                             ? 'bg-amber-500/20 text-amber-500'
                             : 'bg-emerald-500/20 text-emerald-500',
                         )}
                       >
-                        {(t.clashesCount ?? 0) > 0 ? `${t.clashesCount} va chạm` : '0 va chạm'}
+                        {(tItem.clashesCount ?? 0) > 0
+                          ? t('clash.clashesCount', { count: tItem.clashesCount ?? 0 })
+                          : t('clash.noClashes')}
                       </span>
                     )}
-                    {t.status === 'error' && (
+                    {tItem.status === 'error' && (
                       <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] text-red-500 font-medium">
-                        Lỗi
+                        {t('common.error')}
                       </span>
                     )}
                   </div>
@@ -562,9 +566,9 @@ export function ClashPanel() {
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
-                      onClick={(e) => onDuplicateTest(t.id, e)}
-                      title="Nhân bản bài test này"
-                      data-testid={`duplicate-test-${t.id}`}
+                      onClick={(e) => onDuplicateTest(tItem.id, e)}
+                      title={t('clash.duplicateTest')}
+                      data-testid={`duplicate-test-${tItem.id}`}
                       className="p-1 rounded text-muted hover:text-ink hover:bg-surface-3"
                     >
                       <Copy size={11} />
@@ -572,9 +576,9 @@ export function ClashPanel() {
                     {clashState.tests.length > 1 && (
                       <button
                         type="button"
-                        onClick={(e) => onDeleteTest(t.id, e)}
-                        title="Xóa bài test này"
-                        data-testid={`delete-test-${t.id}`}
+                        onClick={(e) => onDeleteTest(tItem.id, e)}
+                        title={t('clash.deleteTest')}
+                        data-testid={`delete-test-${tItem.id}`}
                         className="p-1 rounded text-muted hover:text-red-500 hover:bg-surface-3"
                       >
                         <Trash2 size={11} />
@@ -601,7 +605,7 @@ export function ClashPanel() {
                   : 'border-transparent text-muted hover:text-ink',
               )}
             >
-              Cấu hình
+              {t('clash.tabConfig')}
             </button>
             <button
               type="button"
@@ -614,7 +618,7 @@ export function ClashPanel() {
                   : 'border-transparent text-muted hover:text-ink',
               )}
             >
-              <span>Kết quả</span>
+              <span>{t('clash.tabResults')}</span>
               {(activeTest.records?.length ?? activeTest.clashesCount ?? 0) > 0 && (
                 <span className="rounded bg-accent/20 px-1.5 py-0.2 text-[10px] font-semibold text-accent tabular">
                   {activeTest.records?.length ?? activeTest.clashesCount}
@@ -644,7 +648,7 @@ export function ClashPanel() {
             {/* Presets row */}
             <div className="space-y-1.5">
               <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-                Mẫu nhanh (Presets)
+                {t('clash.presets')}
               </span>
               <div className="flex flex-wrap gap-1">
                 {PRESET_TEMPLATES.map((p, idx) => (
@@ -663,7 +667,7 @@ export function ClashPanel() {
 
             {/* Test name input */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-ink">Tên bài kiểm tra</label>
+              <label className="text-xs font-medium text-ink">{t('clash.testName')}</label>
               <input
                 type="text"
                 value={activeTest.name}
@@ -682,7 +686,7 @@ export function ClashPanel() {
             {/* Clash type & tolerance */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-ink">Loại va chạm</label>
+                <label className="text-xs font-medium text-ink">{t('clash.clashType')}</label>
                 <select
                   value={activeTest.type}
                   data-testid="clash-type-select"
@@ -695,14 +699,14 @@ export function ClashPanel() {
                   }
                   className="w-full rounded border border-line bg-surface-2 px-2 py-1 text-xs text-ink outline-none focus:border-accent"
                 >
-                  <option value="Hard">Hard (Va chạm vật lý)</option>
-                  <option value="Clearance">Clearance (Khoảng cách an toàn)</option>
-                  <option value="Duplicates">Duplicates (Trùng lặp)</option>
+                  <option value="Hard">{t('clash.hardDesc')}</option>
+                  <option value="Clearance">{t('clash.clearanceDesc')}</option>
+                  <option value="Duplicates">{t('clash.duplicatesDesc')}</option>
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-ink">Dung sai (m)</label>
+                <label className="text-xs font-medium text-ink">{t('clash.tolerance')}</label>
                 <input
                   type="number"
                   step="0.001"
@@ -737,15 +741,15 @@ export function ClashPanel() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-ink flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-red-500" />
-                  Tập kiểm tra A
+                  {t('clash.selectionA')}
                 </span>
                 <span className="rounded bg-surface-3 px-1.5 py-0.2 text-[10px] text-muted font-medium tabular">
-                  {elementCounts.countA} phần tử
+                  {t('clash.elementsCount', { count: elementCounts.countA })}
                 </span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] text-muted">Mô hình:</label>
+                <label className="text-[11px] text-muted">{t('clash.modelLabel')}</label>
                 <select
                   value={activeTest.selectionA.modelId || ''}
                   data-testid="selection-a-model"
@@ -760,7 +764,7 @@ export function ClashPanel() {
                   }
                   className="w-full rounded border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-accent"
                 >
-                  <option value="">Tất cả mô hình ({state.models.length})</option>
+                  <option value="">{t('clash.allModelsCount', { count: state.models.length })}</option>
                   {state.models.map((m) => (
                     <option key={m.modelId} value={m.modelId}>
                       {m.fileName || m.name || m.modelId}
@@ -770,10 +774,10 @@ export function ClashPanel() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] text-muted">IFC Class (cách nhau dấu phẩy):</label>
+                <label className="text-[11px] text-muted">{t('clash.ifcClassLabel')}</label>
                 <input
                   type="text"
-                  placeholder="ví dụ: IfcWall, IfcBeam hoặc để trống = Tất cả"
+                  placeholder={t('clash.ifcClassPlaceholderA')}
                   value={activeTest.selectionA.ifcClass || ''}
                   data-testid="selection-a-class"
                   onChange={(e) =>
@@ -795,15 +799,15 @@ export function ClashPanel() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-ink flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  Tập kiểm tra B
+                  {t('clash.selectionB')}
                 </span>
                 <span className="rounded bg-surface-3 px-1.5 py-0.2 text-[10px] text-muted font-medium tabular">
-                  {elementCounts.countB} phần tử
+                  {t('clash.elementsCount', { count: elementCounts.countB })}
                 </span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] text-muted">Mô hình:</label>
+                <label className="text-[11px] text-muted">{t('clash.modelLabel')}</label>
                 <select
                   value={activeTest.selectionB.modelId || ''}
                   data-testid="selection-b-model"
@@ -818,7 +822,7 @@ export function ClashPanel() {
                   }
                   className="w-full rounded border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-accent"
                 >
-                  <option value="">Tất cả mô hình ({state.models.length})</option>
+                  <option value="">{t('clash.allModelsCount', { count: state.models.length })}</option>
                   {state.models.map((m) => (
                     <option key={m.modelId} value={m.modelId}>
                       {m.fileName || m.name || m.modelId}
@@ -828,10 +832,10 @@ export function ClashPanel() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] text-muted">IFC Class (cách nhau dấu phẩy):</label>
+                <label className="text-[11px] text-muted">{t('clash.ifcClassLabel')}</label>
                 <input
                   type="text"
-                  placeholder="ví dụ: IfcBeam, IfcColumn hoặc để trống = Tất cả"
+                  placeholder={t('clash.ifcClassPlaceholderB')}
                   value={activeTest.selectionB.ifcClass || ''}
                   data-testid="selection-b-class"
                   onChange={(e) =>
@@ -863,7 +867,7 @@ export function ClashPanel() {
                 }
                 className="rounded border-line text-accent"
               />
-              <span>Bỏ qua các cặp phần tử trong cùng một mô hình</span>
+              <span>{t('clash.ignoreSameModel')}</span>
             </label>
 
             {/* Run / Cancel buttons & progress */}
@@ -873,7 +877,7 @@ export function ClashPanel() {
                   <div className="flex items-center justify-between text-xs text-ink">
                     <span className="flex items-center gap-1.5 font-medium">
                       <Clock size={13} className="animate-spin text-accent" />
-                      Đang kiểm tra... ({activeTest.progressPercent ?? 0}%)
+                      {t('clash.testingProgress', { percent: activeTest.progressPercent ?? 0 })}
                     </span>
                     <button
                       type="button"
@@ -882,7 +886,7 @@ export function ClashPanel() {
                       className="flex items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-500 hover:bg-red-500/30"
                     >
                       <Square size={11} />
-                      <span>Hủy</span>
+                      <span>{t('common.cancel')}</span>
                     </button>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded bg-surface-3">
@@ -906,7 +910,7 @@ export function ClashPanel() {
                   )}
                 >
                   <Play size={13} className="fill-current" />
-                  <span>Chạy kiểm tra va chạm</span>
+                  <span>{t('clash.run')}</span>
                 </button>
               )}
 
@@ -923,10 +927,10 @@ export function ClashPanel() {
                 >
                   <div className="flex items-center gap-1.5 font-medium">
                     <CheckCircle2 size={14} />
-                    <span>Hoàn tất kiểm tra</span>
+                    <span>{t('clash.testCompleted')}</span>
                   </div>
                   <span className="font-semibold">
-                    {activeTest.clashesCount ?? 0} va chạm được phát hiện
+                    {t('clash.clashesDetected', { count: activeTest.clashesCount ?? 0 })}
                   </span>
                 </div>
               )}
@@ -937,7 +941,7 @@ export function ClashPanel() {
                   data-testid="test-error-banner"
                 >
                   <AlertCircle size={14} className="shrink-0" />
-                  <span>Lỗi: {activeTest.error}</span>
+                  <span>{t('common.error')}: {activeTest.error}</span>
                 </div>
               )}
             </div>

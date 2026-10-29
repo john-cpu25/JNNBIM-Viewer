@@ -11,6 +11,7 @@ import { ViewCube } from './ViewCube';
 import { SectionPanel } from './SectionPanel';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 declare global {
   interface Window {
@@ -28,6 +29,7 @@ export const isSampleMode = () => {
 
 export function Viewport({ model, onViewer, compact }: { model: JnnModel; onViewer: (v: ViewerAdapter | null) => void; compact: boolean }) {
   const { state, dispatch, viewer } = useApp();
+  const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stateRef = useRef(state);
@@ -155,18 +157,18 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
         dispatch({
           type: 'notify',
           tone: 'info',
-          text: 'Giữ Shift + kéo chuột trái (hoặc chuột giữa) để xoay mô hình',
+          text: t('viewport.navHint'),
         });
       }
     });
-  }, [viewer, dispatch]);
+  }, [viewer, dispatch, t]);
   useEffect(() => viewer?.setTheme(state.theme), [viewer, state.theme]);
   useEffect(() => {
     if (state.sectionPickMode) {
       dispatch({
         type: 'notify',
         tone: 'info',
-        text: 'Click vào bề mặt cấu kiện để đặt mặt phẳng cắt (Esc để hủy)',
+        text: t('viewport.pickFaceHint'),
       });
       if (hostRef.current) {
         hostRef.current.style.cursor = 'crosshair';
@@ -174,7 +176,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     } else if (hostRef.current) {
       hostRef.current.style.cursor = '';
     }
-  }, [state.sectionPickMode, dispatch]);
+  }, [state.sectionPickMode, dispatch, t]);
 
   // Drag and drop handler
   const handleDragOver = (e: React.DragEvent) => {
@@ -233,7 +235,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       {status === 'loading' && (
         <div className="absolute inset-0 grid place-items-center text-muted">
           <div className="flex items-center gap-2 text-sm">
-            <Loader2 className="animate-spin" size={16} /> Loading model…
+            <Loader2 className="animate-spin" size={16} /> {t('common.loading')}
           </div>
         </div>
       )}
@@ -242,8 +244,8 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
         <div className="absolute inset-0 z-40 grid place-items-center bg-surface/70 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3 rounded-xl border border-line bg-surface p-6 shadow-float">
             <Loader2 className="animate-spin text-accent" size={28} />
-            <div className="text-sm font-medium text-ink">{convertStatus || 'Đang chuyển đổi mô hình sang Fragments...'}</div>
-            <div className="text-xs text-muted">Web Worker & WebAssembly (offline)</div>
+            <div className="text-sm font-medium text-ink">{convertStatus || t('viewport.converting')}</div>
+            <div className="text-xs text-muted">{t('viewport.offlineNotice')}</div>
           </div>
         </div>
       )}
@@ -251,9 +253,9 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       {status === 'error' && (
         <div role="alert" className="absolute inset-0 grid place-items-center p-6 text-center">
           <div className="max-w-sm rounded-lg border border-line bg-surface p-4 shadow-float">
-            <div className="mb-1 font-semibold">The 3D viewer could not start</div>
+            <div className="mb-1 font-semibold">{t('viewport.webglError')}</div>
             <div className="text-muted">{error}</div>
-            <div className="mt-2 text-xs text-faint">WebGL 2 is required. Check GPU drivers or browser hardware acceleration.</div>
+            <div className="mt-2 text-xs text-faint">{t('viewport.webglDriverHelp')}</div>
           </div>
         </div>
       )}
@@ -272,35 +274,35 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                 data-testid="nav-help-popover"
               >
                 <div className="mb-2 flex items-center justify-between border-b border-line pb-1.5 font-semibold text-ink">
-                  <span>Thao tác chuột</span>
+                  <span>{t('nav.helpTitle')}</span>
                   <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent font-medium">
-                    {state.navigation.preset === 'revit' ? 'Kiểu Revit' : 'Cổ điển'}
+                    {state.navigation.preset === 'revit' ? t('nav.presetRevit') : t('nav.presetClassic')}
                   </span>
                 </div>
                 <div className="space-y-1.5 text-muted text-[11px]">
                   <div className="flex justify-between">
-                    <span className="text-ink font-medium">Xoay 3D:</span>
+                    <span className="text-ink font-medium">{t('nav.orbit')}</span>
                     <span>
                       {state.navigation.preset === 'revit'
-                        ? 'Shift + Kéo trái / giữa'
-                        : 'Kéo chuột trái'}
+                        ? t('nav.revitOrbitDesc')
+                        : t('nav.classicOrbitDesc')}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-ink font-medium">Di chuyển (Pan):</span>
-                    <span>Kéo chuột giữa / phải</span>
+                    <span className="text-ink font-medium">{t('nav.pan')}</span>
+                    <span>{t('nav.panDesc')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-ink font-medium">Thu phóng (Zoom):</span>
-                    <span>Lăn bánh xe chuột</span>
+                    <span className="text-ink font-medium">{t('nav.zoom')}</span>
+                    <span>{t('nav.zoomDesc')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-ink font-medium">Vừa khung nhìn:</span>
-                    <span>Click đúp chuột giữa (hoặc phím F)</span>
+                    <span className="text-ink font-medium">{t('nav.fitAll')}</span>
+                    <span>{t('nav.fitAllDesc')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-ink font-medium">Chọn thêm:</span>
-                    <span>Shift / Ctrl + Click trái</span>
+                    <span className="text-ink font-medium">{t('nav.fitSelection')}</span>
+                    <span>{t('nav.fitSelectionDesc')}</span>
                   </div>
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-line flex justify-end">
@@ -312,7 +314,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                     }}
                     className="rounded bg-surface-2 px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-line"
                   >
-                    Đổi sơ đồ chuột
+                    {t('nav.changeSettings')}
                   </button>
                 </div>
               </div>
@@ -320,7 +322,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
             <button
               type="button"
               onClick={() => setShowNavHelp(!showNavHelp)}
-              aria-label="Trợ giúp điều hướng chuột"
+              aria-label={t('nav.helpTitle')}
               className={cn(
                 'grid h-7 w-7 place-items-center rounded-full border border-line bg-surface/90 text-muted shadow-sm transition hover:bg-surface hover:text-ink',
                 showNavHelp && 'bg-accent text-accent-contrast border-transparent',
@@ -341,9 +343,9 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                 <div className="mb-4 grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent">
                   <UploadCloud size={28} />
                 </div>
-                <h2 className="mb-1.5 text-base font-semibold text-ink">Mở file IFC để bắt đầu</h2>
+                <h2 className="mb-1.5 text-base font-semibold text-ink">{t('viewport.title')}</h2>
                 <p className="mb-6 text-xs leading-relaxed text-muted">
-                  Kéo và thả file IFC vào khung nhìn 3D này, hoặc chọn từ máy tính để phân tích và xem mô hình.
+                  {t('viewport.subtitle')}
                 </p>
 
                 <div className="flex w-full flex-col gap-2.5">
@@ -353,7 +355,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-accent-contrast shadow-sm transition hover:bg-accent-hover active:scale-[0.99]"
                   >
                     <FolderOpen size={15} />
-                    <span>Chọn file IFC từ máy</span>
+                    <span>{t('viewport.openButton')}</span>
                   </button>
                 </div>
               </div>

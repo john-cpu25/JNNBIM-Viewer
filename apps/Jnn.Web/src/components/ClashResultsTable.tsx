@@ -19,6 +19,7 @@ import type { ClashTestItem } from '../clash/clashState';
 import { exportClashCSV, exportClashExcel, exportClashHTML, downloadFile } from '../clash/clashExport';
 import { exportClashTestToBCF } from '../clash/bcfExport';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 interface ClashResultsTableProps {
   testId: string;
@@ -38,6 +39,7 @@ export function ClashResultsTable({
   onUpdateRecord,
 }: ClashResultsTableProps) {
   const { viewer, dispatch } = useApp();
+  const { t, locale } = useTranslation();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -186,7 +188,7 @@ export function ClashResultsTable({
 
   const handleExportCSV = () => {
     setIsExportOpen(false);
-    const csv = exportClashCSV(currentTest);
+    const csv = exportClashCSV(currentTest, locale);
     const filename = `${(currentTest.name || 'clash_report').replace(/\s+/g, '_')}_${Date.now()}.csv`;
     downloadFile(csv, filename, 'text/csv;charset=utf-8');
   };
@@ -194,7 +196,7 @@ export function ClashResultsTable({
   const handleExportExcel = async () => {
     setIsExportOpen(false);
     try {
-      const blob = await exportClashExcel(currentTest);
+      const blob = await exportClashExcel(currentTest, locale);
       const filename = `${(currentTest.name || 'clash_report').replace(/\s+/g, '_')}_${Date.now()}.xlsx`;
       downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     } catch (err) {
@@ -206,7 +208,7 @@ export function ClashResultsTable({
   const handleExportHTML = () => {
     setIsExportOpen(false);
     try {
-      const html = exportClashHTML(currentTest);
+      const html = exportClashHTML(currentTest, locale);
       const filename = `${(currentTest.name || 'clash_report').replace(/\s+/g, '_')}_${Date.now()}.html`;
       downloadFile(html, filename, 'text/html;charset=utf-8');
     } catch (err) {
@@ -283,10 +285,10 @@ export function ClashResultsTable({
               onClick={() => setIsExportOpen(!isExportOpen)}
               data-testid="export-dropdown-btn"
               className="flex items-center gap-1 rounded border border-line bg-surface px-2 py-1 text-xs text-ink hover:bg-surface-2 hover:border-accent transition-colors"
-              title="Xuất báo cáo clash"
+              title={t('clash.export')}
             >
               <Download size={12} className="text-muted" />
-              <span>Xuất</span>
+              <span>{t('clash.export')}</span>
               <ChevronDown size={11} className={cn('text-muted transition-transform', isExportOpen && 'rotate-180')} />
             </button>
             {isExportOpen && (
@@ -301,7 +303,7 @@ export function ClashResultsTable({
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
                 >
                   <FileText size={13} className="text-muted" />
-                  <span>Xuất CSV (.csv)</span>
+                  <span>{t('clash.exportCsv')}</span>
                 </button>
                 <button
                   type="button"
@@ -310,7 +312,7 @@ export function ClashResultsTable({
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
                 >
                   <FileSpreadsheet size={13} className="text-muted" />
-                  <span>Xuất Excel (.xlsx)</span>
+                  <span>{t('clash.exportExcel')}</span>
                 </button>
                 <button
                   type="button"
@@ -319,7 +321,7 @@ export function ClashResultsTable({
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
                 >
                   <FileCode size={13} className="text-muted" />
-                  <span>Xuất HTML (.html)</span>
+                  <span>{t('clash.exportHtml')}</span>
                 </button>
                 <button
                   type="button"
@@ -328,7 +330,7 @@ export function ClashResultsTable({
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-ink hover:bg-accent/10 hover:text-accent transition-colors"
                 >
                   <FolderArchive size={13} className="text-muted" />
-                  <span>Xuất BCF (.bcf)</span>
+                  <span>{t('clash.exportBcf')}</span>
                 </button>
               </div>
             )}
@@ -347,7 +349,7 @@ export function ClashResultsTable({
             />
             <span className="flex items-center gap-1">
               <Box size={12} className="text-accent" />
-              Section box quanh va chạm
+              {t('clash.enableSectionBox')}
             </span>
           </label>
           <span className="text-[10px] text-faint">Phím: ↑↓ chuyển, 1–5 đổi trạng thái</span>
@@ -358,19 +360,19 @@ export function ClashResultsTable({
       <div className="min-h-0 flex-1 overflow-auto scroll-thin" data-testid="clash-results-table">
         {filteredRecords.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-xs text-muted">
-            Không tìm thấy va chạm nào phù hợp.
+            {t('clash.noResults')}
           </div>
         ) : (
           <table className="w-full border-collapse text-left text-xs">
             <thead className="sticky top-0 z-10 border-b border-line bg-surface-2 text-[11px] font-semibold text-muted">
               <tr>
-                <th className="py-1.5 px-2">#</th>
-                <th className="py-1.5 px-2">Trạng thái</th>
-                <th className="py-1.5 px-2">Loại</th>
+                <th className="py-1.5 px-2">{t('clash.colIndex')}</th>
+                <th className="py-1.5 px-2">{t('clash.colStatus')}</th>
+                <th className="py-1.5 px-2">{t('clash.colType')}</th>
                 <th className="py-1.5 px-2">Khoảng cách</th>
-                <th className="py-1.5 px-2">Phần tử A</th>
-                <th className="py-1.5 px-2">Phần tử B</th>
-                <th className="py-1.5 px-2">Tầng</th>
+                <th className="py-1.5 px-2">{t('clash.colElementA')}</th>
+                <th className="py-1.5 px-2">{t('clash.colElementB')}</th>
+                <th className="py-1.5 px-2">{t('clash.colStorey')}</th>
               </tr>
             </thead>
             <tbody>

@@ -17,9 +17,11 @@ import type { RuleCheckResult, RuleViolation, RuleSeverity, RuleDefinition } fro
 import { exportRuleReportHTML } from '../rules/ruleExport';
 import { downloadFile } from '../clash/clashExport';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 export function RulePanel() {
   const { state, dispatch, viewer } = useApp();
+  const { t, locale } = useTranslation();
 
   // Selected rule IDs (default all 5 enabled)
   const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(
@@ -93,9 +95,10 @@ export function RulePanel() {
     const modelName = state.model?.name || 'JNN BIM Model';
     const enabledRules = BUILTIN_RULES.filter((r) => selectedRuleIds.has(r.id));
     const totalChecked = state.byId.size;
-    const html = exportRuleReportHTML(result, enabledRules, totalChecked, modelName);
+    const html = exportRuleReportHTML(result, enabledRules, totalChecked, modelName, locale);
     const dateStr = new Date().toISOString().slice(0, 10);
-    downloadFile(html, `Bao_cao_kiem_tra_quy_tac_${dateStr}.html`, 'text/html;charset=utf-8');
+    const filename = locale === 'en' ? `Rule_Quality_Report_${dateStr}.html` : `Bao_cao_kiem_tra_quy_tac_${dateStr}.html`;
+    downloadFile(html, filename, 'text/html;charset=utf-8');
   };
 
   // Highlight & Zoom into issue element
@@ -158,7 +161,7 @@ export function RulePanel() {
       <div className="flex shrink-0 items-center justify-between border-b border-line px-3.5 py-2.5 bg-surface-1">
         <div className="flex items-center gap-2">
           <Layers size={16} className="text-accent" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-ink">Kiểm tra Quy tắc</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink">{t('rules.title')}</h2>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -175,7 +178,7 @@ export function RulePanel() {
             )}
           >
             <Play size={12} fill="currentColor" />
-            <span>{isRunning ? 'Đang chạy...' : 'Chạy kiểm tra'}</span>
+            <span>{isRunning ? t('rules.running') : t('rules.runAll')}</span>
           </button>
 
           <button
@@ -183,7 +186,7 @@ export function RulePanel() {
             data-testid="export-rules-html-btn"
             disabled={!result}
             onClick={handleExportHTML}
-            title="Xuất báo cáo HTML độc lập"
+            title={t('rules.exportHtml')}
             className={cn(
               'flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-medium transition-colors',
               result
@@ -192,7 +195,7 @@ export function RulePanel() {
             )}
           >
             <Download size={12} />
-            <span>Xuất HTML</span>
+            <span>{t('rules.exportHtml')}</span>
           </button>
         </div>
       </div>
@@ -252,7 +255,7 @@ export function RulePanel() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-ink">{rule.name}</span>
+                      <span className="font-semibold text-ink">{locale === 'en' ? rule.nameEn : rule.name}</span>
                       <span className="text-[10px] font-mono text-muted">({rule.id})</span>
                       <span
                         className={cn(
@@ -408,7 +411,7 @@ export function RulePanel() {
                         </div>
 
                         <p className="mt-1 text-[11px] text-muted leading-relaxed">
-                          {issue.message}
+                          {locale === 'en' ? (issue.messageEn || issue.message) : issue.message}
                         </p>
                       </div>
                     </div>

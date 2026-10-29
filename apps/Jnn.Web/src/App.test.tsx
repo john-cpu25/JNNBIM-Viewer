@@ -6,8 +6,13 @@ import App from './App';
 // properties remain fully functional — exactly the degradation we want.
 describe('App (jsdom)', () => {
   beforeEach(() => {
+    localStorage.setItem('jnn-locale', 'en');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   it('renders the shell with explorer and model summary', () => {

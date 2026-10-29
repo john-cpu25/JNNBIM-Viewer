@@ -7,6 +7,7 @@ import { IconButton, Segmented } from './ui';
 import { useEffect, useMemo, useState } from 'react';
 import { boxForStorey } from '../viewer/sectionMath';
 import { RangePair } from './RangePair';
+import { useTranslation } from '../i18n';
 
 const AXIS_INDEX = { x: 0, y: 1, z: 2 } as const;
 const AXIS_COLORS: Record<'x' | 'y' | 'z', string> = {
@@ -17,6 +18,7 @@ const AXIS_COLORS: Record<'x' | 'y' | 'z', string> = {
 
 export function SectionPanel({ compact = false }: { compact?: boolean }) {
   const { state, dispatch, viewer } = useApp();
+  const { t } = useTranslation();
   const s = state.section!;
 
   // Fallback priority: viewer.getModelBounds() -> selection bounds -> storeys -> +/-25m
@@ -47,17 +49,17 @@ export function SectionPanel({ compact = false }: { compact?: boolean }) {
       } rounded-lg border border-line bg-surface/95 p-3 shadow-float backdrop-blur space-y-3`}
     >
       <div className="flex items-center justify-between">
-        <div className="text-xs font-semibold">{s.kind === 'plane' ? 'Section plane' : 'Section box'}</div>
+        <div className="text-xs font-semibold">{s.kind === 'plane' ? t('section.planeTitle') : t('section.boxTitle')}</div>
         <div className="flex items-center gap-1">
           <IconButton
             icon={state.sectionFrameVisible ? Eye : EyeOff}
-            label={state.sectionFrameVisible ? 'Ẩn khung cắt' : 'Hiện khung cắt'}
+            label={state.sectionFrameVisible ? t('section.hideFrame') : t('section.showFrame')}
             active={state.sectionFrameVisible}
             size="sm"
             onClick={toggleFrame}
             data-testid="section-frame-toggle"
           />
-          <IconButton icon={X} label="Đóng mặt cắt" size="sm" onClick={close} />
+          <IconButton icon={X} label={t('section.close')} size="sm" onClick={close} />
         </div>
       </div>
 
@@ -72,6 +74,7 @@ export function SectionPanel({ compact = false }: { compact?: boolean }) {
 
 function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box' }>; bounds: Bounds }) {
   const { state, dispatch, viewer } = useApp();
+  const { t } = useTranslation();
   const [localMin, setLocalMin] = useState<Vec3>(spec.min);
   const [localMax, setLocalMax] = useState<Vec3>(spec.max);
   const [inputErrors, setInputErrors] = useState<Record<string, boolean>>({});
@@ -230,7 +233,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
           onClick={fitSelection}
           className="flex-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Vừa vùng chọn
+          {t('section.fitSelection')}
         </button>
         <button
           type="button"
@@ -238,7 +241,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
           onClick={fitModel}
           className="flex-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-hover"
         >
-          Vừa mô hình
+          {t('section.fitModel')}
         </button>
         <button
           type="button"
@@ -247,13 +250,13 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
           onClick={resetBox}
           className="rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Đặt lại
+          {t('section.reset')}
         </button>
       </div>
 
       {state.model.storeys.length > 0 && (
         <div className="space-y-1 pt-1 border-t border-line/60">
-          <div className="text-[11px] text-muted">Theo tầng:</div>
+          <div className="text-[11px] text-muted">{t('section.byStorey')}</div>
           <div className="flex flex-wrap gap-1">
             {state.model.storeys.map((st) => {
               const sorted = [...state.model.storeys].sort((a, b) => a.elevation - b.elevation);
@@ -294,6 +297,7 @@ function PlaneControls({
   bounds: Bounds;
 }) {
   const { state, dispatch } = useApp();
+  const { t } = useTranslation();
   const { axis, offset, flipped } = spec;
   const i = AXIS_INDEX[axis];
   const min = Math.floor(Math.min(b.min[i], offset - 1) * 10) / 10;
@@ -310,17 +314,17 @@ function PlaneControls({
           value={axis}
           onChange={(a) => dispatch({ type: 'setSection', section: { ...defaultPlane(a, b, state.model?.storeys), flipped } })}
           options={[
-            { value: 'x', label: 'X', title: 'Cắt dọc trục X' },
-            { value: 'y', label: 'Y', title: 'Cắt dọc trục Y' },
-            { value: 'z', label: 'Z · Mặt bằng', title: 'Mặt phẳng cắt ngang' },
+            { value: 'x', label: 'X', title: t('section.cutAlongX') },
+            { value: 'y', label: 'Y', title: t('section.cutAlongY') },
+            { value: 'z', label: t('section.planCutZ'), title: t('section.planCutZ') },
           ]}
         />
-        <IconButton icon={ArrowLeftRight} label="Lật hướng mặt cắt" active={flipped} onClick={() => set({ flipped: !flipped })} />
+        <IconButton icon={ArrowLeftRight} label={t('section.flipDirection')} active={flipped} onClick={() => set({ flipped: !flipped })} />
       </div>
 
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs text-muted">
-          <span>Độ dời (Offset)</span>
+          <span>{t('section.offset')}</span>
           <div className="flex items-center gap-1 font-mono text-[11px]">
             <input
               type="number"
@@ -362,13 +366,13 @@ function PlaneControls({
           title="Click vào bề mặt cấu kiện để đặt mặt phẳng cắt"
         >
           <Crosshair className="h-3.5 w-3.5" />
-          <span>🎯 Cắt theo mặt</span>
+          <span>{t('section.pickFace')}</span>
         </button>
       </div>
 
       {axis === 'z' && state.model.storeys.length > 0 && (
         <div className="space-y-1 pt-1 border-t border-line/60">
-          <div className="text-[11px] text-muted">Theo tầng:</div>
+          <div className="text-[11px] text-muted">{t('section.byStorey')}</div>
           <div className="flex flex-wrap gap-1">
             {state.model.storeys.map((st) => (
               <button

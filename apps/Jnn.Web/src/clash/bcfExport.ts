@@ -181,6 +181,7 @@ export interface ImportedClashResult {
 export interface ImportBcfOptions {
   guidToElementMap?: Map<string, Pick<JnnElement, 'id'> & Partial<JnnElement>>;
   testId?: string;
+  locale?: 'vi' | 'en';
 }
 
 /**
@@ -240,11 +241,20 @@ export async function importBCFToClashResults(
     const elA = aGuid && options?.guidToElementMap ? options.guidToElementMap.get(aGuid) : undefined;
     const elB = bGuid && options?.guidToElementMap ? options.guidToElementMap.get(bGuid) : undefined;
 
+    const isEn = options?.locale === 'en';
     if (aGuid && !elA && options?.guidToElementMap) {
-      warnings.push(`Cấu kiện A (GUID: ${aGuid}) không tìm thấy trong mô hình hiện tại`);
+      warnings.push(
+        isEn
+          ? `Element A (GUID: ${aGuid}) not found in the current model`
+          : `Cấu kiện A (GUID: ${aGuid}) không tìm thấy trong mô hình hiện tại`,
+      );
     }
     if (bGuid && !elB && options?.guidToElementMap) {
-      warnings.push(`Cấu kiện B (GUID: ${bGuid}) không tìm thấy trong mô hình hiện tại`);
+      warnings.push(
+        isEn
+          ? `Element B (GUID: ${bGuid}) not found in the current model`
+          : `Cấu kiện B (GUID: ${bGuid}) không tìm thấy trong mô hình hiện tại`,
+      );
     }
 
     // Status mapping

@@ -129,6 +129,39 @@ export interface Translations {
   'clash.tolerance': string;
   'clash.typeHard': string;
   'clash.typeClearance': string;
+  'clash.typeDuplicates': string;
+  'clash.exportJson': string;
+  'clash.importJson': string;
+  'clash.testList': string;
+  'clash.tabConfig': string;
+  'clash.tabResults': string;
+  'clash.presets': string;
+  'clash.testName': string;
+  'clash.clashType': string;
+  'clash.hardDesc': string;
+  'clash.clearanceDesc': string;
+  'clash.duplicatesDesc': string;
+  'clash.ignoreSameModel': string;
+  'clash.testCompleted': string;
+  'clash.clashesDetected': string;
+  'clash.clashesCount': string;
+  'clash.noClashes': string;
+  'clash.elementsCount': string;
+  'clash.errorToleranceNegative': string;
+  'clash.errorClearanceZero': string;
+  'clash.testingProgress': string;
+  'clash.bcfNoTopics': string;
+  'clash.bcfImportSuccess': string;
+  'clash.bcfMissingElementsWarning': string;
+  'clash.bcfImportError': string;
+  'clash.jsonInvalidError': string;
+  'clash.testCancelled': string;
+  'clash.testFailed': string;
+  'clash.modelLabel': string;
+  'clash.allModelsCount': string;
+  'clash.ifcClassLabel': string;
+  'clash.ifcClassPlaceholderA': string;
+  'clash.ifcClassPlaceholderB': string;
   'clash.selectionA': string;
   'clash.selectionB': string;
   'clash.allModels': string;
@@ -185,6 +218,18 @@ export interface Translations {
   'settings.cacheDesc': string;
   'settings.clearCache': string;
   'settings.cacheCleared': string;
+
+  // Loader
+  'loader.notReady': string;
+  'loader.downloadingSample': string;
+  'loader.notIfc': string;
+  'loader.readingFile': string;
+  'loader.notSupported': string;
+  'loader.loadingModel': string;
+  'loader.addingModel': string;
+  'loader.appendedSuccess': string;
+  'loader.openedSuccess': string;
+  'loader.fromCache': string;
 }
 
 export type TranslationKey = keyof Translations;

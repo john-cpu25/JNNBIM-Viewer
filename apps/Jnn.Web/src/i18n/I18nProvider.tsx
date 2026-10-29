@@ -50,6 +50,20 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
 export function useI18n(): I18nContextValue {
   const ctx = useContext(I18nContext);
-  if (!ctx) throw new Error('useI18n must be used within an <I18nProvider>');
+  if (!ctx) {
+    return {
+      locale: 'vi',
+      setLocale: () => {},
+      t: (key: TranslationKey, params?: Record<string, string | number>) => {
+        let str = vi[key] || (key as string);
+        if (params) {
+          for (const [pKey, pVal] of Object.entries(params)) {
+            str = str.replace(new RegExp(`\\{${pKey}\\}`, 'g'), String(pVal));
+          }
+        }
+        return str;
+      },
+    };
+  }
   return ctx;
 }

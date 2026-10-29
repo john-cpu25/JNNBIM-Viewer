@@ -23,11 +23,13 @@ import { categoryStyle } from '../viewer/categoryStyle';
 import { IconButton, Segmented } from './ui';
 import { cn } from '../lib/cn';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
+import { useTranslation } from '../i18n';
 
 const KIND_ICON = { project: Folder, site: MapPin, building: Building2, storey: Layers, type: Shapes } as const;
 
 export function Explorer() {
   const { state, dispatch, viewer } = useApp();
+  const { t } = useTranslation();
   const tree = state.trees[state.treeMode === 'models' ? 'spatial' : state.treeMode];
   const query = useDeferredValue(state.search);
   const filtered = useMemo(() => filterTree(tree, query, state.byId), [tree, query, state.byId]);
@@ -54,7 +56,7 @@ export function Explorer() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <h2 className="text-xs font-semibold tracking-wide">Model</h2>
+        <h2 className="text-xs font-semibold tracking-wide">{t('explorer.title')}</h2>
         {state.treeMode !== 'models' && (
           <div className="flex items-center gap-0.5">
             <IconButton icon={ChevronsUpDown} label="Expand all" size="sm" onClick={() => dispatch({ type: 'expandAll' })} />
@@ -68,11 +70,11 @@ export function Explorer() {
           value={state.treeMode}
           onChange={(mode) => dispatch({ type: 'setTreeMode', mode })}
           options={[
-            { value: 'spatial', label: 'Spatial', title: 'Site › Building › Storey › Category' },
-            { value: 'category', label: 'Categories', title: 'Category › Type' },
+            { value: 'spatial', label: t('explorer.spatial'), title: 'Site › Building › Storey › Category' },
+            { value: 'category', label: t('explorer.category'), title: 'Category › Type' },
             {
               value: 'models',
-              label: `Models${state.models.length > 1 ? ` (${state.models.length})` : ''}`,
+              label: `${t('explorer.models')}${state.models.length > 1 ? ` (${state.models.length})` : ''}`,
               title: 'Danh sách các mô hình federated',
             },
           ]}
@@ -85,7 +87,7 @@ export function Explorer() {
                 type="search"
                 value={state.search}
                 onChange={(e) => dispatch({ type: 'setSearch', query: e.target.value })}
-                placeholder="Search name, type, GlobalId, mark…"
+                placeholder={t('explorer.searchPlaceholder')}
                 aria-label="Search elements"
                 className="h-8 w-full rounded-md border border-line bg-surface-2 pr-7 pl-7 text-xs placeholder:text-faint focus:border-accent focus:outline-none"
               />
@@ -124,7 +126,7 @@ export function Explorer() {
         <ModelsPanel />
       ) : (
         <div ref={listRef} role="tree" aria-label="Model tree" aria-multiselectable className="min-h-0 flex-1 overflow-auto py-1 scroll-thin">
-          {rows.length === 0 && <div className="px-3 py-6 text-center text-xs text-faint">No elements match “{query}”.</div>}
+          {rows.length === 0 && <div className="px-3 py-6 text-center text-xs text-faint">{t('explorer.noElements')}{query ? ` “${query}”` : ''}</div>}
           {rows.map((r) => (
             <Row
               key={r.node.id}

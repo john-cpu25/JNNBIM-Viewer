@@ -3,6 +3,7 @@ import { Compass, Database, HardDrive, RotateCcw, Trash2, X } from 'lucide-react
 import { clearIfcCache, getIfcCacheStats, isIndexedDBAvailable, type CacheStats } from '../lib/ifcCache';
 import { formatBytes } from '../lib/format';
 import { useApp } from '../state/AppContext';
+import { useTranslation } from '../i18n';
 
 export interface SettingsModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ export interface SettingsModalProps {
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { state, dispatch } = useApp();
+  const { t, locale, setLocale } = useTranslation();
   const [stats, setStats] = useState<CacheStats>({ count: 0, totalBytes: 0, items: [] });
   const [loading, setLoading] = useState(false);
   const isIdbAvailable = isIndexedDBAvailable();
@@ -63,13 +65,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           <div className="flex items-center gap-2">
             <HardDrive size={18} className="text-accent" />
             <h2 id="settings-title" className="text-sm font-semibold text-ink">
-              Cài đặt & Quản lý Cache
+              {t('settings.title')}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng cài đặt"
+            aria-label={t('common.close')}
             data-testid="close-settings-btn"
             className="rounded p-1 text-muted transition hover:bg-surface-2 hover:text-ink"
           >
@@ -79,12 +81,28 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
         {/* Content */}
         <div className="space-y-4 py-4 text-xs max-h-[70vh] overflow-y-auto pr-1">
+          {/* Language Selection */}
+          <div className="rounded-lg border border-line bg-surface-2 p-3">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-ink">{t('settings.language')}</span>
+              <select
+                value={locale}
+                onChange={(e) => setLocale(e.target.value as 'vi' | 'en')}
+                className="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
+                data-testid="settings-language-select"
+              >
+                <option value="vi">Tiếng Việt (VI)</option>
+                <option value="en">English (EN)</option>
+              </select>
+            </div>
+          </div>
+
           {/* Navigation Section */}
           <div className="rounded-lg border border-line bg-surface-2 p-3" data-testid="nav-settings-section">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-medium text-ink">
                 <Compass size={15} className="text-accent" />
-                <span>Điều hướng chuột (Navigation)</span>
+                <span>{t('settings.navTitle')}</span>
               </div>
               <button
                 type="button"
@@ -92,14 +110,14 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 className="flex items-center gap-1 text-[11px] text-muted transition hover:text-ink"
               >
                 <RotateCcw size={12} />
-                <span>Khôi phục mặc định</span>
+                <span>{t('common.reset')}</span>
               </button>
             </div>
 
             <div className="mt-3 space-y-3">
               {/* Preset selection */}
               <div>
-                <label className="mb-1 block text-[11px] font-medium text-muted">Sơ đồ chuột</label>
+                <label className="mb-1 block text-[11px] font-medium text-muted">{t('settings.navPreset')}</label>
                 <select
                   value={state.navigation.preset}
                   onChange={(e) =>
@@ -119,7 +137,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               {/* Rotate Speed Slider */}
               <div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="font-medium text-muted">Tốc độ xoay</span>
+                  <span className="font-medium text-muted">{t('settings.rotateSpeed')}</span>
                   <span className="font-mono text-ink">{Math.round(state.navigation.rotateSpeed * 100)}%</span>
                 </div>
                 <input
@@ -142,7 +160,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               {/* Zoom Speed Slider */}
               <div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="font-medium text-muted">Tốc độ zoom</span>
+                  <span className="font-medium text-muted">{t('settings.zoomSpeed')}</span>
                   <span className="font-mono text-ink">{state.navigation.zoomSpeed.toFixed(1)}x</span>
                 </div>
                 <input
@@ -190,7 +208,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                     }
                     className="rounded border-line accent-accent"
                   />
-                  <span>Hiện điểm tụ (chấm cam) khi xoay</span>
+                  <span>{t('settings.showPivot')}</span>
                 </label>
               </div>
             </div>
@@ -200,11 +218,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           <div className="rounded-lg border border-line bg-surface-2 p-3">
             <div className="flex items-center gap-2 font-medium text-ink">
               <Database size={15} className="text-accent" />
-              <span>Bộ nhớ đệm mô hình (IndexedDB)</span>
+              <span>{t('settings.cacheTitle')}</span>
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
-              Lưu trữ nhị phân hình học fragments (.frag) và dữ liệu cây cấu kiện để mở tức thì ở các lần xem tiếp theo
-              (nhanh hơn 3x–20x) mà không cần phân tích lại từ file IFC gốc.
+              {t('settings.cacheDesc')}
             </p>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-center">
@@ -244,7 +261,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 className="flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-40"
               >
                 <Trash2 size={13} />
-                <span>Xóa cache IFC</span>
+                <span>{t('settings.clearCache')}</span>
               </button>
             </div>
           </div>
@@ -269,7 +286,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             onClick={onClose}
             className="rounded-md bg-surface-2 px-3 py-1.5 text-xs font-medium text-ink hover:bg-accent hover:text-white"
           >
-            Đóng
+            {t('common.close')}
           </button>
         </div>
       </div>

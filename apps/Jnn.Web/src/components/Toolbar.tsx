@@ -16,9 +16,11 @@ import { useApp } from '../state/AppContext';
 import { runCommand, type CommandId } from '../lib/commands';
 import { Divider, IconButton } from './ui';
 import { cn } from '../lib/cn';
+import { useTranslation } from '../i18n';
 
 export function Toolbar({ compact }: { compact: boolean }) {
   const { state, dispatch, viewer } = useApp();
+  const { t } = useTranslation();
   const run = (id: CommandId) => runCommand(id, state, dispatch, viewer);
   const hasSel = state.selection.length > 0;
   const anyHidden = state.visibility.hidden.size > 0 || state.visibility.isolated.size > 0;
@@ -33,26 +35,26 @@ export function Toolbar({ compact }: { compact: boolean }) {
         compact ? 'bottom-2' : 'bottom-4',
       )}
     >
-      <IconButton icon={Maximize} label="Fit all" shortcut="F" onClick={() => run('fitAll')} />
-      <IconButton icon={Crosshair} label="Fit selection" shortcut="F" disabled={!hasSel} onClick={() => run('fit')} />
+      <IconButton icon={Maximize} label={t('toolbar.fitAll')} shortcut="F" onClick={() => run('fitAll')} />
+      <IconButton icon={Crosshair} label={t('toolbar.fitSelection')} shortcut="F" disabled={!hasSel} onClick={() => run('fit')} />
       <Divider vertical />
       <IconButton
         icon={EyeOff}
-        label={viewer?.capabilities.has('visibility') ? 'Hide selected' : 'Hide selected (Có ở T07)'}
+        label={t('toolbar.hide')}
         shortcut="H"
         disabled={!hasSel || !viewer?.capabilities.has('visibility')}
         onClick={() => run('hide')}
       />
       <IconButton
         icon={Focus}
-        label={viewer?.capabilities.has('isolate') ? 'Isolate selected' : 'Isolate selected (Có ở T07)'}
+        label={t('toolbar.isolate')}
         shortcut="I"
         disabled={!hasSel || !viewer?.capabilities.has('isolate')}
         onClick={() => run('isolate')}
       />
       <IconButton
         icon={Eye}
-        label={viewer?.capabilities.has('visibility') ? 'Show all' : 'Show all (Có ở T07)'}
+        label={t('toolbar.showAll')}
         shortcut="A"
         disabled={!anyHidden || !viewer?.capabilities.has('visibility')}
         onClick={() => run('showAll')}
@@ -60,7 +62,7 @@ export function Toolbar({ compact }: { compact: boolean }) {
       <Divider vertical />
       <IconButton
         icon={Scissors}
-        label={viewer?.capabilities.has('sectionPlane') ? 'Section plane' : 'Section plane (Có ở T08)'}
+        label={t('toolbar.sectionPlane')}
         shortcut="S"
         disabled={!viewer?.capabilities.has('sectionPlane')}
         active={state.section?.kind === 'plane'}
@@ -68,13 +70,7 @@ export function Toolbar({ compact }: { compact: boolean }) {
       />
       <IconButton
         icon={SquareDashed}
-        label={
-          viewer?.capabilities.has('sectionBox')
-            ? hasSel
-              ? 'Section box around selection'
-              : 'Section box'
-            : 'Section box (Có ở T08)'
-        }
+        label={t('toolbar.sectionBox')}
         shortcut="B"
         disabled={!viewer?.capabilities.has('sectionBox')}
         active={state.section?.kind === 'box'}
@@ -82,7 +78,7 @@ export function Toolbar({ compact }: { compact: boolean }) {
       />
       <IconButton
         icon={Ghost}
-        label={viewer?.capabilities.has('xray') ? 'X-ray' : 'X-ray (Có ở T07)'}
+        label={t('toolbar.xray')}
         shortcut="X"
         disabled={!viewer?.capabilities.has('xray')}
         active={state.xray}
@@ -90,14 +86,14 @@ export function Toolbar({ compact }: { compact: boolean }) {
       />
       <IconButton
         icon={state.projection === 'perspective' ? View : Box}
-        label={state.projection === 'perspective' ? 'Switch to orthographic' : 'Switch to perspective'}
+        label={t('toolbar.projection')}
         shortcut="P"
         active={state.projection === 'orthographic'}
         onClick={() => run('projection')}
       />
       <IconButton
         icon={Grid3x3}
-        label={state.gridVisible ? 'Hide grid' : 'Show grid'}
+        label={t('toolbar.grid')}
         shortcut="G"
         active={state.gridVisible}
         onClick={() => run('toggleGrid')}
@@ -105,7 +101,7 @@ export function Toolbar({ compact }: { compact: boolean }) {
       {hasSel && (
         <>
           <Divider vertical />
-          <IconButton icon={XCircle} label="Clear selection" shortcut="Esc" onClick={() => run('clear')} />
+          <IconButton icon={XCircle} label={t('toolbar.clearSelection')} shortcut="Esc" onClick={() => run('clear')} />
         </>
       )}
     </div>
