@@ -43,7 +43,16 @@ import {
   type NavigationSettings,
   DEFAULT_NAV,
 } from './ViewerAdapter';
-import { shouldUseHoverCache, worldUnitsPerPixel, type HoverCache } from './navigation';
+import {
+  baseMapping,
+  DRAG_THRESHOLD_PX,
+  intentOnDown,
+  orbitMapping,
+  shouldUseHoverCache,
+  worldUnitsPerPixel,
+  type GestureIntent,
+  type HoverCache,
+} from './navigation';
 
 // Global patch for WebIFC 0.0.78 StreamMeshes signature mismatch
 let webIfcPatched = false;
@@ -124,6 +133,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private lastHoverAt = 0;
   private hovered: string | null = null;
   private boundCanvas: HTMLCanvasElement | null = null;
+  private boundContainer: HTMLElement | null = null;
+  private gesture: { intent: GestureIntent; x: number; y: number; button: number; pointerId: number } | null = null;
+  private hintShown = false;
+  private lastMiddleDown = 0;
 
   private clipPlanes: THREE.Plane[] = [];
   private gridHelper: THREE.GridHelper | null = null;
@@ -158,6 +171,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.world?.camera.controls.setFocalOffset(0, 0, 0, false);
   }
 
+  private applyMouseMapping(orbiting: boolean) {
+    if (!this.world) return;
+    const c = this.world.camera.controls;
+    const base = baseMapping(this.nav.preset, this.currentProjection === 'orthographic');
+    const m = orbiting ? orbitMapping(base) : base;
+    c.mouseButtons.left = m.left;
+    c.mouseButtons.middle = m.middle;
+    c.mouseButtons.right = m.right;
+    c.mouseButtons.wheel = m.wheel;
+  }
+
   private configureControls() {
     if (!this.world) return;
     const c = this.world.camera.controls;
@@ -170,7 +194,76 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     c.dollyToCursor = true;
     c.infinityDolly = true;
     c.maxDistance = Infinity;
+    this.applyMouseMapping(false);
   }
+
+  private onAuxClick = (e: MouseEvent) => {
+    if (e.button === 1) e.preventDefault();
+  };
+
+  private onNavPointerDown = (ev: PointerEvent) => {
+    if (ev.pointerType === 'touch') {
+      this.anchorPivotAt(ev.clientX, ev.clientY);
+      return;
+    }
+
+    // Double-click middle mouse -> Fit All
+    if (ev.button === 1) {
+      const now = performance.now();
+      if (now - this.lastMiddleDown < 300) {
+        this.fitToView();
+        this.lastMiddleDown = 0;
+        ev.preventDefault();
+        return;
+      }
+      this.lastMiddleDown = now;
+      ev.preventDefault();
+    }
+
+    const intent = intentOnDown(this.nav.preset, ev.button, ev.shiftKey);
+    this.gesture = { intent, x: ev.clientX, y: ev.clientY, button: ev.button, pointerId: ev.pointerId };
+    this.applyMouseMapping(false);
+    if (intent === 'orbit-pending') {
+      this.anchorPivotAt(ev.clientX, ev.clientY);
+    }
+  };
+
+  private onNavPointerMove = (ev: PointerEvent) => {
+    const g = this.gesture;
+    if (!g || ev.pointerId !== g.pointerId) return;
+    const moved = Math.hypot(ev.clientX - g.x, ev.clientY - g.y);
+    if (g.intent === 'orbit-pending' && moved > DRAG_THRESHOLD_PX) {
+      g.intent = 'orbit';
+      this.applyMouseMapping(true);
+    }
+    if (g.intent === 'none' && g.button === 0 && moved > 10 && this.nav.preset === 'revit' && !this.hintShown) {
+      this.hintShown = true;
+      this.events.emit('navHint', { kind: 'holdShiftToOrbit' });
+    }
+  };
+
+  private onNavPointerUp = (ev: PointerEvent) => {
+    if (this.gesture?.pointerId !== ev.pointerId) return;
+    this.gesture = null;
+    this.applyMouseMapping(false);
+  };
+
+  private onWindowKeyDown = (ev: KeyboardEvent) => {
+    if (ev.key === 'Shift' && this.gesture && (this.gesture.button === 0 || this.gesture.button === 1)) {
+      this.applyMouseMapping(true);
+      this.anchorPivotAt(this.lastHover?.x ?? 0, this.lastHover?.y ?? 0);
+    }
+  };
+
+  private onWindowKeyUp = (ev: KeyboardEvent) => {
+    if (ev.key === 'Shift' && this.gesture && (this.gesture.button === 0 || this.gesture.button === 1)) {
+      if (this.nav.preset === 'revit' && this.gesture.button === 0) {
+        this.applyMouseMapping(false);
+      } else if (this.gesture.button === 1) {
+        this.applyMouseMapping(false);
+      }
+    }
+  };
 
   private showPivot(point: THREE.Vector3) {
     if (!this.pivotMesh || !this.nav.showPivot) return;
@@ -331,6 +424,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerleave', this.onPointerLeave);
+
+    this.boundContainer = container;
+    container.addEventListener('pointerdown', this.onNavPointerDown, { capture: true });
+    container.addEventListener('pointermove', this.onNavPointerMove, { capture: true });
+    window.addEventListener('pointerup', this.onNavPointerUp, { capture: true });
+    window.addEventListener('keydown', this.onWindowKeyDown);
+    window.addEventListener('keyup', this.onWindowKeyUp);
+    container.addEventListener('auxclick', this.onAuxClick);
 
     // Camera change event listener
     world.camera.controls.addEventListener('update', () => {
@@ -496,6 +597,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.boundCanvas.removeEventListener('pointerleave', this.onPointerLeave);
       this.boundCanvas = null;
     }
+    if (this.boundContainer) {
+      this.boundContainer.removeEventListener('pointerdown', this.onNavPointerDown, { capture: true });
+      this.boundContainer.removeEventListener('pointermove', this.onNavPointerMove, { capture: true });
+      this.boundContainer.removeEventListener('auxclick', this.onAuxClick);
+      this.boundContainer = null;
+    }
+    window.removeEventListener('pointerup', this.onNavPointerUp, { capture: true });
+    window.removeEventListener('keydown', this.onWindowKeyDown);
+    window.removeEventListener('keyup', this.onWindowKeyUp);
     if (this.highlighter) {
       this.highlighter.dispose();
       this.highlighter = null;
@@ -1001,9 +1111,12 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.currentProjection = projection;
     const target = projection === 'orthographic' ? 'Orthographic' : 'Perspective';
     if (this.world.camera.projection.current !== target) {
-      this.world.camera.projection.set(target).catch((err) => {
-        console.warn('Failed to set projection:', err);
-      });
+      this.world.camera.projection
+        .set(target)
+        .then(() => this.applyMouseMapping(false))
+        .catch((err) => {
+          console.warn('Failed to set projection:', err);
+        });
     }
     return okVoid;
   }

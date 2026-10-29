@@ -4,11 +4,22 @@ import type { NavigationPreset } from './ViewerAdapter';
 
 const A = CameraControls.ACTION;
 
+export type MouseButtonAction =
+  | typeof A.ROTATE
+  | typeof A.TRUCK
+  | typeof A.SCREEN_PAN
+  | typeof A.OFFSET
+  | typeof A.DOLLY
+  | typeof A.ZOOM
+  | typeof A.NONE;
+
+export type MouseWheelAction = MouseButtonAction;
+
 export interface MouseMapping {
-  left: number;
-  middle: number;
-  right: number;
-  wheel: number;
+  left: MouseButtonAction;
+  middle: MouseButtonAction;
+  right: MouseButtonAction;
+  wheel: MouseWheelAction;
 }
 
 /** Sơ đồ nền (khi không trong gesture xoay). */

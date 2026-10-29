@@ -275,4 +275,35 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('applies mouse mapping for revit and classic presets', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const mouseButtons = { left: 0, middle: 0, right: 0, wheel: 0 };
+    (adapter as any).world = {
+      camera: {
+        controls: {
+          mouseButtons,
+        },
+      },
+    };
+
+    (adapter as any).applyMouseMapping(false);
+    expect(mouseButtons.left).toBe(0); // CameraControls.ACTION.NONE
+    expect(mouseButtons.middle).toBe(2); // TRUCK
+
+    (adapter as any).applyMouseMapping(true);
+    expect(mouseButtons.left).toBe(1); // ROTATE
+    expect(mouseButtons.middle).toBe(1); // ROTATE
+
+    adapter.setNavigationSettings({
+      preset: 'classic',
+      rotateSpeed: 0.4,
+      zoomSpeed: 1.0,
+      orbitAroundCursor: true,
+      showPivot: true,
+    });
+    (adapter as any).applyMouseMapping(false);
+    expect(mouseButtons.left).toBe(1); // ROTATE in classic preset
+    adapter.dispose();
+  });
 });
