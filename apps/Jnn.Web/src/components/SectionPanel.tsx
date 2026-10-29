@@ -231,7 +231,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
           data-testid="section-fit-selection"
           disabled={!state.selection.length}
           onClick={fitSelection}
-          className="flex-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {t('section.fitSelection')}
         </button>
@@ -239,7 +239,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
           type="button"
           data-testid="section-fit-model"
           onClick={fitModel}
-          className="flex-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-hover"
+          className="flex-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-2"
         >
           {t('section.fitModel')}
         </button>
@@ -248,7 +248,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
           data-testid="section-reset"
           disabled={!state.initialSectionBox}
           onClick={resetBox}
-          className="rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:border-line-strong hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {t('section.reset')}
         </button>
@@ -273,7 +273,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
                   onClick={() => selectStorey(sIdx)}
                   className={`rounded border px-1.5 py-0.5 text-[11px] ${
                     isCurrent
-                      ? 'border-primary bg-primary/10 text-primary font-semibold'
+                      ? 'border-accent bg-accent-soft text-accent font-semibold'
                       : 'border-line text-muted hover:border-line-strong hover:text-ink'
                   }`}
                   title={t('section.cutStorey', { name: st.name })}
@@ -360,8 +360,8 @@ function PlaneControls({
           onClick={() => dispatch({ type: 'setSectionPickMode', on: !state.sectionPickMode })}
           className={`flex-1 flex items-center justify-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition ${
             state.sectionPickMode
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-line bg-surface text-ink hover:border-line-strong hover:bg-surface-hover'
+              ? 'border-accent bg-accent-soft text-accent'
+              : 'border-line bg-surface text-ink hover:border-line-strong hover:bg-surface-2'
           }`}
           title={t('section.pickFaceTooltip')}
         >

@@ -50,7 +50,7 @@ export function RangePair({
       <div className="absolute inset-x-0 h-1.5 rounded-full bg-line" />
       {/* Active range highlight */}
       <div
-        className="absolute h-1.5 rounded-full bg-primary"
+        className="absolute h-1.5 rounded-full bg-accent"
         style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
       />
       {/* Range inputs stacked */}
@@ -66,11 +66,11 @@ export function RangePair({
         className="pointer-events-none absolute inset-0 w-full appearance-none bg-transparent m-0 cursor-pointer
           [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none
           [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full
-          [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary
+          [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-accent
           [&::-webkit-slider-thumb]:shadow-sm hover:[&::-webkit-slider-thumb]:scale-110 active:[&::-webkit-slider-thumb]:scale-125
           [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5
           [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-surface [&::-moz-range-thumb]:border-2
-          [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:shadow-sm"
+          [&::-moz-range-thumb]:border-accent [&::-moz-range-thumb]:shadow-sm"
       />
       <input
         type="range"
@@ -84,11 +84,11 @@ export function RangePair({
         className="pointer-events-none absolute inset-0 w-full appearance-none bg-transparent m-0 cursor-pointer
           [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none
           [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full
-          [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary
+          [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-accent
           [&::-webkit-slider-thumb]:shadow-sm hover:[&::-webkit-slider-thumb]:scale-110 active:[&::-webkit-slider-thumb]:scale-125
           [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5
           [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-surface [&::-moz-range-thumb]:border-2
-          [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:shadow-sm"
+          [&::-moz-range-thumb]:border-accent [&::-moz-range-thumb]:shadow-sm"
       />
     </div>
   );
