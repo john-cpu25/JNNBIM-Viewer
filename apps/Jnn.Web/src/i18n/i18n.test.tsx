@@ -59,4 +59,31 @@ describe('i18n internationalization framework', () => {
 
     expect(viKeys).toEqual(enKeys);
   });
+
+  it('memoizes t() and prevents infinite render loops when effect triggers dispatch', async () => {
+    let effectCount = 0;
+    function TestConsumer({ dispatch }: { dispatch: (action: { type: string }) => void }) {
+      const { t } = useTranslation();
+      React.useEffect(() => {
+        effectCount++;
+        dispatch({ type: 'NOTIFY' });
+      }, [t, dispatch]);
+      return <div>{t('common.close')}</div>;
+    }
+
+    function TestApp() {
+      const [state, dispatch] = React.useReducer((s: number) => s + 1, 0);
+      return (
+        <I18nProvider>
+          <div>State: {state}</div>
+          <TestConsumer dispatch={dispatch} />
+        </I18nProvider>
+      );
+    }
+
+    const { render } = await import('@testing-library/react');
+    const { getByText } = render(<TestApp />);
+    expect(getByText('State: 1')).toBeDefined();
+    expect(effectCount).toBe(1);
+  });
 });

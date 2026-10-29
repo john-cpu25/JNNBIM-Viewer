@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import type { Locale, TranslationKey } from './types';
 import { vi } from './vi';
 import { en } from './en';
@@ -22,48 +22,50 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     return 'vi'; // Default: Vietnamese
   });
 
-  const setLocale = (nextLocale: Locale) => {
+  const setLocale = useCallback((nextLocale: Locale) => {
     setLocaleState(nextLocale);
     try {
       localStorage.setItem(STORAGE_KEY, nextLocale);
     } catch {}
-  };
+  }, []);
 
   const translations = useMemo(() => (locale === 'en' ? en : vi), [locale]);
 
-  const t = (key: TranslationKey, params?: Record<string, string | number>): string => {
-    let str = translations[key] || vi[key] || (key as string);
-    if (params) {
-      for (const [pKey, pVal] of Object.entries(params)) {
-        str = str.replace(new RegExp(`\\{${pKey}\\}`, 'g'), String(pVal));
+  const t = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>): string => {
+      let str = translations[key] || vi[key] || (key as string);
+      if (params) {
+        for (const [pKey, pVal] of Object.entries(params)) {
+          str = str.replace(new RegExp(`\\{${pKey}\\}`, 'g'), String(pVal));
+        }
       }
-    }
-    return str;
-  };
-
-  return (
-    <I18nContext.Provider value={{ locale, setLocale, t }}>
-      {children}
-    </I18nContext.Provider>
+      return str;
+    },
+    [translations],
   );
+
+  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
+
+const fallbackTranslate = (key: TranslationKey, params?: Record<string, string | number>): string => {
+  let str = vi[key] || (key as string);
+  if (params) {
+    for (const [pKey, pVal] of Object.entries(params)) {
+      str = str.replace(new RegExp(`\\{${pKey}\\}`, 'g'), String(pVal));
+    }
+  }
+  return str;
+};
+
+const fallbackValue: I18nContextValue = {
+  locale: 'vi',
+  setLocale: () => {},
+  t: fallbackTranslate,
+};
 
 export function useI18n(): I18nContextValue {
   const ctx = useContext(I18nContext);
-  if (!ctx) {
-    return {
-      locale: 'vi',
-      setLocale: () => {},
-      t: (key: TranslationKey, params?: Record<string, string | number>) => {
-        let str = vi[key] || (key as string);
-        if (params) {
-          for (const [pKey, pVal] of Object.entries(params)) {
-            str = str.replace(new RegExp(`\\{${pKey}\\}`, 'g'), String(pVal));
-          }
-        }
-        return str;
-      },
-    };
-  }
-  return ctx;
+  return ctx || fallbackValue;
 }
