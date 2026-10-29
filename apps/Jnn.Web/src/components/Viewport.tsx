@@ -47,7 +47,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setIsNarrow(entry.contentRect.width < 400);
@@ -214,9 +214,9 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     const file = e.dataTransfer.files?.[0];
     if (file) {
       setIsConverting(true);
-      setConvertStatus('Đang nạp file kéo thả...');
+      setConvertStatus(t('viewport.loadingDropFile'));
       await loadIfcFile(file, viewer, dispatch, {
-        onProgress: (pct, msg) => setConvertStatus(`${msg || 'Đang xử lý'} (${pct.toFixed(0)}%)`),
+        onProgress: (pct, msg) => setConvertStatus(`${msg || t('viewport.processing')} (${pct.toFixed(0)}%)`),
       });
       setIsConverting(false);
     }
@@ -226,9 +226,9 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     const file = e.target.files?.[0];
     if (file) {
       setIsConverting(true);
-      setConvertStatus('Đang đọc file IFC...');
+      setConvertStatus(t('viewport.readingIfc'));
       await loadIfcFile(file, viewer, dispatch, {
-        onProgress: (pct, msg) => setConvertStatus(`${msg || 'Đang xử lý'} (${pct.toFixed(0)}%)`),
+        onProgress: (pct, msg) => setConvertStatus(`${msg || t('viewport.processing')} (${pct.toFixed(0)}%)`),
       });
       setIsConverting(false);
       e.target.value = '';
@@ -407,14 +407,14 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                         onClick={() => handleLoadSample('./samples/building-arch-2x3.ifc')}
                         className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
                       >
-                        <span>Kiến trúc (90 KB)</span>
+                        <span>{t('viewport.sampleArch')}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleLoadSample('./samples/building-struct-2x3.ifc')}
                         className="flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink transition hover:border-accent hover:text-accent"
                       >
-                        <span>Kết cấu (106 KB)</span>
+                        <span>{t('viewport.sampleStruct')}</span>
                       </button>
                     </div>
                   )}

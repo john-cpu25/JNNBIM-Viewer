@@ -54,6 +54,7 @@ function matchClassCriteria(elementCategory: string, criteriaClasses?: string): 
 }
 
 const PRESET_TEMPLATES: Array<{
+  nameKey?: 'clash.presetStructArch' | 'clash.presetMepStruct';
   name: string;
   type: ClashType;
   tolerance: number;
@@ -62,7 +63,8 @@ const PRESET_TEMPLATES: Array<{
   ignoreSameModel: boolean;
 }> = [
   {
-    name: 'Kết cấu × Kiến trúc (Hard)',
+    nameKey: 'clash.presetStructArch',
+    name: 'Structure × Architecture (Hard)',
     type: 'Hard',
     tolerance: 0,
     selectionA: { ifcClass: 'IfcBeam,IfcColumn,IfcSlab' },
@@ -70,7 +72,8 @@ const PRESET_TEMPLATES: Array<{
     ignoreSameModel: false,
   },
   {
-    name: 'MEP × Kết cấu (Hard, 0)',
+    nameKey: 'clash.presetMepStruct',
+    name: 'MEP × Structure (Hard, 0)',
     type: 'Hard',
     tolerance: 0,
     selectionA: { ifcClass: 'IfcPipeSegment,IfcDuctSegment' },
@@ -114,7 +117,7 @@ export function ClashPanel() {
         } else {
           // Initialize with 1 default test if empty
           const defaultTest = createDefaultClashTest(0, {
-            name: 'Kiến trúc × Kết cấu (Hard)',
+            name: t('clash.presetArchStruct'),
             selectionA: { ifcClass: 'IfcWall' },
             selectionB: { ifcClass: 'IfcBeam,IfcColumn' },
           });
@@ -202,7 +205,7 @@ export function ClashPanel() {
       type: 'updateTest',
       id: activeTest.id,
       updates: {
-        name: preset.name,
+        name: preset.nameKey ? t(preset.nameKey) : preset.name,
         type: preset.type,
         tolerance: preset.tolerance,
         selectionA: { ...activeTest.selectionA, ifcClass: preset.selectionA.ifcClass },
@@ -659,7 +662,7 @@ export function ClashPanel() {
                     data-testid={`preset-btn-${idx}`}
                     className="rounded bg-surface-2 border border-line px-2 py-0.5 text-[11px] text-muted hover:border-accent hover:text-ink transition-colors"
                   >
-                    {p.name}
+                    {p.nameKey ? t(p.nameKey) : p.name}
                   </button>
                 ))}
               </div>

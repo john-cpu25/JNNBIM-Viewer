@@ -114,20 +114,20 @@ export function TopBar({ layout }: { layout: Layout }) {
             <button
               type="button"
               onClick={onLoadSample}
-              title="Mở mô hình IFC mẫu kiến trúc (debug)"
+              title={t('topbar.sampleArchTooltip')}
               data-testid="open-sample-btn"
               className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-accent transition-colors hover:border-accent hover:text-ink"
             >
-              <span className="hidden md:inline">Mẫu KT</span>
+              <span className="hidden md:inline">{t('topbar.sampleArch')}</span>
             </button>
             <button
               type="button"
               onClick={onAppendSampleStruct}
-              title="Thêm mô hình IFC mẫu kết cấu (debug)"
+              title={t('topbar.sampleStructTooltip')}
               data-testid="append-sample-struct-btn"
               className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1 text-xs font-medium text-emerald-600 transition-colors hover:border-accent hover:text-emerald-500"
             >
-              <span className="hidden lg:inline">+ Mẫu KC</span>
+              <span className="hidden lg:inline">{t('topbar.sampleStruct')}</span>
             </button>
           </>
         )}
@@ -141,7 +141,7 @@ export function TopBar({ layout }: { layout: Layout }) {
         <button
           type="button"
           onClick={() => setLocale(locale === 'vi' ? 'en' : 'vi')}
-          title={locale === 'vi' ? 'Switch to English' : 'Chuyển sang tiếng Việt'}
+          title={locale === 'vi' ? t('topbar.switchToEn') : t('topbar.switchToVi')}
           aria-label={t('topbar.language')}
           data-testid="language-toggle"
           className="flex h-7 items-center justify-center rounded-md border border-line bg-surface-2 px-2 text-xs font-semibold text-ink transition-colors hover:border-accent hover:text-accent"

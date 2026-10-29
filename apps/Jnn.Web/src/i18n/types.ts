@@ -229,7 +229,93 @@ export interface Translations {
   'loader.addingModel': string;
   'loader.appendedSuccess': string;
   'loader.openedSuccess': string;
+  'loader.errorOpening': string;
   'loader.fromCache': string;
+
+  // Clash Extra
+  'clash.presetStructArch': string;
+  'clash.presetMepStruct': string;
+  'clash.presetArchStruct': string;
+  'clash.errorExportExcel': string;
+  'clash.errorExportHtml': string;
+  'clash.errorExportBcf': string;
+  'clash.searchPlaceholderFilter': string;
+  'clash.filterAllCount': string;
+  'clash.filterAllTypes': string;
+  'clash.shortcutsHint': string;
+  'clash.colDistance': string;
+  'clash.zoomClash': string;
+  'clash.closeDetail': string;
+  'clash.statusLabel': string;
+  'clash.elementALabel': string;
+  'clash.elementBLabel': string;
+  'clash.assignedToLabel': string;
+  'clash.assignedToPlaceholder': string;
+  'clash.commentsPlaceholder': string;
+
+  // Explorer Extra
+  'explorer.modelRemoved': string;
+  'explorer.elementCount': string;
+  'explorer.storeyCount': string;
+  'explorer.hideModel': string;
+  'explorer.showModel': string;
+  'explorer.zoomModel': string;
+  'explorer.removeModel': string;
+
+  // Properties Extra
+  'properties.offlineDesc': string;
+
+  // Rules Extra
+  'rules.checking': string;
+  'rules.applicableRules': string;
+  'rules.unselectAll': string;
+  'rules.selectAll': string;
+  'rules.totalViolations': string;
+  'rules.errorLabel': string;
+  'rules.warningLabel': string;
+  'rules.infoLabel': string;
+  'rules.duration': string;
+  'rules.elementsChecked': string;
+  'rules.filterPlaceholder': string;
+  'rules.allSeverityCount': string;
+  'rules.noIssuesGreat': string;
+  'rules.noIssuesCompliant': string;
+  'rules.noIssuesFilter': string;
+
+  // Section Extra
+  'section.cutStorey': string;
+  'section.pickFaceTooltip': string;
+
+  // Settings Extra
+  'settings.cacheClearSuccess': string;
+  'settings.cacheClearError': string;
+  'settings.cacheClearErr': string;
+  'settings.revitOptionDesc': string;
+  'settings.classicOptionDesc': string;
+  'settings.orbitAroundCursor': string;
+  'settings.langVi': string;
+  'settings.langEn': string;
+  'settings.cacheStatusLabel': string;
+  'settings.cacheStatusActive': string;
+  'settings.cacheStatusUnsupported': string;
+  'settings.cacheSizeLabel': string;
+  'settings.attributionTitle': string;
+  'settings.attributionDesc': string;
+
+  // TopBar Extra
+  'topbar.sampleArchTooltip': string;
+  'topbar.sampleArch': string;
+  'topbar.sampleStructTooltip': string;
+  'topbar.sampleStruct': string;
+  'topbar.switchToVi': string;
+  'topbar.switchToEn': string;
+
+  // Viewport Extra
+  'viewport.loadingDropFile': string;
+  'viewport.processing': string;
+  'viewport.readingIfc': string;
+  'viewport.sampleArch': string;
+  'viewport.sampleStruct': string;
 }
 
 export type TranslationKey = keyof Translations;

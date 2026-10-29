@@ -276,7 +276,7 @@ function BoxControls({ spec, bounds }: { spec: Extract<SectionSpec, { kind: 'box
                       ? 'border-primary bg-primary/10 text-primary font-semibold'
                       : 'border-line text-muted hover:border-line-strong hover:text-ink'
                   }`}
-                  title={`Cắt theo ${st.name}`}
+                  title={t('section.cutStorey', { name: st.name })}
                 >
                   {st.name.replace(' (Ground)', '')}
                 </button>
@@ -363,7 +363,7 @@ function PlaneControls({
               ? 'border-primary bg-primary/10 text-primary'
               : 'border-line bg-surface text-ink hover:border-line-strong hover:bg-surface-hover'
           }`}
-          title="Click vào bề mặt cấu kiện để đặt mặt phẳng cắt"
+          title={t('section.pickFaceTooltip')}
         >
           <Crosshair className="h-3.5 w-3.5" />
           <span>{t('section.pickFace')}</span>
@@ -380,7 +380,7 @@ function PlaneControls({
                 type="button"
                 onClick={() => set({ offset: Math.round((st.elevation + 1.2) * 100) / 100, flipped: false })}
                 className="rounded border border-line px-1.5 py-0.5 text-[11px] text-muted hover:border-line-strong hover:text-ink"
-                title={`Mặt cắt cách ${st.name} 1.2 m`}
+                title={t('section.cutByStorey', { name: st.name })}
               >
                 {st.name.replace(' (Ground)', '')}
               </button>

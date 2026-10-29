@@ -201,7 +201,7 @@ export function ClashResultsTable({
       downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     } catch (err) {
       console.error('Failed to export Excel:', err);
-      alert('Lỗi xuất Excel: ' + (err as Error).message);
+      alert(t('clash.errorExportExcel', { error: (err as Error).message }));
     }
   };
 
@@ -213,7 +213,7 @@ export function ClashResultsTable({
       downloadFile(html, filename, 'text/html;charset=utf-8');
     } catch (err) {
       console.error('Failed to export HTML:', err);
-      alert('Lỗi xuất HTML: ' + (err as Error).message);
+      alert(t('clash.errorExportHtml', { error: (err as Error).message }));
     }
   };
 
@@ -225,7 +225,7 @@ export function ClashResultsTable({
       downloadFile(blob, filename, 'application/zip');
     } catch (err) {
       console.error('Failed to export BCF:', err);
-      alert('Lỗi xuất BCF: ' + (err as Error).message);
+      alert(t('clash.errorExportBcf', { error: (err as Error).message }));
     }
   };
 
@@ -244,7 +244,7 @@ export function ClashResultsTable({
             <Search size={12} className="absolute left-2 top-2 text-muted" />
             <input
               type="text"
-              placeholder="Tìm theo tên, GUID, tầng..."
+              placeholder={t('clash.searchPlaceholderFilter')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="clash-search-input"
@@ -258,7 +258,7 @@ export function ClashResultsTable({
             data-testid="status-filter-select"
             className="rounded border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-accent"
           >
-            <option value="ALL">Tất cả ({records.length})</option>
+            <option value="ALL">{t('clash.filterAllCount', { count: records.length })}</option>
             <option value="New">New</option>
             <option value="Active">Active</option>
             <option value="Reviewed">Reviewed</option>
@@ -272,7 +272,7 @@ export function ClashResultsTable({
             data-testid="type-filter-select"
             className="rounded border border-line bg-surface px-2 py-1 text-xs text-ink outline-none focus:border-accent"
           >
-            <option value="ALL">Mọi loại</option>
+            <option value="ALL">{t('clash.filterAllTypes')}</option>
             <option value="Hard">Hard</option>
             <option value="Clearance">Clearance</option>
             <option value="Duplicates">Duplicates</option>
@@ -352,7 +352,7 @@ export function ClashResultsTable({
               {t('clash.enableSectionBox')}
             </span>
           </label>
-          <span className="text-[10px] text-faint">Phím: ↑↓ chuyển, 1–5 đổi trạng thái</span>
+          <span className="text-[10px] text-faint">{t('clash.shortcutsHint')}</span>
         </div>
       </div>
 
@@ -369,7 +369,7 @@ export function ClashResultsTable({
                 <th className="py-1.5 px-2">{t('clash.colIndex')}</th>
                 <th className="py-1.5 px-2">{t('clash.colStatus')}</th>
                 <th className="py-1.5 px-2">{t('clash.colType')}</th>
-                <th className="py-1.5 px-2">Khoảng cách</th>
+                <th className="py-1.5 px-2">{t('clash.colDistance')}</th>
                 <th className="py-1.5 px-2">{t('clash.colElementA')}</th>
                 <th className="py-1.5 px-2">{t('clash.colElementB')}</th>
                 <th className="py-1.5 px-2">{t('clash.colStorey')}</th>
@@ -428,7 +428,7 @@ export function ClashResultsTable({
                 onClick={() => {
                   viewer?.fitToView([String(selectedRecord.aId), String(selectedRecord.bId)]);
                 }}
-                title="Zoom lại điểm va chạm"
+                title={t('clash.zoomClash')}
                 data-testid="fit-clash-btn"
                 className="flex items-center gap-1 rounded bg-surface border border-line px-2 py-0.5 text-[11px] hover:border-accent text-ink"
               >
@@ -438,7 +438,7 @@ export function ClashResultsTable({
               <button
                 type="button"
                 onClick={() => onSelectClash(null)}
-                title="Đóng chi tiết"
+                title={t('clash.closeDetail')}
                 className="p-1 rounded text-muted hover:text-ink"
               >
                 <X size={13} />
@@ -448,7 +448,7 @@ export function ClashResultsTable({
 
           {/* Quick status buttons */}
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-muted">Trạng thái:</span>
+            <span className="text-[11px] text-muted">{t('clash.statusLabel')}</span>
             {(['New', 'Active', 'Reviewed', 'Approved', 'Resolved'] as const).map((s) => (
               <button
                 key={s}
@@ -470,12 +470,12 @@ export function ClashResultsTable({
           {/* Elements metadata */}
           <div className="grid grid-cols-2 gap-2 rounded bg-surface p-2 border border-line text-[11px]">
             <div>
-              <span className="font-semibold text-rose-500 block">Phần tử A (Đỏ):</span>
+              <span className="font-semibold text-rose-500 block">{t('clash.elementALabel')}</span>
               <span className="truncate block font-medium text-ink">{selectedRecord.aName}</span>
               <span className="text-muted block text-[10px]">GUID: {selectedRecord.aGuid || '—'}</span>
             </div>
             <div>
-              <span className="font-semibold text-emerald-500 block">Phần tử B (Xanh):</span>
+              <span className="font-semibold text-emerald-500 block">{t('clash.elementBLabel')}</span>
               <span className="truncate block font-medium text-ink">{selectedRecord.bName}</span>
               <span className="text-muted block text-[10px]">GUID: {selectedRecord.bGuid || '—'}</span>
             </div>
@@ -486,11 +486,11 @@ export function ClashResultsTable({
             <div className="space-y-0.5">
               <label className="text-[10.5px] text-muted flex items-center gap-1">
                 <User size={10} />
-                Người phụ trách
+                {t('clash.assignedToLabel')}
               </label>
               <input
                 type="text"
-                placeholder="ví dụ: KTS Tuấn"
+                placeholder={t('clash.assignedToPlaceholder')}
                 value={selectedRecord.assignedTo || ''}
                 data-testid="assigned-to-input"
                 onChange={(e) =>
@@ -502,11 +502,11 @@ export function ClashResultsTable({
             <div className="space-y-0.5">
               <label className="text-[10.5px] text-muted flex items-center gap-1">
                 <MessageSquare size={10} />
-                Ghi chú
+                {t('clash.colComments')}
               </label>
               <input
                 type="text"
-                placeholder="Ghi chú đánh giá..."
+                placeholder={t('clash.commentsPlaceholder')}
                 value={selectedRecord.comments || ''}
                 data-testid="comments-input"
                 onChange={(e) =>

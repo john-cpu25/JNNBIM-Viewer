@@ -89,7 +89,7 @@ function ModelSummary() {
       </div>
       <p className="text-[11px] leading-relaxed text-faint">
         {m.sourceFormat === 'IFC'
-          ? 'Mô hình IFC nạp từ tệp qua That Open Engine (WASM offline).'
+          ? t('properties.offlineDesc')
           : 'This is a procedurally generated sample building for UI development. IFC loading arrives with the That Open adapter (Milestone 1).'}
       </p>
     </div>

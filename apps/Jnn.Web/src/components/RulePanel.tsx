@@ -204,7 +204,7 @@ export function RulePanel() {
       {isRunning && progress && (
         <div className="border-b border-line bg-surface-2 px-3 py-2">
           <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-            <span>Đang kiểm tra quy tắc...</span>
+            <span>{t('rules.checking')}</span>
             <span className="font-semibold tabular">{Math.round(progress.percent)}%</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
@@ -222,7 +222,7 @@ export function RulePanel() {
         <div className="rounded-lg border border-line bg-surface-1 p-2.5 shadow-xs">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[11.5px] font-bold uppercase tracking-wider text-muted">
-              Quy tắc áp dụng ({selectedRuleIds.size}/{BUILTIN_RULES.length})
+              {t('rules.applicableRules', { count: selectedRuleIds.size, total: BUILTIN_RULES.length })}
             </span>
             <button
               type="button"
@@ -230,7 +230,7 @@ export function RulePanel() {
               onClick={toggleAll}
               className="text-[11px] font-medium text-accent hover:underline"
             >
-              {selectedRuleIds.size === BUILTIN_RULES.length ? 'Bỏ chọn hết' : 'Chọn tất cả'}
+              {selectedRuleIds.size === BUILTIN_RULES.length ? t('rules.unselectAll') : t('rules.selectAll')}
             </button>
           </div>
 
@@ -283,7 +283,7 @@ export function RulePanel() {
           <div className="space-y-2">
             <div className="grid grid-cols-4 gap-1.5">
               <div className="rounded-md border border-line bg-surface-1 p-2 text-center">
-                <div className="text-[10px] font-medium uppercase text-muted">Tổng vi phạm</div>
+                <div className="text-[10px] font-medium uppercase text-muted">{t('rules.totalViolations')}</div>
                 <div
                   data-testid="stat-total-violations"
                   className={cn(
@@ -296,21 +296,21 @@ export function RulePanel() {
               </div>
 
               <div className="rounded-md border border-red-500/20 bg-red-500/5 p-2 text-center">
-                <div className="text-[10px] font-medium uppercase text-red-600 dark:text-red-400">Lỗi</div>
+                <div className="text-[10px] font-medium uppercase text-red-600 dark:text-red-400">{t('rules.errorLabel')}</div>
                 <div data-testid="stat-errors" className="text-base font-bold text-red-600 tabular">
                   {result.bySeverity.Error}
                 </div>
               </div>
 
               <div className="rounded-md border border-amber-500/20 bg-amber-500/5 p-2 text-center">
-                <div className="text-[10px] font-medium uppercase text-amber-600 dark:text-amber-400">Cảnh báo</div>
+                <div className="text-[10px] font-medium uppercase text-amber-600 dark:text-amber-400">{t('rules.warningLabel')}</div>
                 <div data-testid="stat-warnings" className="text-base font-bold text-amber-600 tabular">
                   {result.bySeverity.Warning}
                 </div>
               </div>
 
               <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2 text-center">
-                <div className="text-[10px] font-medium uppercase text-blue-600 dark:text-blue-400">Thông tin</div>
+                <div className="text-[10px] font-medium uppercase text-blue-600 dark:text-blue-400">{t('rules.infoLabel')}</div>
                 <div data-testid="stat-info" className="text-base font-bold text-blue-600 tabular">
                   {result.bySeverity.Info}
                 </div>
@@ -320,9 +320,9 @@ export function RulePanel() {
             <div className="flex items-center justify-between px-1 text-[11px] text-muted">
               <span className="flex items-center gap-1">
                 <Clock size={11} />
-                <span>Thời gian: {result.duration.toFixed(1)} ms</span>
+                <span>{t('rules.duration', { ms: result.duration.toFixed(1) })}</span>
               </span>
-              <span>Đã kiểm tra: {state.byId.size} cấu kiện</span>
+              <span>{t('rules.elementsChecked', { count: state.byId.size })}</span>
             </div>
           </div>
         )}
@@ -339,7 +339,7 @@ export function RulePanel() {
                   data-testid="rule-search-input"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Lọc phần tử hoặc lỗi..."
+                  placeholder={t('rules.filterPlaceholder')}
                   className="w-full rounded-md border border-line bg-surface py-1 pl-7 pr-2 text-xs placeholder:text-muted/60 focus:border-accent focus:outline-none"
                 />
               </div>
@@ -350,10 +350,10 @@ export function RulePanel() {
                 onChange={(e) => setSeverityFilter(e.target.value as any)}
                 className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink focus:border-accent focus:outline-none"
               >
-                <option value="ALL">Tất cả ({allIssues.length})</option>
-                <option value="Error">Lỗi ({result.bySeverity.Error})</option>
-                <option value="Warning">Cảnh báo ({result.bySeverity.Warning})</option>
-                <option value="Info">Thông tin ({result.bySeverity.Info})</option>
+                <option value="ALL">{t('rules.allSeverityCount', { count: allIssues.length })}</option>
+                <option value="Error">{t('rules.errorLabel')} ({result.bySeverity.Error})</option>
+                <option value="Warning">{t('rules.warningLabel')} ({result.bySeverity.Warning})</option>
+                <option value="Info">{t('rules.infoLabel')} ({result.bySeverity.Info})</option>
               </select>
             </div>
 
@@ -363,11 +363,11 @@ export function RulePanel() {
                 {result.totalViolations === 0 ? (
                   <div className="flex flex-col items-center gap-1.5 text-emerald-600">
                     <CheckCircle size={28} />
-                    <span className="text-xs font-semibold">Tuyệt vời! Không có vi phạm nào.</span>
-                    <span className="text-[11px] text-muted">Mô hình hoàn toàn tuân thủ các quy tắc đã chọn.</span>
+                    <span className="text-xs font-semibold">{t('rules.noIssuesGreat')}</span>
+                    <span className="text-[11px] text-muted">{t('rules.noIssuesCompliant')}</span>
                   </div>
                 ) : (
-                  <div className="text-xs text-muted">Không tìm thấy vi phạm nào khớp với bộ lọc.</div>
+                  <div className="text-xs text-muted">{t('rules.noIssuesFilter')}</div>
                 )}
               </div>
             ) : (

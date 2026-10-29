@@ -149,6 +149,7 @@ export function Explorer() {
 
 function ModelsPanel() {
   const { state, dispatch, viewer } = useApp();
+  const { t } = useTranslation();
   const appendInputRef = useRef<HTMLInputElement>(null);
 
   const onAppendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -167,7 +168,7 @@ function ModelsPanel() {
   const handleRemove = (modelId: string, name: string) => {
     viewer?.removeModel?.(modelId);
     dispatch({ type: 'removeModel', modelId });
-    dispatch({ type: 'notify', tone: 'info', text: `Đã gỡ mô hình "${name}".` });
+    dispatch({ type: 'notify', tone: 'info', text: t('explorer.modelRemoved', { name }) });
   };
 
   const handleFit = (modelId: string) => {
@@ -229,16 +230,16 @@ function ModelsPanel() {
                   )}
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-[11px] text-faint">
-                  <span>{m.elementCount} cấu kiện</span>
+                  <span>{t('explorer.elementCount', { count: m.elementCount })}</span>
                   <span>•</span>
-                  <span>{m.jnnModel.storeys.length} tầng</span>
+                  <span>{t('explorer.storeyCount', { count: m.jnnModel.storeys.length })}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  title={m.visible ? 'Ẩn toàn bộ model' : 'Hiện model'}
+                  title={m.visible ? t('explorer.hideModel') : t('explorer.showModel')}
                   onClick={() => handleToggleVisible(m.modelId, m.visible)}
                   className="rounded p-1 text-faint hover:bg-surface-3 hover:text-ink"
                   data-testid={`toggle-visible-model-${m.modelId}`}
@@ -247,7 +248,7 @@ function ModelsPanel() {
                 </button>
                 <button
                   type="button"
-                  title="Zoom đến model"
+                  title={t('explorer.zoomModel')}
                   onClick={() => handleFit(m.modelId)}
                   className="rounded p-1 text-faint hover:bg-surface-3 hover:text-ink"
                   data-testid={`fit-model-${m.modelId}`}
@@ -257,7 +258,7 @@ function ModelsPanel() {
                 {state.models.length > 1 && (
                   <button
                     type="button"
-                    title="Gỡ model (giải phóng bộ nhớ)"
+                    title={t('explorer.removeModel')}
                     onClick={() => handleRemove(m.modelId, m.name)}
                     className="rounded p-1 text-faint hover:bg-red-500/10 hover:text-red-500"
                     data-testid={`remove-model-${m.modelId}`}

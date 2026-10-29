@@ -229,5 +229,91 @@ export const en: Translations = {
   'loader.addingModel': 'Appending IFC model: {filename}...',
   'loader.appendedSuccess': 'Successfully appended model "{filename}" with {count} elements{cache}.',
   'loader.openedSuccess': 'Successfully opened "{filename}" with {count} elements{cache}.',
+  'loader.errorOpening': 'Error opening IFC: {message}',
   'loader.fromCache': ' [from IndexedDB cache]',
+
+  // Clash Extra
+  'clash.presetStructArch': 'Structure x Architecture (Hard)',
+  'clash.presetMepStruct': 'MEP x Structure (Hard, 0)',
+  'clash.presetArchStruct': 'Architecture x Structure (Hard)',
+  'clash.errorExportExcel': 'Excel export error: {error}',
+  'clash.errorExportHtml': 'HTML export error: {error}',
+  'clash.errorExportBcf': 'BCF export error: {error}',
+  'clash.searchPlaceholderFilter': 'Search by name, GUID, storey...',
+  'clash.filterAllCount': 'All ({count})',
+  'clash.filterAllTypes': 'All Types',
+  'clash.shortcutsHint': 'Keys: ↑↓ navigate, 1-5 change status',
+  'clash.colDistance': 'Distance',
+  'clash.zoomClash': 'Zoom to clash point',
+  'clash.closeDetail': 'Close detail',
+  'clash.statusLabel': 'Status:',
+  'clash.elementALabel': 'Element A (Red):',
+  'clash.elementBLabel': 'Element B (Green):',
+  'clash.assignedToLabel': 'Assigned to',
+  'clash.assignedToPlaceholder': 'e.g. Architect Tuan',
+  'clash.commentsPlaceholder': 'Evaluation notes...',
+
+  // Explorer Extra
+  'explorer.modelRemoved': 'Model "{name}" removed.',
+  'explorer.elementCount': '{count} elements',
+  'explorer.storeyCount': '{count} storeys',
+  'explorer.hideModel': 'Hide entire model',
+  'explorer.showModel': 'Show model',
+  'explorer.zoomModel': 'Zoom to model',
+  'explorer.removeModel': 'Remove model (free memory)',
+
+  // Properties Extra
+  'properties.offlineDesc': 'IFC model parsed from file via That Open Engine (offline WASM).',
+
+  // Rules Extra
+  'rules.checking': 'Checking rules...',
+  'rules.applicableRules': 'Applicable Rules ({count}/{total})',
+  'rules.unselectAll': 'Unselect all',
+  'rules.selectAll': 'Select all',
+  'rules.totalViolations': 'Total Violations',
+  'rules.errorLabel': 'Error',
+  'rules.warningLabel': 'Warning',
+  'rules.infoLabel': 'Info',
+  'rules.duration': 'Duration: {ms} ms',
+  'rules.elementsChecked': 'Checked: {count} elements',
+  'rules.filterPlaceholder': 'Filter elements or errors...',
+  'rules.allSeverityCount': 'All ({count})',
+  'rules.noIssuesGreat': 'Great! No violations found.',
+  'rules.noIssuesCompliant': 'Model fully complies with selected rules.',
+  'rules.noIssuesFilter': 'No violations match the filter.',
+
+  // Section Extra
+  'section.cutStorey': 'Cut by {name}',
+  'section.pickFaceTooltip': 'Click on element surface to place cutting plane',
+
+  // Settings Extra
+  'settings.cacheClearSuccess': 'All IFC cache successfully cleared.',
+  'settings.cacheClearError': 'Cannot clear cache (IndexedDB locked or error).',
+  'settings.cacheClearErr': 'Error clearing cache: {error}',
+  'settings.revitOptionDesc': 'Revit (Shift + drag left / middle to orbit)',
+  'settings.classicOptionDesc': 'Classic (Drag left to orbit)',
+  'settings.orbitAroundCursor': 'Orbit around point under cursor',
+  'settings.langVi': 'Vietnamese (VI)',
+  'settings.langEn': 'English (EN)',
+  'settings.cacheStatusLabel': 'Status',
+  'settings.cacheStatusActive': 'Active',
+  'settings.cacheStatusUnsupported': 'Not supported',
+  'settings.cacheSizeLabel': 'Cached storage size',
+  'settings.attributionTitle': 'Sample Data Attribution',
+  'settings.attributionDesc': 'Default sample models ({models}) belong to the {scene} dataset by {bsi}, released under {license}.',
+
+  // TopBar Extra
+  'topbar.sampleArchTooltip': 'Open sample architecture IFC model (debug)',
+  'topbar.sampleArch': 'Sample Arch',
+  'topbar.sampleStructTooltip': 'Append sample structural IFC model (debug)',
+  'topbar.sampleStruct': '+ Sample Struct',
+  'topbar.switchToVi': 'Switch to Vietnamese',
+  'topbar.switchToEn': 'Switch to English',
+
+  // Viewport Extra
+  'viewport.loadingDropFile': 'Loading dropped file...',
+  'viewport.processing': 'Processing',
+  'viewport.readingIfc': 'Reading IFC file...',
+  'viewport.sampleArch': 'Architecture (90 KB)',
+  'viewport.sampleStruct': 'Structure (106 KB)',
 };

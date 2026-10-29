@@ -229,5 +229,91 @@ export const vi: Translations = {
   'loader.addingModel': 'Đang thêm mô hình IFC: {filename}...',
   'loader.appendedSuccess': 'Đã thêm mô hình "{filename}" với {count} cấu kiện{cache}.',
   'loader.openedSuccess': 'Mở thành công "{filename}" với {count} cấu kiện{cache}.',
+  'loader.errorOpening': 'Lỗi khi mở IFC: {message}',
   'loader.fromCache': ' [từ cache IndexedDB]',
+
+  // Clash Extra
+  'clash.presetStructArch': 'Kết cấu x Kiến trúc (Hard)',
+  'clash.presetMepStruct': 'MEP x Kết cấu (Hard, 0)',
+  'clash.presetArchStruct': 'Kiến trúc x Kết cấu (Hard)',
+  'clash.errorExportExcel': 'Lỗi xuất Excel: {error}',
+  'clash.errorExportHtml': 'Lỗi xuất HTML: {error}',
+  'clash.errorExportBcf': 'Lỗi xuất BCF: {error}',
+  'clash.searchPlaceholderFilter': 'Tìm theo tên, GUID, tầng...',
+  'clash.filterAllCount': 'Tất cả ({count})',
+  'clash.filterAllTypes': 'Mọi loại',
+  'clash.shortcutsHint': 'Phím: ↑↓ chuyển, 1-5 đổi trạng thái',
+  'clash.colDistance': 'Khoảng cách',
+  'clash.zoomClash': 'Zoom lại điểm va chạm',
+  'clash.closeDetail': 'Đóng chi tiết',
+  'clash.statusLabel': 'Trạng thái:',
+  'clash.elementALabel': 'Phần tử A (Đỏ):',
+  'clash.elementBLabel': 'Phần tử B (Xanh):',
+  'clash.assignedToLabel': 'Người phụ trách',
+  'clash.assignedToPlaceholder': 'ví dụ: KTS Tuấn',
+  'clash.commentsPlaceholder': 'Ghi chú đánh giá...',
+
+  // Explorer Extra
+  'explorer.modelRemoved': 'Đã gỡ mô hình "{name}".',
+  'explorer.elementCount': '{count} cấu kiện',
+  'explorer.storeyCount': '{count} tầng',
+  'explorer.hideModel': 'Ẩn toàn bộ model',
+  'explorer.showModel': 'Hiện model',
+  'explorer.zoomModel': 'Zoom đến model',
+  'explorer.removeModel': 'Gỡ model (giải phóng bộ nhớ)',
+
+  // Properties Extra
+  'properties.offlineDesc': 'Mô hình IFC nạp từ tệp qua That Open Engine (WASM offline).',
+
+  // Rules Extra
+  'rules.checking': 'Đang kiểm tra quy tắc...',
+  'rules.applicableRules': 'Quy tắc áp dụng ({count}/{total})',
+  'rules.unselectAll': 'Bỏ chọn hết',
+  'rules.selectAll': 'Chọn tất cả',
+  'rules.totalViolations': 'Tổng vi phạm',
+  'rules.errorLabel': 'Lỗi',
+  'rules.warningLabel': 'Cảnh báo',
+  'rules.infoLabel': 'Thông tin',
+  'rules.duration': 'Thời gian: {ms} ms',
+  'rules.elementsChecked': 'Đã kiểm tra: {count} cấu kiện',
+  'rules.filterPlaceholder': 'Lọc phần tử hoặc lỗi...',
+  'rules.allSeverityCount': 'Tất cả ({count})',
+  'rules.noIssuesGreat': 'Tuyệt vời! Không có vi phạm nào.',
+  'rules.noIssuesCompliant': 'Mô hình hoàn toàn tuân thủ các quy tắc đã chọn.',
+  'rules.noIssuesFilter': 'Không tìm thấy vi phạm nào khớp với bộ lọc.',
+
+  // Section Extra
+  'section.cutStorey': 'Cắt theo {name}',
+  'section.pickFaceTooltip': 'Click vào bề mặt cấu kiện để đặt mặt phẳng cắt',
+
+  // Settings Extra
+  'settings.cacheClearSuccess': 'Đã xóa toàn bộ bộ nhớ đệm IFC thành công.',
+  'settings.cacheClearError': 'Không thể xóa bộ nhớ đệm (IndexedDB bị khóa hoặc lỗi).',
+  'settings.cacheClearErr': 'Lỗi khi xóa cache: {error}',
+  'settings.revitOptionDesc': 'Revit (Shift + kéo trái / giữa để xoay)',
+  'settings.classicOptionDesc': 'Cổ điển (Kéo trái để xoay)',
+  'settings.orbitAroundCursor': 'Xoay quanh điểm dưới con trỏ',
+  'settings.langVi': 'Tiếng Việt (VI)',
+  'settings.langEn': 'English (EN)',
+  'settings.cacheStatusLabel': 'Trạng thái',
+  'settings.cacheStatusActive': 'Hoạt động',
+  'settings.cacheStatusUnsupported': 'Không hỗ trợ',
+  'settings.cacheSizeLabel': 'Dung lượng đã cache',
+  'settings.attributionTitle': 'Bản quyền dữ liệu mẫu (Attribution)',
+  'settings.attributionDesc': 'Mô hình mẫu mặc định ({models}) thuộc bộ dữ liệu {scene} của {bsi}, phát hành theo giấy phép {license}.',
+
+  // TopBar Extra
+  'topbar.sampleArchTooltip': 'Mở mô hình IFC mẫu kiến trúc (debug)',
+  'topbar.sampleArch': 'Mẫu KT',
+  'topbar.sampleStructTooltip': 'Thêm mô hình IFC mẫu kết cấu (debug)',
+  'topbar.sampleStruct': '+ Mẫu KC',
+  'topbar.switchToVi': 'Chuyển sang tiếng Việt',
+  'topbar.switchToEn': 'Switch to English',
+
+  // Viewport Extra
+  'viewport.loadingDropFile': 'Đang nạp file kéo thả...',
+  'viewport.processing': 'Đang xử lý',
+  'viewport.readingIfc': 'Đang đọc file IFC...',
+  'viewport.sampleArch': 'Kiến trúc (90 KB)',
+  'viewport.sampleStruct': 'Kết cấu (106 KB)',
 };

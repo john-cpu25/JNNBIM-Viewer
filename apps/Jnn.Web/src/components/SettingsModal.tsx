@@ -41,13 +41,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     try {
       const ok = await clearIfcCache();
       if (ok) {
-        dispatch({ type: 'notify', tone: 'info', text: 'Đã xóa toàn bộ bộ nhớ đệm IFC thành công.' });
+        dispatch({ type: 'notify', tone: 'info', text: t('settings.cacheClearSuccess') });
         await loadStats();
       } else {
-        dispatch({ type: 'notify', tone: 'error', text: 'Không thể xóa bộ nhớ đệm (IndexedDB bị khóa hoặc lỗi).' });
+        dispatch({ type: 'notify', tone: 'error', text: t('settings.cacheClearError') });
       }
     } catch (err) {
-      dispatch({ type: 'notify', tone: 'error', text: `Lỗi khi xóa cache: ${err}` });
+      dispatch({ type: 'notify', tone: 'error', text: t('settings.cacheClearErr', { error: String(err) }) });
     }
   };
 
@@ -91,8 +91,8 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 className="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
                 data-testid="settings-language-select"
               >
-                <option value="vi">Tiếng Việt (VI)</option>
-                <option value="en">English (EN)</option>
+                <option value="vi">{t('settings.langVi')}</option>
+                <option value="en">{t('settings.langEn')}</option>
               </select>
             </div>
           </div>
@@ -129,8 +129,8 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
                   data-testid="nav-preset-select"
                 >
-                  <option value="revit">Revit (Shift + kéo trái / giữa để xoay)</option>
-                  <option value="classic">Cổ điển (Kéo trái để xoay)</option>
+                  <option value="revit">{t('settings.revitOptionDesc')}</option>
+                  <option value="classic">{t('settings.classicOptionDesc')}</option>
                 </select>
               </div>
 
@@ -194,7 +194,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                     }
                     className="rounded border-line accent-accent"
                   />
-                  <span>Xoay quanh điểm dưới con trỏ</span>
+                  <span>{t('settings.orbitAroundCursor')}</span>
                 </label>
                 <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
                   <input
@@ -226,13 +226,13 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-center">
               <div className="rounded-md border border-line bg-surface p-2">
-                <span className="block text-[10px] text-muted">Trạng thái</span>
+                <span className="block text-[10px] text-muted">{t('settings.cacheStatusLabel')}</span>
                 <span className="font-semibold text-ink" data-testid="cache-status-text">
-                  {isIdbAvailable ? 'Hoạt động' : 'Không hỗ trợ'}
+                  {isIdbAvailable ? t('settings.cacheStatusActive') : t('settings.cacheStatusUnsupported')}
                 </span>
               </div>
               <div className="rounded-md border border-line bg-surface p-2">
-                <span className="block text-[10px] text-muted">Dung lượng đã cache</span>
+                <span className="block text-[10px] text-muted">{t('settings.cacheSizeLabel')}</span>
                 <span className="font-semibold text-ink" data-testid="cache-size-text">
                   {formatBytes(stats.totalBytes)} ({stats.count} file)
                 </span>
@@ -268,13 +268,14 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
           {/* Attribution Section */}
           <div className="rounded-lg border border-line bg-surface-2 p-3">
-            <span className="font-semibold text-ink">Bản quyền dữ liệu mẫu (Attribution)</span>
+            <span className="font-semibold text-ink">{t('settings.attributionTitle')}</span>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
-              Mô hình mẫu mặc định (<span className="font-mono text-ink">Building-Architecture.ifc</span>,{' '}
-              <span className="font-mono text-ink">Building-Structural.ifc</span>) thuộc bộ dữ liệu{' '}
-              <strong className="text-ink">Simple-Scene</strong> của{' '}
-              <strong className="text-ink">buildingSMART International</strong>, phát hành theo giấy phép{' '}
-              <strong className="text-ink">Creative Commons Attribution 4.0 International (CC BY 4.0)</strong>.
+              {t('settings.attributionDesc', {
+                models: 'Building-Architecture.ifc, Building-Structural.ifc',
+                scene: 'Simple-Scene',
+                bsi: 'buildingSMART International',
+                license: 'CC BY 4.0',
+              })}
             </p>
           </div>
         </div>

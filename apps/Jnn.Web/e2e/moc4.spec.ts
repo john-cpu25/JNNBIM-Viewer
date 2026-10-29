@@ -116,7 +116,7 @@ test.describe('Mốc 4 ThatOpen Adapter: Revit navigation, section gizmo, projec
     await page.goto('/?debug=1');
     await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
 
-    const archBtn = page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i });
+    const archBtn = page.getByRole('button', { name: /(Kiến trúc|Architecture) \(90 KB\)/i });
     await expect(archBtn).toBeVisible();
     await archBtn.click();
 

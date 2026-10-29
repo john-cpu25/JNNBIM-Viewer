@@ -130,7 +130,7 @@ export async function loadIfcFile(
     dispatch({
       type: 'notify',
       tone: 'error',
-      text: loc === 'en' ? `Error opening IFC: ${message}` : `Lỗi khi mở IFC: ${message}`,
+      text: translate('loader.errorOpening', { message }, loc),
     });
     return false;
   }
