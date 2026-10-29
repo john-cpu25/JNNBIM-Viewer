@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen, Loader2, UploadCloud } from 'lucide-react';
+import { FolderOpen, HelpCircle, Loader2, UploadCloud } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
 import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
@@ -36,6 +36,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   const [isDragging, setIsDragging] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [convertStatus, setConvertStatus] = useState<string>('');
+  const [showNavHelp, setShowNavHelp] = useState(false);
 
   const sample = isSampleMode();
 
@@ -118,6 +119,21 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   useEffect(() => report(viewer?.setXray(state.xray)), [viewer, state.xray]);
   useEffect(() => report(viewer?.setGridVisible?.(state.gridVisible)), [viewer, state.gridVisible]);
   useEffect(() => report(viewer?.setProjection(state.projection)), [viewer, state.projection]);
+  useEffect(() => {
+    viewer?.setNavigationSettings?.(state.navigation);
+  }, [viewer, state.navigation]);
+  useEffect(() => {
+    if (!viewer) return;
+    return viewer.on('navHint', (hint) => {
+      if (hint.kind === 'holdShiftToOrbit') {
+        dispatch({
+          type: 'notify',
+          tone: 'info',
+          text: 'Giữ Shift + kéo chuột trái (hoặc chuột giữa) để xoay mô hình',
+        });
+      }
+    });
+  }, [viewer, dispatch]);
   useEffect(() => viewer?.setTheme(state.theme), [viewer, state.theme]);
 
   // Drag and drop handler
@@ -207,6 +223,72 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           <ViewPresets />
           {state.section && <SectionPanel compact={compact} />}
           <Toolbar compact={compact} />
+
+          {/* Mouse navigation help popover */}
+          <div className="absolute right-3 bottom-3 z-20">
+            {showNavHelp && (
+              <div
+                className="mb-2 w-72 rounded-lg border border-line bg-surface/95 p-3 text-xs shadow-float backdrop-blur"
+                data-testid="nav-help-popover"
+              >
+                <div className="mb-2 flex items-center justify-between border-b border-line pb-1.5 font-semibold text-ink">
+                  <span>Thao tác chuột</span>
+                  <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent font-medium">
+                    {state.navigation.preset === 'revit' ? 'Kiểu Revit' : 'Cổ điển'}
+                  </span>
+                </div>
+                <div className="space-y-1.5 text-muted text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-ink font-medium">Xoay 3D:</span>
+                    <span>
+                      {state.navigation.preset === 'revit'
+                        ? 'Shift + Kéo trái / giữa'
+                        : 'Kéo chuột trái'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink font-medium">Di chuyển (Pan):</span>
+                    <span>Kéo chuột giữa / phải</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink font-medium">Thu phóng (Zoom):</span>
+                    <span>Lăn bánh xe chuột</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink font-medium">Vừa khung nhìn:</span>
+                    <span>Click đúp chuột giữa (hoặc phím F)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink font-medium">Chọn thêm:</span>
+                    <span>Shift / Ctrl + Click trái</span>
+                  </div>
+                </div>
+                <div className="mt-2.5 pt-2 border-t border-line flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNavHelp(false);
+                      dispatch({ type: 'setSettingsOpen', open: true });
+                    }}
+                    className="rounded bg-surface-2 px-2 py-1 text-[11px] font-medium text-ink transition hover:bg-line"
+                  >
+                    Đổi sơ đồ chuột
+                  </button>
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowNavHelp(!showNavHelp)}
+              aria-label="Trợ giúp điều hướng chuột"
+              className={cn(
+                'grid h-7 w-7 place-items-center rounded-full border border-line bg-surface/90 text-muted shadow-sm transition hover:bg-surface hover:text-ink',
+                showNavHelp && 'bg-accent text-accent-contrast border-transparent',
+              )}
+            >
+              <HelpCircle size={15} />
+            </button>
+          </div>
           {hovered && !compact && (
             <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-surface/90 px-2.5 py-1 text-xs text-muted shadow-float backdrop-blur">
               <span className="text-ink">{hovered.category}</span> · {hovered.name}

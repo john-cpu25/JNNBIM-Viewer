@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Settings, Sun } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import type { Layout } from '../lib/useLayout';
@@ -8,7 +8,6 @@ import { SettingsModal } from './SettingsModal';
 
 export function TopBar({ layout }: { layout: Layout }) {
   const { state, dispatch, viewer } = useApp();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appendFileInputRef = useRef<HTMLInputElement>(null);
   const m = state.model;
@@ -97,7 +96,7 @@ export function TopBar({ layout }: { layout: Layout }) {
         <IconButton
           icon={Settings}
           label="Cài đặt & Quản lý Cache"
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => dispatch({ type: 'setSettingsOpen', open: true })}
           data-testid="settings-btn"
         />
         <IconButton
@@ -115,7 +114,7 @@ export function TopBar({ layout }: { layout: Layout }) {
           />
         )}
       </div>
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal open={state.settingsOpen} onClose={() => dispatch({ type: 'setSettingsOpen', open: false })} />
     </header>
   );
 }

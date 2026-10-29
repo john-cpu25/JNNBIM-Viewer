@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Database, HardDrive, Trash2, X } from 'lucide-react';
+import { Compass, Database, HardDrive, RotateCcw, Trash2, X } from 'lucide-react';
 import { clearIfcCache, getIfcCacheStats, isIndexedDBAvailable, type CacheStats } from '../lib/ifcCache';
 import { formatBytes } from '../lib/format';
 import { useApp } from '../state/AppContext';
@@ -10,7 +10,7 @@ export interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const [stats, setStats] = useState<CacheStats>({ count: 0, totalBytes: 0, items: [] });
   const [loading, setLoading] = useState(false);
   const isIdbAvailable = isIndexedDBAvailable();
@@ -78,7 +78,124 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </div>
 
         {/* Content */}
-        <div className="space-y-4 py-4 text-xs">
+        <div className="space-y-4 py-4 text-xs max-h-[70vh] overflow-y-auto pr-1">
+          {/* Navigation Section */}
+          <div className="rounded-lg border border-line bg-surface-2 p-3" data-testid="nav-settings-section">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-medium text-ink">
+                <Compass size={15} className="text-accent" />
+                <span>Điều hướng chuột (Navigation)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'resetNavigation' })}
+                className="flex items-center gap-1 text-[11px] text-muted transition hover:text-ink"
+              >
+                <RotateCcw size={12} />
+                <span>Khôi phục mặc định</span>
+              </button>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {/* Preset selection */}
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-muted">Sơ đồ chuột</label>
+                <select
+                  value={state.navigation.preset}
+                  onChange={(e) =>
+                    dispatch({
+                      type: 'setNavigation',
+                      settings: { preset: e.target.value as any },
+                    })
+                  }
+                  className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
+                  data-testid="nav-preset-select"
+                >
+                  <option value="revit">Revit (Shift + kéo trái / giữa để xoay)</option>
+                  <option value="classic">Cổ điển (Kéo trái để xoay)</option>
+                </select>
+              </div>
+
+              {/* Rotate Speed Slider */}
+              <div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="font-medium text-muted">Tốc độ xoay</span>
+                  <span className="font-mono text-ink">{Math.round(state.navigation.rotateSpeed * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.05"
+                  value={state.navigation.rotateSpeed}
+                  onChange={(e) =>
+                    dispatch({
+                      type: 'setNavigation',
+                      settings: { rotateSpeed: parseFloat(e.target.value) },
+                    })
+                  }
+                  className="mt-1 w-full accent-accent"
+                  data-testid="rotate-speed-slider"
+                />
+              </div>
+
+              {/* Zoom Speed Slider */}
+              <div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="font-medium text-muted">Tốc độ zoom</span>
+                  <span className="font-mono text-ink">{state.navigation.zoomSpeed.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="2.0"
+                  step="0.1"
+                  value={state.navigation.zoomSpeed}
+                  onChange={(e) =>
+                    dispatch({
+                      type: 'setNavigation',
+                      settings: { zoomSpeed: parseFloat(e.target.value) },
+                    })
+                  }
+                  className="mt-1 w-full accent-accent"
+                  data-testid="zoom-speed-slider"
+                />
+              </div>
+
+              {/* Checkboxes */}
+              <div className="space-y-1.5 pt-1">
+                <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
+                  <input
+                    type="checkbox"
+                    checked={state.navigation.orbitAroundCursor}
+                    onChange={(e) =>
+                      dispatch({
+                        type: 'setNavigation',
+                        settings: { orbitAroundCursor: e.target.checked },
+                      })
+                    }
+                    className="rounded border-line accent-accent"
+                  />
+                  <span>Xoay quanh điểm dưới con trỏ</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
+                  <input
+                    type="checkbox"
+                    checked={state.navigation.showPivot}
+                    onChange={(e) =>
+                      dispatch({
+                        type: 'setNavigation',
+                        settings: { showPivot: e.target.checked },
+                      })
+                    }
+                    className="rounded border-line accent-accent"
+                  />
+                  <span>Hiện điểm tụ (chấm cam) khi xoay</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
           {/* IndexedDB Cache Section */}
           <div className="rounded-lg border border-line bg-surface-2 p-3">
             <div className="flex items-center gap-2 font-medium text-ink">

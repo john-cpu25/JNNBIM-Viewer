@@ -9,7 +9,7 @@ import {
   type TreeNode,
 } from '../domain/tree';
 import { EMPTY_VISIBILITY, hide, isolate, show, toggleGroup, type VisibilityState } from '../domain/visibility';
-import type { SectionAxis, SectionSpec, Vec3 } from '../viewer/ViewerAdapter';
+import { DEFAULT_NAV, type NavigationSettings, type SectionAxis, type SectionSpec, type Vec3 } from '../viewer/ViewerAdapter';
 
 export type Theme = 'light' | 'dark';
 export type MobilePane = 'explorer' | 'viewer' | 'properties';
@@ -40,6 +40,8 @@ export interface AppState {
   propertiesOpen: boolean;
   rightTab: 'properties' | 'clash' | 'rules';
   gridVisible: boolean;
+  navigation: NavigationSettings;
+  settingsOpen: boolean;
   mobilePane: MobilePane;
   notices: Notice[];
 }
@@ -66,6 +68,9 @@ export type Action =
   | { type: 'setRightTab'; tab: 'properties' | 'clash' | 'rules' }
   | { type: 'toggleGrid' }
   | { type: 'setGridVisible'; visible: boolean }
+  | { type: 'setNavigation'; settings: Partial<NavigationSettings> }
+  | { type: 'resetNavigation' }
+  | { type: 'setSettingsOpen'; open: boolean }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
   | { type: 'dismissNotice'; id: number }
@@ -75,6 +80,14 @@ export type Action =
   | { type: 'toggleModelVisibility'; modelId: string; visible?: boolean };
 
 let noticeSeq = 1;
+
+function loadSavedNav(): NavigationSettings {
+  try {
+    const raw = localStorage.getItem('jnn-nav-settings');
+    if (raw) return { ...DEFAULT_NAV, ...JSON.parse(raw) };
+  } catch {}
+  return structuredClone(DEFAULT_NAV);
+}
 
 export function createInitialState(model: JnnModel, theme: Theme): AppState {
   const fed: FederatedModel = {
@@ -107,6 +120,8 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     propertiesOpen: true,
     rightTab: 'properties',
     gridVisible: true,
+    navigation: loadSavedNav(),
+    settingsOpen: false,
     mobilePane: 'viewer',
     notices: [],
   };
@@ -184,6 +199,22 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, gridVisible: !state.gridVisible };
     case 'setGridVisible':
       return { ...state, gridVisible: action.visible };
+    case 'setNavigation': {
+      const next = { ...state.navigation, ...action.settings };
+      try {
+        localStorage.setItem('jnn-nav-settings', JSON.stringify(next));
+      } catch {}
+      return { ...state, navigation: next };
+    }
+    case 'resetNavigation': {
+      const next = structuredClone(DEFAULT_NAV);
+      try {
+        localStorage.removeItem('jnn-nav-settings');
+      } catch {}
+      return { ...state, navigation: next };
+    }
+    case 'setSettingsOpen':
+      return { ...state, settingsOpen: action.open };
     case 'setTheme':
       return { ...state, theme: action.theme };
     case 'togglePanel': {
@@ -208,6 +239,8 @@ export function reducer(state: AppState, action: Action): AppState {
         rightTab: state.rightTab,
         mobilePane: state.mobilePane,
         gridVisible: state.gridVisible,
+        navigation: state.navigation,
+        settingsOpen: state.settingsOpen,
       };
     }
     case 'appendModel': {

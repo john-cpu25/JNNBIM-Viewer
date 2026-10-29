@@ -112,6 +112,30 @@ describe('reducer', () => {
     s = reducer(s, { type: 'setModel', model });
     expect(s.gridVisible).toBe(false);
   });
+
+  it('manages navigation settings and settings modal in store', () => {
+    let s = init();
+    expect(s.navigation.preset).toBe('revit');
+    expect(s.navigation.rotateSpeed).toBe(0.4);
+    expect(s.settingsOpen).toBe(false);
+
+    s = reducer(s, { type: 'setNavigation', settings: { preset: 'classic', rotateSpeed: 0.8 } });
+    expect(s.navigation.preset).toBe('classic');
+    expect(s.navigation.rotateSpeed).toBe(0.8);
+
+    s = reducer(s, { type: 'setSettingsOpen', open: true });
+    expect(s.settingsOpen).toBe(true);
+
+    s = reducer(s, { type: 'resetNavigation' });
+    expect(s.navigation.preset).toBe('revit');
+    expect(s.navigation.rotateSpeed).toBe(0.4);
+
+    // Preserved on setModel
+    s = reducer(s, { type: 'setNavigation', settings: { rotateSpeed: 0.7 } });
+    s = reducer(s, { type: 'setModel', model });
+    expect(s.navigation.rotateSpeed).toBe(0.7);
+    expect(s.settingsOpen).toBe(true);
+  });
 });
 
 describe('defaultPlane', () => {
