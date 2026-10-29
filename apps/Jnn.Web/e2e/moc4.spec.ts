@@ -109,3 +109,110 @@ test.describe('Mốc 4: UI Polish, Revit Navigation, ViewCube, Section Box, i18n
     await expect(page.getByTestId('open-ifc-btn')).toContainText('Open IFC');
   });
 });
+
+test.describe('Mốc 4 ThatOpen Adapter: Revit navigation, section gizmo, projection', () => {
+  test('E2E with ThatOpen adapter: left drag hint, Shift+left orbit, gizmo Z-max drag, X min input, P toggle and middle pan', async ({ page }) => {
+    test.setTimeout(75_000);
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    const archBtn = page.getByRole('button', { name: /Kiến trúc \(90 KB\)/i });
+    await expect(archBtn).toBeVisible();
+    await archBtn.click();
+
+    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 50_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
+
+    const canvas = page.getByTestId('viewer-host').locator('canvas');
+    await expect(canvas).toBeVisible();
+    const box = (await canvas.boundingBox())!;
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+
+    // 1. Left-drag without Shift -> camera position does NOT move
+    const camBeforeLeft = await page.evaluate(() => (window.__jnn!.viewer.getCamera() as any).value);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(startX + 80, startY + 40, { steps: 5 });
+    await page.mouse.up({ button: 'left' });
+
+    const camAfterLeft = await page.evaluate(() => (window.__jnn!.viewer.getCamera() as any).value);
+    expect(camAfterLeft.position[0]).toBeCloseTo(camBeforeLeft.position[0], 2);
+    expect(camAfterLeft.position[1]).toBeCloseTo(camBeforeLeft.position[1], 2);
+    expect(camAfterLeft.position[2]).toBeCloseTo(camBeforeLeft.position[2], 2);
+
+    // 2. Shift + left-drag -> camera moves / orbits
+    const camBeforeShift = await page.evaluate(() => (window.__jnn!.viewer.getCamera() as any).value);
+    await page.keyboard.down('Shift');
+    await page.mouse.move(startX, startY);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(startX + 120, startY + 60, { steps: 5 });
+    await page.mouse.up({ button: 'left' });
+    await page.keyboard.up('Shift');
+
+    const camAfterShift = await page.evaluate(() => (window.__jnn!.viewer.getCamera() as any).value);
+    const distShift = Math.hypot(
+      camAfterShift.position[0] - camBeforeShift.position[0],
+      camAfterShift.position[1] - camBeforeShift.position[1],
+      camAfterShift.position[2] - camBeforeShift.position[2]
+    );
+    expect(distShift).toBeGreaterThan(0.05);
+
+    // 3. Open Section Box with 'B'
+    await page.keyboard.press('b');
+    const panel = page.getByTestId('section-panel');
+    await expect(panel).toBeVisible();
+
+    // Find screen position of Z-max handle and drag it down
+    const handleScreenPos = await page.evaluate(() => {
+      const viewer = window.__jnn?.viewer as any;
+      const sectionGizmo = viewer?.sectionGizmo;
+      const handleObj = sectionGizmo?.handles?.get('z-max');
+      if (!handleObj) return null;
+      const worldPos = handleObj.group.position.clone();
+      worldPos.project(viewer.world.camera.three);
+      const host = document.querySelector('[data-testid="viewer-host"]');
+      const rect = host!.getBoundingClientRect();
+      const x = ((worldPos.x + 1) / 2) * rect.width + rect.left;
+      const y = ((-worldPos.y + 1) / 2) * rect.height + rect.top;
+      return { x, y };
+    });
+
+    expect(handleScreenPos).not.toBeNull();
+    const zMaxInput = page.getByTestId('section-box-max-z');
+    const initialZMax = parseFloat(await zMaxInput.inputValue());
+
+    await page.mouse.move(handleScreenPos!.x, handleScreenPos!.y);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(handleScreenPos!.x, handleScreenPos!.y + 50, { steps: 5 });
+    await page.mouse.up({ button: 'left' });
+
+    const afterZMax = parseFloat(await zMaxInput.inputValue());
+    expect(afterZMax).toBeLessThan(initialZMax);
+
+    // 4. Type numeric input X min -> box updates
+    const xMinInput = page.getByTestId('section-box-min-x');
+    await xMinInput.fill('-15');
+    await xMinInput.press('Enter');
+    const currentSection = await page.evaluate(() => (window.__jnn!.getState() as any).section);
+    expect(currentSection.min[0]).toBeCloseTo(-15, 1);
+
+    // 5. Toggle projection ('P') -> middle drag still pans
+    const targetBeforePan = await page.evaluate(() => (window.__jnn!.viewer.getCamera() as any).value.target);
+    await page.keyboard.press('p');
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down({ button: 'middle' });
+    await page.mouse.move(startX + 80, startY + 40, { steps: 5 });
+    await page.mouse.up({ button: 'middle' });
+
+    const targetAfterPan = await page.evaluate(() => (window.__jnn!.viewer.getCamera() as any).value.target);
+    const distPan = Math.hypot(
+      targetAfterPan[0] - targetBeforePan[0],
+      targetAfterPan[1] - targetBeforePan[1],
+      targetAfterPan[2] - targetBeforePan[2]
+    );
+    expect(distPan).toBeGreaterThan(0.05);
+  });
+});
+
