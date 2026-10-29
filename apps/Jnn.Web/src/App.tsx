@@ -15,6 +15,7 @@ import { StatusBar } from './components/StatusBar';
 import { MobileNav } from './components/MobileNav';
 import { Notices } from './components/Notices';
 import { cn } from './lib/cn';
+import { I18nProvider } from './i18n';
 
 export default function App() {
   const sample = isSampleMode();
@@ -53,27 +54,29 @@ export default function App() {
     );
 
   return (
-    <AppContext.Provider value={ctx}>
-      <div className="flex h-full flex-col" data-layout={layout}>
-        <TopBar layout={layout} />
-        <main className="relative flex min-h-0 flex-1">
-          {showExplorer && (
-            <aside className={panelClass('left')} aria-label="Model explorer" data-testid="explorer-panel">
-              <Explorer />
-            </aside>
-          )}
-          <section className="relative min-w-0 flex-1" aria-label="3D viewer">
-            <Viewport model={state.model} onViewer={setViewer} compact={isNarrow} />
-          </section>
-          {showProperties && (
-            <aside className={panelClass('right')} aria-label="Properties and Clash" data-testid="properties-panel">
-              <RightPanel />
-            </aside>
-          )}
-          <Notices />
-        </main>
-        {isNarrow ? <MobileNav /> : <StatusBar />}
-      </div>
-    </AppContext.Provider>
+    <I18nProvider>
+      <AppContext.Provider value={ctx}>
+        <div className="flex h-full flex-col" data-layout={layout}>
+          <TopBar layout={layout} />
+          <main className="relative flex min-h-0 flex-1">
+            {showExplorer && (
+              <aside className={panelClass('left')} aria-label="Model explorer" data-testid="explorer-panel">
+                <Explorer />
+              </aside>
+            )}
+            <section className="relative min-w-0 flex-1" aria-label="3D viewer">
+              <Viewport model={state.model} onViewer={setViewer} compact={isNarrow} />
+            </section>
+            {showProperties && (
+              <aside className={panelClass('right')} aria-label="Properties and Clash" data-testid="properties-panel">
+                <RightPanel />
+              </aside>
+            )}
+            <Notices />
+          </main>
+          {isNarrow ? <MobileNav /> : <StatusBar />}
+        </div>
+      </AppContext.Provider>
+    </I18nProvider>
   );
 }

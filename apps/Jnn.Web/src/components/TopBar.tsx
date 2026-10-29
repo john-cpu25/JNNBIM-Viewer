@@ -5,9 +5,11 @@ import type { Layout } from '../lib/useLayout';
 import { IconButton } from './ui';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
 import { SettingsModal } from './SettingsModal';
+import { useTranslation } from '../i18n';
 
 export function TopBar({ layout }: { layout: Layout }) {
   const { state, dispatch, viewer } = useApp();
+  const { t, locale, setLocale } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appendFileInputRef = useRef<HTMLInputElement>(null);
   const m = state.model;
@@ -99,6 +101,16 @@ export function TopBar({ layout }: { layout: Layout }) {
           onClick={() => dispatch({ type: 'setSettingsOpen', open: true })}
           data-testid="settings-btn"
         />
+        <button
+          type="button"
+          onClick={() => setLocale(locale === 'vi' ? 'en' : 'vi')}
+          title={locale === 'vi' ? 'Chuyển sang tiếng Anh (Switch to English)' : 'Chuyển sang tiếng Việt'}
+          aria-label={t('topbar.language')}
+          data-testid="language-toggle"
+          className="flex h-7 items-center justify-center rounded-md border border-line bg-surface-2 px-2 text-xs font-semibold text-ink transition-colors hover:border-accent hover:text-accent"
+        >
+          {locale.toUpperCase()}
+        </button>
         <IconButton
           icon={state.theme === 'dark' ? Sun : Moon}
           label={state.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
