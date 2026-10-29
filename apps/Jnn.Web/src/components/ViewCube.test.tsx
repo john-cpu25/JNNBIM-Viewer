@@ -19,4 +19,27 @@ describe('ViewCube 3D component', () => {
     expect(cube).toBeInTheDocument();
     expect(screen.getByTestId('viewcube-canvas')).toBeInTheDocument();
   });
+
+  it('handles pointer events on canvas without crashing', () => {
+    const model = createSampleModel();
+    const state = createInitialState(model, 'light');
+    const fakeViewer: any = {
+      getCamera: () => ({ ok: true, value: { position: [10, 10, 10], target: [0, 0, 0], projection: 'perspective' } }),
+      on: () => () => {},
+      orbitBy: () => ({ ok: true }),
+      setViewPreset: () => ({ ok: true }),
+    };
+
+    render(
+      <AppContext.Provider value={{ state, dispatch: () => {}, viewer: fakeViewer }}>
+        <ViewCube />
+      </AppContext.Provider>,
+    );
+
+    const canvas = screen.getByTestId('viewcube-canvas');
+    canvas.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 50, clientY: 50 }));
+    canvas.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 60, clientY: 50 }));
+    canvas.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 60, clientY: 50 }));
+    expect(canvas).toBeInTheDocument();
+  });
 });

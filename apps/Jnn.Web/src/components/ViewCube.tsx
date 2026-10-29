@@ -175,9 +175,127 @@ export function ViewCube() {
       updateFromCamera();
     });
 
+    // Interaction: Raycasting, Hover, Click to snap preset, Drag to orbit
+    const raycaster = new THREE.Raycaster();
+    const mouseNdc = new THREE.Vector2();
+    let hoveredMesh: THREE.Mesh | null = null;
+    let isDown = false;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let lastX = 0;
+    let lastY = 0;
+
+    const getPointerNdc = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / (rect.width || 1)) * 2 - 1;
+      const y = -((e.clientY - rect.top) / (rect.height || 1)) * 2 + 1;
+      return mouseNdc.set(x, y);
+    };
+
+    const clearHover = () => {
+      if (hoveredMesh) {
+        const mat = hoveredMesh.material as THREE.MeshLambertMaterial;
+        mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+        hoveredMesh = null;
+        canvas.style.cursor = 'grab';
+        render();
+      }
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      isDown = true;
+      isDragging = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {}
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (isDown) {
+        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+        if (dist > 4) {
+          isDragging = true;
+          canvas.style.cursor = 'grabbing';
+          clearHover();
+        }
+        if (isDragging) {
+          const dx = e.clientX - lastX;
+          const dy = e.clientY - lastY;
+          lastX = e.clientX;
+          lastY = e.clientY;
+          viewer?.orbitBy?.(-dx * 0.015, -dy * 0.015, false);
+          return;
+        }
+      }
+
+      // Hover hit test
+      const ndc = getPointerNdc(e);
+      raycaster.setFromCamera(ndc, camera);
+      const intersects = raycaster.intersectObjects([...meshMap.keys()]);
+      if (intersects.length > 0 && intersects[0]) {
+        const hitMesh = intersects[0].object as THREE.Mesh;
+        if (hitMesh !== hoveredMesh) {
+          clearHover();
+          hoveredMesh = hitMesh;
+          const mat = hitMesh.material as THREE.MeshLambertMaterial;
+          mat.emissive.setHex(0xfab005);
+          mat.emissiveIntensity = 0.5;
+          canvas.style.cursor = 'pointer';
+          render();
+        }
+      } else {
+        clearHover();
+      }
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (!isDown) return;
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch {}
+      isDown = false;
+      canvas.style.cursor = 'grab';
+
+      if (!isDragging) {
+        const ndc = getPointerNdc(e);
+        raycaster.setFromCamera(ndc, camera);
+        const intersects = raycaster.intersectObjects([...meshMap.keys()]);
+        if (intersects.length > 0 && intersects[0]) {
+          const hitMesh = intersects[0].object as THREE.Mesh;
+          const part = meshMap.get(hitMesh);
+          if (part && viewer) {
+            viewer.setViewPreset(part.preset);
+          }
+        }
+      }
+      isDragging = false;
+    };
+
+    const onPointerLeave = () => {
+      if (!isDown) {
+        clearHover();
+      }
+    };
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+
     render();
 
     return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
       unsub?.();
       renderer.dispose();
       texturesToDispose.forEach((t) => t.dispose());
