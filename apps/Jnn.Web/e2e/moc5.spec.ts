@@ -306,5 +306,54 @@ test.describe('Mốc 5: Group J - Saved Views (J2) on ThatOpen', () => {
 
     expect(download.suggestedFilename()).toMatch(/^JNN_.*\.png$/);
   });
+
+  test('J6: Levels dropdown isolates storey elements and restores all storeys', async ({ page }) => {
+    await openThatOpenArch(page);
+
+    // 1. Levels dropdown button is present
+    const levelsBtn = page.getByTestId('levels-dropdown-btn');
+    await expect(levelsBtn).toBeVisible();
+
+    // 2. Open dropdown
+    await levelsBtn.click();
+    const menu = page.getByTestId('levels-dropdown-menu');
+    await expect(menu).toBeVisible();
+
+    // Storey items are displayed
+    const storeyItems = page.getByTestId('level-item');
+    const count = await storeyItems.count();
+    expect(count).toBeGreaterThan(0);
+
+    // 3. Select first storey
+    await storeyItems.first().click();
+    await page.waitForTimeout(400);
+
+    // Verify isolation is active in state
+    let vis = await page.evaluate(() => {
+      const s = (window as any).__jnn.getState();
+      return {
+        selectedStoreyId: s.selectedStoreyId,
+        isolatedCount: s.visibility.isolated.size,
+      };
+    });
+    expect(vis.selectedStoreyId).toBeTruthy();
+    expect(vis.isolatedCount).toBeGreaterThan(0);
+
+    // 4. Click Levels dropdown again and select 'All Levels'
+    await levelsBtn.click();
+    await expect(menu).toBeVisible();
+    await page.getByTestId('level-item-all').click();
+    await page.waitForTimeout(400);
+
+    vis = await page.evaluate(() => {
+      const s = (window as any).__jnn.getState();
+      return {
+        selectedStoreyId: s.selectedStoreyId,
+        isolatedCount: s.visibility.isolated.size,
+      };
+    });
+    expect(vis.selectedStoreyId).toBeNull();
+    expect(vis.isolatedCount).toBe(0);
+  });
 });
 

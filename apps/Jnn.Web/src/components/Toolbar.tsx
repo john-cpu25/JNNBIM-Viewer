@@ -17,6 +17,7 @@ import {
 import { useApp } from '../state/AppContext';
 import { runCommand, type CommandId } from '../lib/commands';
 import { Divider, IconButton } from './ui';
+import { LevelsDropdown } from './LevelsDropdown';
 import { cn } from '../lib/cn';
 import { useTranslation } from '../i18n';
 
@@ -33,7 +34,7 @@ export function Toolbar({ compact }: { compact: boolean }) {
       aria-label="Viewer tools"
       data-testid="viewer-toolbar"
       className={cn(
-        'absolute left-1/2 z-20 flex max-w-[calc(100%-16px)] -translate-x-1/2 items-center gap-0.5 overflow-x-auto rounded-lg border border-line bg-surface/95 p-1 shadow-float backdrop-blur scroll-thin',
+        'absolute left-1/2 z-30 flex max-w-[calc(100%-16px)] -translate-x-1/2 items-center gap-0.5 overflow-visible rounded-lg border border-line bg-surface/95 p-1 shadow-float backdrop-blur',
         compact ? 'bottom-2' : 'bottom-4',
       )}
     >
@@ -116,6 +117,12 @@ export function Toolbar({ compact }: { compact: boolean }) {
         onClick={() => run('screenshot')}
         data-testid="screenshot-btn"
       />
+      {state.model.storeys.length > 0 && (
+        <>
+          <Divider vertical />
+          <LevelsDropdown />
+        </>
+      )}
       {hasSel && (
         <>
           <Divider vertical />

@@ -9,6 +9,8 @@ import {
   type TreeNode,
 } from '../domain/tree';
 import { EMPTY_VISIBILITY, hide, isolate, show, toggleGroup, type VisibilityState } from '../domain/visibility';
+import { boundsOf, isEmpty } from '../domain/bounds';
+import { boxForStorey } from '../viewer/sectionMath';
 import {
   DEFAULT_NAV,
   type MeasureItem,
@@ -66,6 +68,7 @@ export interface AppState {
   measurementsVisible: boolean;
   measurePanelOpen: boolean;
   savedViews: SavedView[];
+  selectedStoreyId: string | null;
 }
 
 export type Action =
@@ -86,6 +89,7 @@ export type Action =
   | { type: 'setSectionFrameVisible'; visible: boolean }
   | { type: 'setSectionPickMode'; on: boolean }
   | { type: 'toggleXray' }
+  | { type: 'setXray'; enabled: boolean }
   | { type: 'setProjection'; projection: AppState['projection'] }
   | { type: 'setTheme'; theme: Theme }
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
@@ -95,6 +99,7 @@ export type Action =
   | { type: 'deleteSavedView'; id: string }
   | { type: 'renameSavedView'; id: string; name: string }
   | { type: 'applySavedView'; view: SavedView }
+  | { type: 'selectStorey'; storeyId: string | null; ghostOthers?: boolean; applySection?: boolean }
   | { type: 'toggleGrid' }
   | { type: 'setGridVisible'; visible: boolean }
   | { type: 'setNavigation'; settings: Partial<NavigationSettings> }
@@ -171,6 +176,7 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     measurementsVisible: true,
     measurePanelOpen: false,
     savedViews: loadSavedViews(model.modelId || model.name || 'default'),
+    selectedStoreyId: null,
   };
 }
 
@@ -270,6 +276,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, sectionPickMode: action.on };
     case 'toggleXray':
       return { ...state, xray: !state.xray };
+    case 'setXray':
+      return { ...state, xray: action.enabled };
     case 'setProjection':
       return { ...state, projection: action.projection };
     case 'toggleGrid':
@@ -440,6 +448,39 @@ export function reducer(state: AppState, action: Action): AppState {
         },
         xray: action.view.xray,
         projection: action.view.camera.projection,
+      };
+    }
+    case 'selectStorey': {
+      if (!action.storeyId) {
+        return {
+          ...state,
+          selectedStoreyId: null,
+          visibility: EMPTY_VISIBILITY,
+          xray: false,
+          section: action.applySection ? null : state.section,
+        };
+      }
+      const s = state.model.storeys.find((st) => st.id === action.storeyId);
+      const name = s?.name;
+      const ids = state.model.elements
+        .filter((e) => (name && e.storey === name) || e.storey === action.storeyId)
+        .map((e) => e.id);
+      const nextVis = isolate(ids);
+      let nextSection = state.section;
+      if (action.applySection && s) {
+        const idx = state.model.storeys.findIndex((st) => st.id === action.storeyId);
+        const b = boundsOf(state.model.elements);
+        if (!isEmpty(b)) {
+          const box = boxForStorey(state.model.storeys, idx, b, b);
+          nextSection = { kind: 'box', min: box.min, max: box.max };
+        }
+      }
+      return {
+        ...state,
+        selectedStoreyId: action.storeyId,
+        visibility: nextVis,
+        xray: Boolean(action.ghostOthers),
+        section: nextSection,
       };
     }
   }
