@@ -122,6 +122,19 @@ export interface FpsStats {
   raycastCount?: number;
 }
 
+export type BoxSelectEvent =
+  | {
+      phase: 'drag';
+      start: { x: number; y: number };
+      current: { x: number; y: number };
+      mode: 'window' | 'crossing';
+    }
+  | {
+      phase: 'end';
+      ids: string[];
+      additive: boolean;
+    };
+
 export interface ViewerEvents {
   /** Fired on a click in the viewport (not after an orbit/pan drag). */
   pick: { result: PickResult | null; additive: boolean };
@@ -130,6 +143,7 @@ export interface ViewerEvents {
   navHint: { kind: 'holdShiftToOrbit' };
   sectionEdit: { spec: SectionSpec; phase: 'drag' | 'end'; handle?: string };
   fpsStats: FpsStats;
+  boxSelect: BoxSelectEvent;
 }
 
 export type ViewerEventName = keyof ViewerEvents;

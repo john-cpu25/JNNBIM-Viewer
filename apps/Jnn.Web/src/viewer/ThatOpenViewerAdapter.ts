@@ -16,7 +16,7 @@ import * as WebIFC from 'web-ifc';
 import type { FragmentsModel } from '@thatopen/fragments';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
-import { center as boundsCenter, size as boundsSize } from '../domain/bounds';
+import { boundsOf, center as boundsCenter, isEmpty, size as boundsSize } from '../domain/bounds';
 import { isVisible, type VisibilityState } from '../domain/visibility';
 import {
   mapIfcToJnnModel,
@@ -45,9 +45,11 @@ import {
 } from './ViewerAdapter';
 import {
   baseMapping,
+  boxSelectMode,
   choosePivot,
   DRAG_THRESHOLD_PX,
   intentOnDown,
+  normalizeRect,
   orbitMapping,
   shouldReanchorOnShift,
   shouldUseHoverCache,
@@ -167,7 +169,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     button: number;
     pointerId: number;
   } | null = null;
-  private hintShown = false;
   private lastMiddleDown = 0;
 
   private clipPlanes: THREE.Plane[] = [];
@@ -378,7 +379,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       ev.preventDefault();
     }
 
-    const intent = intentOnDown(this.nav.preset, ev.button, ev.shiftKey);
+    const intent =
+      this.nav.preset === 'classic' && (ev.altKey || ev.ctrlKey) && ev.button === 0
+        ? 'none'
+        : intentOnDown(this.nav.preset, ev.button, ev.shiftKey);
     this.gesture = {
       intent,
       x: ev.clientX,
@@ -473,9 +477,15 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       g.intent = 'orbit';
       this.applyMouseMapping(true);
     }
-    if (g.intent === 'none' && g.button === 0 && moved > 10 && this.nav.preset === 'revit' && !this.hintShown) {
-      this.hintShown = true;
-      this.events.emit('navHint', { kind: 'holdShiftToOrbit' });
+    if (g.button === 0 && (g.intent === 'none' || g.intent === 'box-select') && moved > DRAG_THRESHOLD_PX) {
+      g.intent = 'box-select';
+      const mode = boxSelectMode({ x: g.x, y: g.y }, { x: ev.clientX, y: ev.clientY });
+      this.events.emit('boxSelect', {
+        phase: 'drag',
+        start: { x: g.x, y: g.y },
+        current: { x: ev.clientX, y: ev.clientY },
+        mode,
+      });
     }
   };
 
@@ -505,9 +515,95 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     if (this.gesture?.pointerId !== ev.pointerId) return;
+    const g = this.gesture;
     this.gesture = null;
     this.applyMouseMapping(false);
+
+    if (g.intent === 'box-select') {
+      const moved = Math.hypot(ev.clientX - g.x, ev.clientY - g.y);
+      if (moved > DRAG_THRESHOLD_PX) {
+        void this.handleBoxSelect(g.x, g.y, ev.clientX, ev.clientY, ev.ctrlKey || ev.metaKey);
+        return;
+      }
+    }
   };
+
+  private async handleBoxSelect(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    additive: boolean,
+  ): Promise<void> {
+    const { minX, minY, maxX, maxY, mode } = normalizeRect(
+      { x: startX, y: startY },
+      { x: endX, y: endY },
+    );
+
+    const allSelectedIds: string[] = [];
+    if (this.world && this.world.camera && this.world.renderer) {
+      const dom = this.world.renderer.three.domElement;
+      const camera = this.world.camera.three as any;
+
+      for (const entry of this.modelsMap.values()) {
+        if (!entry.model || !entry.model.object.visible) continue;
+        if (typeof (entry.model as any).rectangleRaycast === 'function') {
+          try {
+            const res = await (entry.model as any).rectangleRaycast({
+              camera,
+              dom,
+              topLeft: new THREE.Vector2(minX, minY),
+              bottomRight: new THREE.Vector2(maxX, maxY),
+              fullyIncluded: mode === 'window',
+            });
+            if (res && res.localIds && Array.isArray(res.localIds)) {
+              for (const localId of res.localIds) {
+                const elementId = `${entry.jnnModel.modelId}:${localId}`;
+                if (!isVisible(elementId, this.visibility)) continue;
+
+                if (this.currentSection) {
+                  const el = entry.jnnModel.elements.find((e) => e.id === elementId);
+                  if (el) {
+                    const b = boundsOf([el]);
+                    if (!isEmpty(b)) {
+                      if (this.currentSection.kind === 'box') {
+                        const sec = this.currentSection;
+                        if (
+                          b.max[0] < sec.min[0] || b.min[0] > sec.max[0] ||
+                          b.max[1] < sec.min[1] || b.min[1] > sec.max[1] ||
+                          b.max[2] < sec.min[2] || b.min[2] > sec.max[2]
+                        ) {
+                          continue;
+                        }
+                      } else if (this.currentSection.kind === 'plane') {
+                        const sec = this.currentSection;
+                        const axisIdx = sec.axis === 'x' ? 0 : sec.axis === 'y' ? 1 : 2;
+                        if (sec.flipped) {
+                          if (b.min[axisIdx] > sec.offset) continue;
+                        } else {
+                          if (b.max[axisIdx] < sec.offset) continue;
+                        }
+                      }
+                    }
+                  }
+                }
+
+                allSelectedIds.push(elementId);
+              }
+            }
+          } catch (err) {
+            console.warn('rectangleRaycast failed:', err);
+          }
+        }
+      }
+    }
+
+    this.events.emit('boxSelect', {
+      phase: 'end',
+      ids: allSelectedIds,
+      additive,
+    });
+  }
 
   private onWindowKeyDown = (ev: KeyboardEvent) => {
     if (ev.key !== 'Shift') return;

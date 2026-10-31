@@ -9,6 +9,8 @@ import {
   shouldReanchorOnShift,
   shouldUseHoverCache,
   worldUnitsPerPixel,
+  boxSelectMode,
+  normalizeRect,
 } from './navigation';
 
 const A = CameraControls.ACTION;
@@ -169,5 +171,38 @@ describe('shouldReanchorOnShift (Hotfix 2 - F1)', () => {
 
   it('accepts left-click idle gesture in revit mode when pressing Shift', () => {
     expect(shouldReanchorOnShift(false, { button: 0, intent: 'none' })).toBe(true);
+  });
+});
+
+describe('boxSelectMode & normalizeRect (Group H2)', () => {
+  it('determines window selection when dragging left to right', () => {
+    expect(boxSelectMode({ x: 100, y: 150 }, { x: 300, y: 250 })).toBe('window');
+    expect(boxSelectMode({ x: 100, y: 150 }, { x: 100, y: 250 })).toBe('window');
+  });
+
+  it('determines crossing selection when dragging right to left', () => {
+    expect(boxSelectMode({ x: 300, y: 150 }, { x: 100, y: 250 })).toBe('crossing');
+  });
+
+  it('normalizes rectangle coordinates correctly for window selection', () => {
+    const rect = normalizeRect({ x: 50, y: 80 }, { x: 200, y: 300 });
+    expect(rect.minX).toBe(50);
+    expect(rect.maxX).toBe(200);
+    expect(rect.minY).toBe(80);
+    expect(rect.maxY).toBe(300);
+    expect(rect.width).toBe(150);
+    expect(rect.height).toBe(220);
+    expect(rect.mode).toBe('window');
+  });
+
+  it('normalizes rectangle coordinates correctly for crossing selection (bottom-right to top-left)', () => {
+    const rect = normalizeRect({ x: 400, y: 500 }, { x: 150, y: 200 });
+    expect(rect.minX).toBe(150);
+    expect(rect.maxX).toBe(400);
+    expect(rect.minY).toBe(200);
+    expect(rect.maxY).toBe(500);
+    expect(rect.width).toBe(250);
+    expect(rect.height).toBe(300);
+    expect(rect.mode).toBe('crossing');
   });
 });

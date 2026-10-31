@@ -35,7 +35,45 @@ export function orbitMapping(base: MouseMapping): MouseMapping {
   return { ...base, left: A.ROTATE, middle: A.ROTATE };
 }
 
-export type GestureIntent = 'orbit-pending' | 'orbit' | 'pan' | 'none';
+export type GestureIntent = 'orbit-pending' | 'orbit' | 'pan' | 'box-select' | 'none';
+
+export type BoxSelectMode = 'window' | 'crossing';
+
+export function boxSelectMode(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): BoxSelectMode {
+  return start.x <= end.x ? 'window' : 'crossing';
+}
+
+export interface NormalizedRect {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+  mode: BoxSelectMode;
+}
+
+export function normalizeRect(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+): NormalizedRect {
+  const minX = Math.min(start.x, end.x);
+  const maxX = Math.max(start.x, end.x);
+  const minY = Math.min(start.y, end.y);
+  const maxY = Math.max(start.y, end.y);
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+    mode: start.x <= end.x ? 'window' : 'crossing',
+  };
+}
 
 /** Xác định ý định từ nút + Shift ở thời điểm pointerdown. */
 export function intentOnDown(preset: NavigationPreset, button: number, shift: boolean): GestureIntent {

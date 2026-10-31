@@ -48,6 +48,11 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   const [showNavHelp, setShowNavHelp] = useState(false);
   const [dragValueLabel, setDragValueLabel] = useState<string | null>(null);
   const [isNarrow, setIsNarrow] = useState(false);
+  const [boxOverlay, setBoxOverlay] = useState<{
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+    mode: 'window' | 'crossing';
+  } | null>(null);
 
   const sample = isSampleMode();
 
@@ -106,6 +111,18 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       dispatch({ type: 'select', ids: [result.elementId], mode: additive ? 'toggle' : 'replace', reveal: true });
     });
     const offHover = adapter.on('hover', ({ elementId }) => dispatch({ type: 'hover', id: elementId }));
+    const offBoxSelect = adapter.on('boxSelect', (ev) => {
+      if (ev.phase === 'drag') {
+        setBoxOverlay(ev);
+      } else {
+        setBoxOverlay(null);
+        if (ev.ids.length > 0) {
+          dispatch({ type: 'select', ids: ev.ids, mode: ev.additive ? 'add' : 'replace' });
+        } else if (!ev.additive) {
+          dispatch({ type: 'clearSelection' });
+        }
+      }
+    });
 
     if (sample) {
       adapter.loadModel(model).then((r) => {
@@ -129,6 +146,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       cancelled = true;
       offPick();
       offHover();
+      offBoxSelect();
       onViewer(null);
       adapter.dispose();
       if (window.__jnn?.viewer === adapter) delete window.__jnn;
@@ -384,6 +402,22 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           </div>
 
           {isFpsDebugEnabled() && <FpsOverlay viewer={viewer} />}
+          {boxOverlay && (
+            <div
+              className="selection-box pointer-events-none fixed z-30"
+              data-testid="selection-box"
+              style={{
+                left: Math.min(boxOverlay.start.x, boxOverlay.current.x),
+                top: Math.min(boxOverlay.start.y, boxOverlay.current.y),
+                width: Math.abs(boxOverlay.current.x - boxOverlay.start.x),
+                height: Math.abs(boxOverlay.current.y - boxOverlay.start.y),
+                backgroundColor:
+                  boxOverlay.mode === 'window' ? 'rgba(37, 99, 235, 0.15)' : 'rgba(22, 163, 74, 0.15)',
+                border:
+                  boxOverlay.mode === 'window' ? '1px solid #2563eb' : '1px dashed #16a34a',
+              }}
+            />
+          )}
           {hovered && !compact && (
             <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-surface/90 px-2.5 py-1 text-xs text-muted shadow-float backdrop-blur">
               <span className="text-ink">{hovered.category}</span> · {hovered.name}
