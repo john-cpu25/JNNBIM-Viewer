@@ -112,6 +112,13 @@ export interface PickResult {
   normal?: Vec3;
 }
 
+export interface FpsStats {
+  avgFps: number;
+  maxFrameMs: number;
+  over100Count: number;
+  active: boolean;
+}
+
 export interface ViewerEvents {
   /** Fired on a click in the viewport (not after an orbit/pan drag). */
   pick: { result: PickResult | null; additive: boolean };
@@ -119,6 +126,7 @@ export interface ViewerEvents {
   cameraChange: CameraState;
   navHint: { kind: 'holdShiftToOrbit' };
   sectionEdit: { spec: SectionSpec; phase: 'drag' | 'end'; handle?: string };
+  fpsStats: FpsStats;
 }
 
 export type ViewerEventName = keyof ViewerEvents;

@@ -185,6 +185,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   });
   private pivotFadeRaf: number | null = null;
   private cameraChangeRaf: number | null = null;
+  private fpsDeltas: number[] = [];
+  private fpsRafId: number | null = null;
+  private fpsLastTime = 0;
   private sectionHelper: THREE.Object3D | null = null;
   private sectionGizmo: SectionGizmo | null = null;
   private sectionFrameVisible = true;
@@ -684,8 +687,48 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         });
       }
     });
+    world.camera.controls.addEventListener('controlstart', () => {
+      this.fpsDeltas = [];
+      this.fpsLastTime = performance.now();
+      const onRaf = (now: number) => {
+        if (!this.userControlling && this.fpsRafId === null) return;
+        const delta = now - this.fpsLastTime;
+        this.fpsLastTime = now;
+        this.fpsDeltas.push(delta);
+
+        const total = this.fpsDeltas.reduce((a, b) => a + b, 0);
+        const avgFps = this.fpsDeltas.length > 0 && total > 0 ? this.fpsDeltas.length / (total / 1000) : 0;
+        const maxFrameMs = this.fpsDeltas.length > 0 ? Math.max(...this.fpsDeltas) : 0;
+        const over100Count = this.fpsDeltas.filter((d) => d > 100).length;
+
+        this.events.emit('fpsStats', {
+          avgFps,
+          maxFrameMs,
+          over100Count,
+          active: true,
+        });
+        this.fpsRafId = requestAnimationFrame(onRaf);
+      };
+      this.fpsRafId = requestAnimationFrame(onRaf);
+    });
+
     world.camera.controls.addEventListener('controlend', () => {
       this.hidePivot();
+      if (this.fpsRafId !== null) {
+        cancelAnimationFrame(this.fpsRafId);
+        this.fpsRafId = null;
+      }
+      const total = this.fpsDeltas.reduce((a, b) => a + b, 0);
+      const avgFps = this.fpsDeltas.length > 0 && total > 0 ? this.fpsDeltas.length / (total / 1000) : 0;
+      const maxFrameMs = this.fpsDeltas.length > 0 ? Math.max(...this.fpsDeltas) : 0;
+      const over100Count = this.fpsDeltas.filter((d) => d > 100).length;
+
+      this.events.emit('fpsStats', {
+        avgFps,
+        maxFrameMs,
+        over100Count,
+        active: false,
+      });
     });
 
     // Setup local worker & wasm
@@ -837,6 +880,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.cameraChangeRaf !== null) {
       cancelAnimationFrame(this.cameraChangeRaf);
       this.cameraChangeRaf = null;
+    }
+    if (this.fpsRafId !== null) {
+      cancelAnimationFrame(this.fpsRafId);
+      this.fpsRafId = null;
     }
     if (this.pivotFadeRaf) {
       cancelAnimationFrame(this.pivotFadeRaf);

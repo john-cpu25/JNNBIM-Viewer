@@ -9,6 +9,7 @@ import { useApp } from '../state/AppContext';
 import { Toolbar } from './Toolbar';
 import { ViewCube } from './ViewCube';
 import { SectionPanel } from './SectionPanel';
+import { FpsOverlay } from './FpsOverlay';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
 import { cn } from '../lib/cn';
 import { useTranslation } from '../i18n';
@@ -21,6 +22,11 @@ declare global {
 }
 
 const debugEnabled = () => import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
+
+const isFpsDebugEnabled = () => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('debug') === '1';
+};
 
 export const isSampleMode = () => {
   if (typeof window === 'undefined') return false;
@@ -373,6 +379,8 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
               <HelpCircle size={15} />
             </button>
           </div>
+
+          {isFpsDebugEnabled() && <FpsOverlay viewer={viewer} />}
           {hovered && !compact && (
             <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-surface/90 px-2.5 py-1 text-xs text-muted shadow-float backdrop-blur">
               <span className="text-ink">{hovered.category}</span> · {hovered.name}
