@@ -27,6 +27,8 @@ import {
   type ViewPreset,
   type NavigationSettings,
   DEFAULT_NAV,
+  type MeasureSettings,
+  type MeasureTool,
 } from './ViewerAdapter';
 
 /** Minimal renderer surface so unit tests can run without WebGL. */
@@ -845,6 +847,22 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     const changed = this.controls?.update() ?? false;
     if (changed || this.needsRender) this.renderNow();
   };
+
+  setMeasureTool(_tool: MeasureTool | null): AdapterResult {
+    return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
+  }
+  setMeasureSettings(_s: MeasureSettings): AdapterResult {
+    return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
+  }
+  clearMeasurements(): AdapterResult {
+    return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
+  }
+  deleteMeasurement(_id: string): AdapterResult {
+    return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
+  }
+  setMeasurementsVisible(_visible: boolean): AdapterResult {
+    return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
+  }
 
   // ------------------------------------------------------------ test support
   /** Introspection used by unit tests and the e2e debug hook. */

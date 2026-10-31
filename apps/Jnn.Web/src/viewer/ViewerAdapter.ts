@@ -32,7 +32,8 @@ export type ViewerCapability =
   | 'sectionPlane'
   | 'sectionBox'
   | 'highlight'
-  | 'xray';
+  | 'xray'
+  | 'measure';
 
 export type ViewPreset =
   | 'iso'
@@ -135,6 +136,34 @@ export type BoxSelectEvent =
       additive: boolean;
     };
 
+export type MeasureTool = 'length' | 'edge' | 'angle' | 'area' | 'volume';
+
+export type MeasureUnit = 'mm' | 'cm' | 'm';
+
+export interface MeasureSettings {
+  unit: MeasureUnit;
+  precision: 0 | 1 | 2 | 3;
+  snap: {
+    vertex: boolean;
+    edge: boolean;
+    face: boolean;
+  };
+}
+
+export const DEFAULT_MEASURE_SETTINGS: MeasureSettings = {
+  unit: 'mm',
+  precision: 1,
+  snap: { vertex: true, edge: true, face: false },
+};
+
+export interface MeasureItem {
+  id: string;
+  tool: MeasureTool;
+  value: number;
+  unit: string;
+  points: Vec3[];
+}
+
 export interface ViewerEvents {
   /** Fired on a click in the viewport (not after an orbit/pan drag). */
   pick: { result: PickResult | null; additive: boolean };
@@ -144,6 +173,7 @@ export interface ViewerEvents {
   sectionEdit: { spec: SectionSpec; phase: 'drag' | 'end'; handle?: string };
   fpsStats: FpsStats;
   boxSelect: BoxSelectEvent;
+  measureChange: { items: MeasureItem[] };
 }
 
 export type ViewerEventName = keyof ViewerEvents;
@@ -196,6 +226,12 @@ export interface ViewerAdapter {
   setXray(enabled: boolean): AdapterResult;
   setGridVisible?(visible: boolean): AdapterResult;
   setTheme(theme: 'light' | 'dark'): void;
+
+  setMeasureTool?(tool: MeasureTool | null): AdapterResult;
+  setMeasureSettings?(s: MeasureSettings): AdapterResult;
+  clearMeasurements?(): AdapterResult;
+  deleteMeasurement?(id: string): AdapterResult;
+  setMeasurementsVisible?(visible: boolean): AdapterResult;
 
   /** Screen-space position (CSS px, relative to the container) of an element's centre. */
   projectToScreen(id: string): AdapterResult<{ x: number; y: number; onScreen: boolean }>;

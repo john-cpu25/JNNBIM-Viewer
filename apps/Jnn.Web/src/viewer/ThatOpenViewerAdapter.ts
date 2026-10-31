@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 import * as OBCF from '@thatopen/components-front';
 import * as WebIFC from 'web-ifc';
+import * as FRAGS from '@thatopen/fragments';
 import type { FragmentsModel } from '@thatopen/fragments';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
@@ -42,6 +43,10 @@ import {
   type ViewPreset,
   type NavigationSettings,
   DEFAULT_NAV,
+  DEFAULT_MEASURE_SETTINGS,
+  type MeasureItem,
+  type MeasureSettings,
+  type MeasureTool,
 } from './ViewerAdapter';
 import {
   baseMapping,
@@ -133,6 +138,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     'xray',
     'sectionPlane',
     'sectionBox',
+    'measure',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -148,6 +154,13 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private disposed = false;
   private initializedPromise: Promise<void> | null = null;
   private currentProjection: CameraState['projection'] = 'perspective';
+
+  private currentMeasureTool: MeasureTool | null = null;
+  private measureSettings: MeasureSettings = structuredClone(DEFAULT_MEASURE_SETTINGS);
+  private lengthMeasurer: OBCF.LengthMeasurement | null = null;
+  private angleMeasurer: OBCF.AngleMeasurement | null = null;
+  private areaMeasurer: OBCF.AreaMeasurement | null = null;
+  private volumeMeasurer: OBCF.VolumeMeasurement | null = null;
   private currentTheme: 'light' | 'dark' = 'dark';
 
   private selection = new Set<string>();
@@ -477,6 +490,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       g.intent = 'orbit';
       this.applyMouseMapping(true);
     }
+    if (this.currentMeasureTool) return;
     if (g.button === 0 && (g.intent === 'none' || g.intent === 'box-select') && moved > DRAG_THRESHOLD_PX) {
       g.intent = 'box-select';
       const mode = boxSelectMode({ x: g.x, y: g.y }, { x: ev.clientX, y: ev.clientY });
@@ -606,6 +620,31 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   private onWindowKeyDown = (ev: KeyboardEvent) => {
+    if (this.currentMeasureTool) {
+      if (ev.key === 'Escape') {
+        const m = this.currentMeasurer;
+        if (m) {
+          (m as any).cancelCreation?.();
+          this.emitMeasureChange();
+        }
+        return;
+      }
+      if (ev.key === 'Enter') {
+        if (this.currentMeasureTool === 'area') {
+          this.areaMeasurer?.endCreation();
+          this.emitMeasureChange();
+        }
+        return;
+      }
+      if (ev.key === 'Delete') {
+        const m = this.currentMeasurer;
+        if (m) {
+          (m as any).delete?.();
+          this.emitMeasureChange();
+        }
+        return;
+      }
+    }
     if (ev.key !== 'Shift') return;
     if (!shouldReanchorOnShift(ev.repeat, this.gesture)) return;
     const g = this.gesture!;
@@ -1138,6 +1177,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.modelsMap.clear();
       this.propertiesCache.clear();
     }
+    this.lengthMeasurer?.dispose();
+    this.angleMeasurer?.dispose();
+    this.areaMeasurer?.dispose();
+    this.volumeMeasurer?.dispose();
+    this.lengthMeasurer = null;
+    this.angleMeasurer = null;
+    this.areaMeasurer = null;
+    this.volumeMeasurer = null;
     if (this.fragments) {
       this.fragments.core.baseCoordinates = null;
       this.fragments.baseCoordinationModel = '';
@@ -1848,6 +1895,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
     if (!spec) {
       this.clipPlanes = [];
+      this.lengthMeasurer?.applyPlanesVisibility([]);
+      this.angleMeasurer?.applyPlanesVisibility([]);
+      this.areaMeasurer?.applyPlanesVisibility([]);
+      this.volumeMeasurer?.applyPlanesVisibility([]);
       if (this.world?.renderer?.three) {
         this.world.renderer.three.clippingPlanes = [];
       }
@@ -1897,6 +1948,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
 
     this.clipPlanes = threePlanes;
+    this.lengthMeasurer?.applyPlanesVisibility(this.clipPlanes);
+    this.angleMeasurer?.applyPlanesVisibility(this.clipPlanes);
+    this.areaMeasurer?.applyPlanesVisibility(this.clipPlanes);
+    this.volumeMeasurer?.applyPlanesVisibility(this.clipPlanes);
 
     if (this.world?.renderer?.three) {
       this.world.renderer.three.clippingPlanes = this.clipPlanes;
@@ -2165,6 +2220,290 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
+  private getOrCreateLengthMeasurer(): OBCF.LengthMeasurement | null {
+    if (!this.components || !this.world) return null;
+    if (!this.lengthMeasurer) {
+      this.lengthMeasurer = this.components.get(OBCF.LengthMeasurement);
+      this.lengthMeasurer.world = this.world;
+      this.lengthMeasurer.enabled = false;
+      this.lengthMeasurer.units = this.measureSettings.unit;
+      this.lengthMeasurer.rounding = this.measureSettings.precision;
+      this.applySnappingsTo(this.lengthMeasurer);
+      this.lengthMeasurer.list.onItemAdded.add(() => this.emitMeasureChange());
+      this.lengthMeasurer.list.onItemDeleted.add(() => this.emitMeasureChange());
+      this.lengthMeasurer.list.onCleared.add(() => this.emitMeasureChange());
+      this.lengthMeasurer.applyPlanesVisibility(this.clipPlanes);
+    }
+    return this.lengthMeasurer;
+  }
+
+  private getOrCreateAngleMeasurer(): OBCF.AngleMeasurement | null {
+    if (!this.components || !this.world) return null;
+    if (!this.angleMeasurer) {
+      this.angleMeasurer = this.components.get(OBCF.AngleMeasurement);
+      this.angleMeasurer.world = this.world;
+      this.angleMeasurer.enabled = false;
+      this.angleMeasurer.rounding = this.measureSettings.precision;
+      this.applySnappingsTo(this.angleMeasurer);
+      this.angleMeasurer.list.onItemAdded.add(() => this.emitMeasureChange());
+      this.angleMeasurer.list.onItemDeleted.add(() => this.emitMeasureChange());
+      this.angleMeasurer.list.onCleared.add(() => this.emitMeasureChange());
+      this.angleMeasurer.applyPlanesVisibility(this.clipPlanes);
+    }
+    return this.angleMeasurer;
+  }
+
+  private getOrCreateAreaMeasurer(): OBCF.AreaMeasurement | null {
+    if (!this.components || !this.world) return null;
+    if (!this.areaMeasurer) {
+      this.areaMeasurer = this.components.get(OBCF.AreaMeasurement);
+      this.areaMeasurer.world = this.world;
+      this.areaMeasurer.enabled = false;
+      const areaUnit = this.measureSettings.unit === 'mm' ? 'mm2' : this.measureSettings.unit === 'cm' ? 'cm2' : 'm2';
+      this.areaMeasurer.units = areaUnit;
+      this.areaMeasurer.rounding = this.measureSettings.precision;
+      this.applySnappingsTo(this.areaMeasurer);
+      this.areaMeasurer.list.onItemAdded.add(() => this.emitMeasureChange());
+      this.areaMeasurer.list.onItemDeleted.add(() => this.emitMeasureChange());
+      this.areaMeasurer.list.onCleared.add(() => this.emitMeasureChange());
+      this.areaMeasurer.applyPlanesVisibility(this.clipPlanes);
+    }
+    return this.areaMeasurer;
+  }
+
+  private getOrCreateVolumeMeasurer(): OBCF.VolumeMeasurement | null {
+    if (!this.components || !this.world) return null;
+    if (!this.volumeMeasurer) {
+      this.volumeMeasurer = this.components.get(OBCF.VolumeMeasurement);
+      this.volumeMeasurer.world = this.world;
+      this.volumeMeasurer.enabled = false;
+      const volUnit = this.measureSettings.unit === 'mm' ? 'mm3' : this.measureSettings.unit === 'cm' ? 'cm3' : 'm3';
+      this.volumeMeasurer.units = volUnit;
+      this.volumeMeasurer.rounding = this.measureSettings.precision;
+      this.volumeMeasurer.list.onItemAdded.add(() => this.emitMeasureChange());
+      this.volumeMeasurer.list.onItemDeleted.add(() => this.emitMeasureChange());
+      this.volumeMeasurer.list.onCleared.add(() => this.emitMeasureChange());
+      this.volumeMeasurer.applyPlanesVisibility(this.clipPlanes);
+    }
+    return this.volumeMeasurer;
+  }
+
+  private applySnappingsTo(measurer: OBCF.Measurement<any, any>): void {
+    const snappings: FRAGS.SnappingClass[] = [];
+    if (this.measureSettings.snap.vertex) snappings.push(FRAGS.SnappingClass.POINT);
+    if (this.measureSettings.snap.edge) snappings.push(FRAGS.SnappingClass.LINE);
+    if (this.measureSettings.snap.face) snappings.push(FRAGS.SnappingClass.FACE);
+    measurer.snappings = snappings;
+  }
+
+  private get currentMeasurer(): (OBCF.LengthMeasurement | OBCF.AngleMeasurement | OBCF.AreaMeasurement | OBCF.VolumeMeasurement) | null {
+    switch (this.currentMeasureTool) {
+      case 'length':
+      case 'edge':
+        return this.getOrCreateLengthMeasurer();
+      case 'angle':
+        return this.getOrCreateAngleMeasurer();
+      case 'area':
+        return this.getOrCreateAreaMeasurer();
+      case 'volume':
+        return this.getOrCreateVolumeMeasurer();
+      default:
+        return null;
+    }
+  }
+
+  private getMeasureItems(): MeasureItem[] {
+    const items: MeasureItem[] = [];
+    if (this.lengthMeasurer) {
+      for (const line of this.lengthMeasurer.list) {
+        items.push({
+          id: line.id,
+          tool: (line as any)._mode === 'edge' ? 'edge' : 'length',
+          value: line.value,
+          unit: line.units,
+          points: [toModel(line.start), toModel(line.end)],
+        });
+      }
+    }
+    if (this.angleMeasurer) {
+      for (const angle of this.angleMeasurer.list) {
+        items.push({
+          id: angle.id,
+          tool: 'angle',
+          value: angle.value,
+          unit: angle.units,
+          points: [toModel(angle.start), toModel(angle.vertex), toModel(angle.end)],
+        });
+      }
+    }
+    if (this.areaMeasurer) {
+      for (const area of this.areaMeasurer.list) {
+        items.push({
+          id: area.id,
+          tool: 'area',
+          value: area.value,
+          unit: area.units,
+          points: [...area.points].map((p) => toModel(p)),
+        });
+      }
+    }
+    if (this.volumeMeasurer) {
+      for (const vol of this.volumeMeasurer.list) {
+        items.push({
+          id: vol.id,
+          tool: 'volume',
+          value: (vol as any)._cachedValue ?? 0,
+          unit: vol.units,
+          points: [],
+        });
+      }
+    }
+    return items;
+  }
+
+  private emitMeasureChange(): void {
+    this.events.emit('measureChange', { items: this.getMeasureItems() });
+  }
+
+  setMeasureTool(tool: MeasureTool | null): AdapterResult {
+    if (this.lengthMeasurer) this.lengthMeasurer.enabled = false;
+    if (this.angleMeasurer) this.angleMeasurer.enabled = false;
+    if (this.areaMeasurer) this.areaMeasurer.enabled = false;
+    if (this.volumeMeasurer) this.volumeMeasurer.enabled = false;
+
+    this.currentMeasureTool = tool;
+    if (!tool) {
+      return okVoid;
+    }
+
+    if (tool === 'length') {
+      const m = this.getOrCreateLengthMeasurer();
+      if (m) {
+        m.mode = 'free';
+        m.enabled = true;
+      }
+    } else if (tool === 'edge') {
+      const m = this.getOrCreateLengthMeasurer();
+      if (m) {
+        m.mode = 'edge';
+        m.enabled = true;
+      }
+    } else if (tool === 'angle') {
+      const m = this.getOrCreateAngleMeasurer();
+      if (m) {
+        m.mode = 'free';
+        m.enabled = true;
+      }
+    } else if (tool === 'area') {
+      const m = this.getOrCreateAreaMeasurer();
+      if (m) {
+        m.mode = 'free';
+        m.enabled = true;
+      }
+    } else if (tool === 'volume') {
+      const m = this.getOrCreateVolumeMeasurer();
+      if (m) {
+        m.enabled = true;
+      }
+    }
+
+    return okVoid;
+  }
+
+  setMeasureSettings(s: MeasureSettings): AdapterResult {
+    this.measureSettings = structuredClone(s);
+    if (this.lengthMeasurer) {
+      this.lengthMeasurer.units = s.unit;
+      this.lengthMeasurer.rounding = s.precision;
+      for (const line of this.lengthMeasurer.list) {
+        line.units = s.unit;
+        line.rounding = s.precision;
+      }
+      this.applySnappingsTo(this.lengthMeasurer);
+    }
+    if (this.areaMeasurer) {
+      const areaUnit = s.unit === 'mm' ? 'mm2' : s.unit === 'cm' ? 'cm2' : 'm2';
+      this.areaMeasurer.units = areaUnit;
+      this.areaMeasurer.rounding = s.precision;
+      for (const a of this.areaMeasurer.list) {
+        a.units = areaUnit;
+        a.rounding = s.precision;
+      }
+      this.applySnappingsTo(this.areaMeasurer);
+    }
+    if (this.angleMeasurer) {
+      this.angleMeasurer.rounding = s.precision;
+      for (const a of this.angleMeasurer.list) {
+        a.rounding = s.precision;
+      }
+      this.applySnappingsTo(this.angleMeasurer);
+    }
+    if (this.volumeMeasurer) {
+      const volUnit = s.unit === 'mm' ? 'mm3' : s.unit === 'cm' ? 'cm3' : 'm3';
+      this.volumeMeasurer.units = volUnit;
+      this.volumeMeasurer.rounding = s.precision;
+      for (const v of this.volumeMeasurer.list) {
+        v.units = volUnit;
+        v.rounding = s.precision;
+      }
+    }
+    this.emitMeasureChange();
+    return okVoid;
+  }
+
+  clearMeasurements(): AdapterResult {
+    this.lengthMeasurer?.list.clear();
+    this.angleMeasurer?.list.clear();
+    this.areaMeasurer?.list.clear();
+    this.volumeMeasurer?.list.clear();
+    this.emitMeasureChange();
+    return okVoid;
+  }
+
+  deleteMeasurement(id: string): AdapterResult {
+    if (this.lengthMeasurer) {
+      const line = [...this.lengthMeasurer.list].find((l) => l.id === id);
+      if (line) {
+        this.lengthMeasurer.list.delete(line);
+        this.emitMeasureChange();
+        return okVoid;
+      }
+    }
+    if (this.angleMeasurer) {
+      const a = [...this.angleMeasurer.list].find((m) => m.id === id);
+      if (a) {
+        this.angleMeasurer.list.delete(a);
+        this.emitMeasureChange();
+        return okVoid;
+      }
+    }
+    if (this.areaMeasurer) {
+      const a = [...this.areaMeasurer.list].find((m) => m.id === id);
+      if (a) {
+        this.areaMeasurer.list.delete(a);
+        this.emitMeasureChange();
+        return okVoid;
+      }
+    }
+    if (this.volumeMeasurer) {
+      const v = [...this.volumeMeasurer.list].find((m) => m.id === id);
+      if (v) {
+        this.volumeMeasurer.list.delete(v);
+        this.emitMeasureChange();
+        return okVoid;
+      }
+    }
+    return fail('not-found', `Measurement with id ${id} not found.`);
+  }
+
+  setMeasurementsVisible(visible: boolean): AdapterResult {
+    if (this.lengthMeasurer) this.lengthMeasurer.visible = visible;
+    if (this.angleMeasurer) this.angleMeasurer.visible = visible;
+    if (this.areaMeasurer) this.areaMeasurer.visible = visible;
+    if (this.volumeMeasurer) this.volumeMeasurer.visible = visible;
+    return okVoid;
+  }
+
   debugState() {
     let totalElements = 0;
     for (const entry of this.modelsMap.values()) {
@@ -2401,6 +2740,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (!d || ev.button !== 0) return;
     const moved = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
     if (moved > 5) return;
+    if (this.currentMeasureTool) {
+      const m = this.currentMeasurer;
+      if (m) {
+        await (m as any).create();
+        this.emitMeasureChange();
+      }
+      return;
+    }
     const hit = await this.pickAt(ev.clientX, ev.clientY);
     this.events.emit('pick', {
       result: hit,
@@ -2409,6 +2756,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   };
 
   private onPointerMove = async (ev: PointerEvent) => {
+    if (this.currentMeasureTool) return;
     if (ev.buttons !== 0 || ev.pointerType === 'touch') return;
     const now = performance.now();
     if (now - this.lastHoverAt < 40) return;
