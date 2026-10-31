@@ -394,4 +394,39 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
     adapter.dispose();
     expect((adapter as any).userControlling).toBe(false);
   });
+
+  it('Hotfix 2 - F1: onWindowKeyDown ignores repeat and does not re-anchor when already orbiting', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    let anchorCalled = false;
+    adapter.anchorPivotAt = () => {
+      anchorCalled = true;
+    };
+
+    // When gesture is already orbiting
+    (adapter as any).gesture = {
+      button: 0,
+      intent: 'orbit',
+      x: 100,
+      y: 100,
+      currentX: 150,
+      currentY: 150,
+    };
+
+    // Auto-repeated Shift keydown
+    (adapter as any).onWindowKeyDown({ key: 'Shift', repeat: true } as KeyboardEvent);
+    expect(anchorCalled).toBe(false);
+
+    // Initial Shift keydown when already orbiting
+    (adapter as any).onWindowKeyDown({ key: 'Shift', repeat: false } as KeyboardEvent);
+    expect(anchorCalled).toBe(false);
+
+    // When panning and pressing Shift for the first time
+    (adapter as any).gesture.intent = 'pan';
+    (adapter as any).gesture.button = 1;
+    (adapter as any).onWindowKeyDown({ key: 'Shift', repeat: false } as KeyboardEvent);
+    expect(anchorCalled).toBe(true);
+    expect((adapter as any).gesture.intent).toBe('orbit');
+
+    adapter.dispose();
+  });
 });

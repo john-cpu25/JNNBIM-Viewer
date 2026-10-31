@@ -49,6 +49,7 @@ import {
   DRAG_THRESHOLD_PX,
   intentOnDown,
   orbitMapping,
+  shouldReanchorOnShift,
   shouldUseHoverCache,
   worldUnitsPerPixel,
   type GestureIntent,
@@ -503,21 +504,26 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   };
 
   private onWindowKeyDown = (ev: KeyboardEvent) => {
-    if (ev.key === 'Shift' && this.gesture && (this.gesture.button === 0 || this.gesture.button === 1)) {
-      this.applyMouseMapping(true);
-      const targetX = this.gesture.currentX ?? this.gesture.x;
-      const targetY = this.gesture.currentY ?? this.gesture.y;
-      this.anchorPivotAt(targetX, targetY);
-    }
+    if (ev.key !== 'Shift') return;
+    if (!shouldReanchorOnShift(ev.repeat, this.gesture)) return;
+    const g = this.gesture!;
+    g.intent = 'orbit';
+    this.applyMouseMapping(true);
+    const targetX = g.currentX ?? g.x;
+    const targetY = g.currentY ?? g.y;
+    this.anchorPivotAt(targetX, targetY);
   };
 
   private onWindowKeyUp = (ev: KeyboardEvent) => {
-    if (ev.key === 'Shift' && this.gesture && (this.gesture.button === 0 || this.gesture.button === 1)) {
-      if (this.nav.preset === 'revit' && this.gesture.button === 0) {
-        this.applyMouseMapping(false);
-      } else if (this.gesture.button === 1) {
-        this.applyMouseMapping(false);
-      }
+    if (ev.key !== 'Shift') return;
+    const g = this.gesture;
+    if (!g || (g.button !== 0 && g.button !== 1)) return;
+    if (this.nav.preset === 'revit') {
+      g.intent = g.button === 1 ? 'pan' : 'none';
+      this.applyMouseMapping(false);
+    } else if (g.button === 1) {
+      g.intent = 'pan';
+      this.applyMouseMapping(false);
     }
   };
 
@@ -945,9 +951,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.boundContainer.removeEventListener('auxclick', this.onAuxClick);
       this.boundContainer = null;
     }
-    window.removeEventListener('pointerup', this.onNavPointerUp, { capture: true });
-    window.removeEventListener('keydown', this.onWindowKeyDown);
-    window.removeEventListener('keyup', this.onWindowKeyUp);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointerup', this.onNavPointerUp, { capture: true });
+      window.removeEventListener('keydown', this.onWindowKeyDown);
+      window.removeEventListener('keyup', this.onWindowKeyUp);
+    }
     if (this.highlighter) {
       this.highlighter.dispose();
       this.highlighter = null;

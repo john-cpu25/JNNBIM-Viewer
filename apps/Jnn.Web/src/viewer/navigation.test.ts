@@ -6,6 +6,7 @@ import {
   choosePivot,
   intentOnDown,
   orbitMapping,
+  shouldReanchorOnShift,
   shouldUseHoverCache,
   worldUnitsPerPixel,
 } from './navigation';
@@ -136,5 +137,37 @@ describe('choosePivot (F2)', () => {
     expect(res.x).toBeCloseTo(0);
     expect(res.y).toBeCloseTo(0);
     expect(res.z).toBeCloseTo(0);
+  });
+});
+
+describe('shouldReanchorOnShift (Hotfix 2 - F1)', () => {
+  it('rejects auto-repeated keydown events', () => {
+    expect(shouldReanchorOnShift(true, { button: 1, intent: 'pan' })).toBe(false);
+  });
+
+  it('rejects when there is no active gesture', () => {
+    expect(shouldReanchorOnShift(false, null)).toBe(false);
+  });
+
+  it('rejects when gesture is already orbiting', () => {
+    expect(shouldReanchorOnShift(false, { button: 0, intent: 'orbit' })).toBe(false);
+    expect(shouldReanchorOnShift(false, { button: 1, intent: 'orbit' })).toBe(false);
+  });
+
+  it('rejects when gesture is orbit-pending (Shift already down at pointerdown)', () => {
+    expect(shouldReanchorOnShift(false, { button: 0, intent: 'orbit-pending' })).toBe(false);
+    expect(shouldReanchorOnShift(false, { button: 1, intent: 'orbit-pending' })).toBe(false);
+  });
+
+  it('rejects right-click gesture (button 2)', () => {
+    expect(shouldReanchorOnShift(false, { button: 2, intent: 'pan' })).toBe(false);
+  });
+
+  it('accepts middle-mouse pan gesture when pressing Shift (switching pan -> orbit)', () => {
+    expect(shouldReanchorOnShift(false, { button: 1, intent: 'pan' })).toBe(true);
+  });
+
+  it('accepts left-click idle gesture in revit mode when pressing Shift', () => {
+    expect(shouldReanchorOnShift(false, { button: 0, intent: 'none' })).toBe(true);
   });
 });

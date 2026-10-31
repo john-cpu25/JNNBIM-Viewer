@@ -111,3 +111,20 @@ export function choosePivot(
   bounds.getCenter(center);
   return center;
 }
+
+/**
+ * Determines whether a Shift keydown event should re-anchor the pivot and switch to orbit.
+ * - Ignores auto-repeated keydown events (ev.repeat === true).
+ * - Ignores if no gesture is active or if not using mouse button 0 or 1.
+ * - Ignores if gesture is already orbiting ('orbit' or 'orbit-pending').
+ * - Only triggers when currently panning (e.g. middle-mouse drag in Revit mode).
+ */
+export function shouldReanchorOnShift(
+  repeat: boolean,
+  gesture: { button: number; intent: GestureIntent } | null,
+): boolean {
+  if (repeat || !gesture) return false;
+  if (gesture.button !== 0 && gesture.button !== 1) return false;
+  if (gesture.intent === 'orbit' || gesture.intent === 'orbit-pending') return false;
+  return true;
+}
