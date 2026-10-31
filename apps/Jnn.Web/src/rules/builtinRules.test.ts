@@ -171,6 +171,39 @@ describe('Built-in Rules (T17.2)', () => {
       const violations = await ruleDefaultNaming.check(ctx);
       expect(violations).toHaveLength(0);
     });
+
+    it('ignores unnamed non-physical elements but flags unnamed physical elements (D6)', async () => {
+      // Non-physical elements with no name should be ignored
+      const unnamedProject = createMockElement({ id: 'proj-1', category: 'IfcProject', name: '' });
+      const unnamedSite = createMockElement({ id: 'site-1', category: 'IfcSite', name: undefined });
+      const unnamedBuilding = createMockElement({ id: 'bld-1', category: 'IfcBuilding', name: '   ' });
+      const unnamedStorey = createMockElement({ id: 'lvl-1', category: 'IfcBuildingStorey', name: '' });
+      const unnamedSpace = createMockElement({ id: 'sp-1', category: 'IfcSpace', name: '' });
+
+      // Physical element with no name should still be flagged
+      const unnamedWall = createMockElement({ id: 'wall-unnamed', category: 'IfcWall', name: '' });
+
+      // Non-physical element with explicit default name should still be flagged
+      const genericSpace = createMockElement({ id: 'sp-generic', category: 'IfcSpace', name: 'Generic Space' });
+
+      const ctx: RuleContext = {
+        models: [],
+        elements: [
+          unnamedProject,
+          unnamedSite,
+          unnamedBuilding,
+          unnamedStorey,
+          unnamedSpace,
+          unnamedWall,
+          genericSpace,
+        ],
+        getProperties: async () => [],
+      };
+
+      const violations = await ruleDefaultNaming.check(ctx);
+      expect(violations).toHaveLength(2);
+      expect(violations.map((v) => v.elementId)).toEqual(['wall-unnamed', 'sp-generic']);
+    });
   });
 
   describe('R-PROP-01: Missing Required Properties', () => {

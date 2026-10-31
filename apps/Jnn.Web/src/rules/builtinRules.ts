@@ -29,6 +29,27 @@ function normalizeIfcClass(val: string): string {
   return 'Ifc' + base.charAt(0).toUpperCase() + base.slice(1);
 }
 
+export const NON_PHYSICAL_CLASSES = new Set([
+  'IfcProject',
+  'IfcSite',
+  'IfcBuilding',
+  'IfcBuildingStorey',
+  'IfcSpace',
+]);
+
+export function isNonPhysicalElement(el: { category?: string | null; ifcClass?: string | null }): boolean {
+  const rawClass = ((el as any).ifcClass || el.category || '').trim();
+  if (!rawClass) return true;
+  const lower = rawClass.toLowerCase();
+  return (
+    lower === 'ifcproject' ||
+    lower === 'ifcsite' ||
+    lower === 'ifcbuilding' ||
+    lower === 'ifcbuildingstorey' ||
+    lower === 'ifcspace'
+  );
+}
+
 /**
  * Quy tắc 1 — R-GEO-01: Phần tử không có hình học hiển thị
  */
@@ -44,15 +65,7 @@ export const ruleMissingGeometry: RuleDefinition = {
 
     for (const el of ctx.elements) {
       // Chỉ kiểm tra các cấu kiện vật lý thông thường
-      const rawClass = (el as any).ifcClass || el.category || '';
-      if (
-        !el.category ||
-        rawClass === 'IfcProject' ||
-        rawClass === 'IfcSite' ||
-        rawClass === 'IfcBuilding' ||
-        rawClass === 'IfcBuildingStorey' ||
-        rawClass === 'IfcSpace'
-      ) {
+      if (isNonPhysicalElement(el)) {
         continue;
       }
 
@@ -153,7 +166,8 @@ export const ruleDefaultNaming: RuleDefinition = {
 
     for (const el of ctx.elements) {
       const name = (el.name || '').trim();
-      const isDefault = !name || defaultPattern.test(name);
+      const nonPhysical = isNonPhysicalElement(el);
+      const isDefault = (!name && !nonPhysical) || (!!name && defaultPattern.test(name));
 
       if (isDefault) {
         violations.push({
