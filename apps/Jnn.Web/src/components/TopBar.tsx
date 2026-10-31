@@ -194,9 +194,6 @@ export function TopBar({ layout }: { layout: Layout }) {
 
 function Logo() {
   return (
-    <svg width="20" height="20" viewBox="0 0 32 32" aria-hidden>
-      <path d="M8 22V12l8-4 8 4v10l-8 4z" fill="none" stroke="var(--jnn-accent)" strokeWidth="2.4" strokeLinejoin="round" />
-      <path d="M8 12l8 4 8-4M16 16v10" fill="none" stroke="var(--jnn-accent)" strokeWidth="2.4" strokeLinejoin="round" />
-    </svg>
+    <img src="./brand/logo-tile-64.png" width={22} height={22} alt="JNN" className="rounded-[5px]" draggable={false} />
   );
 }

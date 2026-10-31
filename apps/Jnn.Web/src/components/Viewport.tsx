@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen, Footprints, HelpCircle, Loader2, UploadCloud } from 'lucide-react';
+import { FolderOpen, Footprints, HelpCircle, Loader2 } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
 import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
@@ -482,9 +482,14 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           {showEmptyState && (
             <div className="pointer-events-auto absolute inset-0 z-10 flex flex-col items-center justify-center p-4">
               <div className="flex max-w-md flex-col items-center rounded-2xl border border-line bg-surface/90 p-8 text-center shadow-float backdrop-blur-md">
-                <div className="mb-4 grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent">
-                  <UploadCloud size={28} />
-                </div>
+                <img
+                  src="./brand/logo-tile-128.png"
+                  width={56}
+                  height={56}
+                  alt="JNN"
+                  className="mb-4 rounded-xl shadow-sm"
+                  draggable={false}
+                />
                 <h2 className="mb-1.5 text-base font-semibold text-ink">{t('viewport.title')}</h2>
                 <p className="mb-6 text-xs leading-relaxed text-muted">
                   {t('viewport.subtitle')}

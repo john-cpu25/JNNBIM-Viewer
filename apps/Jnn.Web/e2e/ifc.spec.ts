@@ -21,6 +21,16 @@ test.describe('IFC Viewer with That Open Adapter', () => {
 
     await page.goto('/?debug=1');
 
+    // 0. Verify brand favicon and TopBar logo (v0.5.2)
+    const faviconHref = await page.locator('link[rel="icon"]').first().getAttribute('href');
+    expect(faviconHref).toContain('brand/favicon.ico');
+
+    const topBarLogo = page.locator('header img[alt="JNN"]');
+    await expect(topBarLogo).toBeVisible();
+    await expect.poll(async () => {
+      return topBarLogo.evaluate((el: HTMLImageElement) => el.naturalWidth);
+    }).toBeGreaterThan(0);
+
     // 1. Initial empty state
     await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
     await expect(page.getByText('Mở file IFC để bắt đầu')).toBeVisible();
