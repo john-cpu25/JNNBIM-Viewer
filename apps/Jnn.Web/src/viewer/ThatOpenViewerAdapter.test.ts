@@ -847,5 +847,45 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
       adapter.dispose();
     });
+
+    it('getMeasureItems caches Volume getRawValue() and converts units correctly', async () => {
+      const adapter = new ThatOpenViewerAdapter();
+      adapter.setMeasureSettings({
+        unit: 'm',
+        precision: 2,
+        snap: { vertex: true, edge: true, face: false },
+      });
+
+      const mockVolume = {
+        id: 'test-vol-1',
+        getRawValue: vi.fn().mockResolvedValue(3.25),
+      };
+
+      (adapter as any).volumeMeasurer = {
+        list: [mockVolume],
+        dispose: vi.fn(),
+      };
+
+      (adapter as any).volumeCache.set(mockVolume.id, 3.25);
+
+      const itemsM3 = (adapter as any).getMeasureItems();
+      expect(itemsM3.length).toBe(1);
+      expect(itemsM3[0].tool).toBe('volume');
+      expect(itemsM3[0].unit).toBe('m3');
+      expect(itemsM3[0].value).toBe(3.25);
+
+      // Change settings to mm with precision 0
+      adapter.setMeasureSettings({
+        unit: 'mm',
+        precision: 0,
+        snap: { vertex: true, edge: true, face: false },
+      });
+      const itemsMm3 = (adapter as any).getMeasureItems();
+      expect(itemsMm3[0].unit).toBe('mm3');
+      expect(itemsMm3[0].value).toBe(3_250_000_000);
+
+      adapter.dispose();
+      expect((adapter as any).volumeCache.size).toBe(0);
+    });
   });
 });

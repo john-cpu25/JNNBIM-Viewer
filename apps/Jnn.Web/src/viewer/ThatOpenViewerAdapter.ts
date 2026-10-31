@@ -164,6 +164,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private angleMeasurer: OBCF.AngleMeasurement | null = null;
   private areaMeasurer: OBCF.AreaMeasurement | null = null;
   private volumeMeasurer: OBCF.VolumeMeasurement | null = null;
+  private volumeCache = new Map<string, number>();
   private currentTheme: 'light' | 'dark' = 'dark';
   private walkMode = false;
   private walkSpeed = 3.0;
@@ -613,6 +614,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       if (ev.key === 'Enter') {
         if (this.currentMeasureTool === 'area') {
           this.areaMeasurer?.endCreation();
+          this.emitMeasureChange();
+        } else if (this.currentMeasureTool === 'volume') {
+          this.volumeMeasurer?.endCreation();
           this.emitMeasureChange();
         }
         return;
@@ -1165,6 +1169,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.angleMeasurer?.dispose();
     this.areaMeasurer?.dispose();
     this.volumeMeasurer?.dispose();
+    this.volumeCache.clear();
     this.lengthMeasurer = null;
     this.angleMeasurer = null;
     this.areaMeasurer = null;
@@ -2277,9 +2282,27 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       const volUnit = this.measureSettings.unit === 'mm' ? 'mm3' : this.measureSettings.unit === 'cm' ? 'cm3' : 'm3';
       this.volumeMeasurer.units = volUnit;
       this.volumeMeasurer.rounding = this.measureSettings.precision;
-      this.volumeMeasurer.list.onItemAdded.add(() => this.emitMeasureChange());
-      this.volumeMeasurer.list.onItemDeleted.add(() => this.emitMeasureChange());
-      this.volumeMeasurer.list.onCleared.add(() => this.emitMeasureChange());
+      this.volumeMeasurer.list.onItemAdded.add(async (vol: any) => {
+        try {
+          if (typeof vol?.getRawValue === 'function') {
+            const rawM3 = await vol.getRawValue();
+            this.volumeCache.set(vol.id, rawM3);
+          } else if (typeof vol?.value === 'number') {
+            this.volumeCache.set(vol.id, vol.value);
+          }
+        } catch (err) {
+          console.warn('[VolumeMeasurement] Failed to calculate volume:', err);
+        }
+        this.emitMeasureChange();
+      });
+      this.volumeMeasurer.list.onItemDeleted.add((vol: any) => {
+        if (vol?.id) this.volumeCache.delete(vol.id);
+        this.emitMeasureChange();
+      });
+      this.volumeMeasurer.list.onCleared.add(() => {
+        this.volumeCache.clear();
+        this.emitMeasureChange();
+      });
       this.volumeMeasurer.applyPlanesVisibility(this.clipPlanes);
     }
     return this.volumeMeasurer;
@@ -2352,7 +2375,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
     if (this.volumeMeasurer) {
       for (const vol of this.volumeMeasurer.list) {
-        const rawVolM3 = (vol as any)._cachedValue ?? (vol as any).value ?? 0;
+        const rawVolM3 = this.volumeCache.get(vol.id) ?? 0;
         const { value, unit } = convertMeasureValue(rawVolM3, 'volume', this.measureSettings.unit, this.measureSettings.precision);
         items.push({
           id: vol.id,
@@ -2468,6 +2491,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.angleMeasurer?.list.clear();
     this.areaMeasurer?.list.clear();
     this.volumeMeasurer?.list.clear();
+    this.volumeCache.clear();
     this.emitMeasureChange();
     return okVoid;
   }
@@ -2501,6 +2525,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       const v = [...this.volumeMeasurer.list].find((m) => m.id === id);
       if (v) {
         this.volumeMeasurer.list.delete(v);
+        this.volumeCache.delete(id);
         this.emitMeasureChange();
         return okVoid;
       }
@@ -2794,6 +2819,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
           m.updatePreviewLine();
         }
         await m.create();
+        if (this.currentMeasureTool === 'volume') {
+          m.endCreation?.();
+        }
         this.emitMeasureChange();
       }
       return;

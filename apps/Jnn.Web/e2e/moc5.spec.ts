@@ -247,7 +247,37 @@ test.describe('Mốc 5: Group I - Measurement Tools on ThatOpen', () => {
     const expectedDistM = Number((expectedDistMm / 1000).toFixed(1));
     expect(Math.abs(itemsM[0].value - expectedDistM)).toBeLessThan(0.01);
 
-    // 7. Clear all measurements
+    // 7. Test Volume measurement (D1)
+    const volRadio = page.getByRole('radio', { name: /Thể tích|Volume/i });
+    if (await volRadio.isVisible()) {
+      await volRadio.click();
+      await page.waitForTimeout(200);
+
+      // Click on model geometry (p1) to measure element volume
+      await page.mouse.move(p1.x, p1.y, { steps: 5 });
+      await page.waitForTimeout(150);
+      await page.mouse.click(p1.x, p1.y);
+
+      // Wait for async getRawValue() and verify volume item appears with value > 0
+      await expect
+        .poll(
+          async () => {
+            const stateItems = await page.evaluate(() => (window as any).__jnn.getState().measurements);
+            const vol = stateItems.find((m: any) => m.tool === 'volume');
+            return vol ? vol.value : 0;
+          },
+          { timeout: 5000 },
+        )
+        .toBeGreaterThan(0);
+
+      const itemsVol = await page.evaluate(() => (window as any).__jnn.getState().measurements);
+      const vol = itemsVol.find((m: any) => m.tool === 'volume');
+      expect(vol).toBeTruthy();
+      expect(vol.value).toBeGreaterThan(0);
+      expect(vol.unit).toBe('m3');
+    }
+
+    // 8. Clear all measurements
     const clearBtn = page.getByTestId('measure-clear-btn');
     await expect(clearBtn).toBeEnabled();
     await clearBtn.click();
