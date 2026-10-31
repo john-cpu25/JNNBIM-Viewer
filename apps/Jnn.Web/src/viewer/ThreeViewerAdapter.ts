@@ -485,6 +485,10 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
+  beginOrbit(): AdapterResult {
+    return okVoid;
+  }
+
   orbitBy(deltaAzimuth: number, deltaPolar: number, _animate = false): AdapterResult {
     if (!this.controls) return fail('not-loaded', 'Viewer is not mounted.');
     const offset = this.camera.position.clone().sub(this.controls.target);

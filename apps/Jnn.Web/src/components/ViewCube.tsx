@@ -234,6 +234,9 @@ export function ViewCube() {
       if (isDown) {
         const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
         if (dist > 4) {
+          if (!isDragging) {
+            viewer?.beginOrbit?.();
+          }
           isDragging = true;
           canvas.style.cursor = 'grabbing';
           clearHover();

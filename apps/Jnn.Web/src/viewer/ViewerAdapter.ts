@@ -171,6 +171,8 @@ export interface ViewerAdapter {
   setNavigationSettings?(s: NavigationSettings): AdapterResult;
   /** Rotate camera around current pivot in radians. Used for ViewCube drag. */
   orbitBy?(deltaAzimuth: number, deltaPolar: number, animate?: boolean): AdapterResult;
+  /** Prepare camera controls for an orbit gesture (e.g. ViewCube drag). Sets orbit point to selection center if active. */
+  beginOrbit?(): AdapterResult | void;
 
   setSection(spec: SectionSpec | null): AdapterResult;
   setSectionFrameVisible?(visible: boolean): AdapterResult;

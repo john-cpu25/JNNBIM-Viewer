@@ -590,4 +590,35 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('beginOrbit sets orbit point to selectionCenter when orbitAroundSelection is true', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const setOrbitPointSpy = vi.fn();
+    const target = new THREE.Vector3(0, 0, 0);
+
+    (adapter as any).world = {
+      camera: {
+        controls: {
+          setOrbitPoint: setOrbitPointSpy,
+          getTarget: vi.fn().mockReturnValue(target),
+        },
+      },
+    };
+
+    const mockCenter = new THREE.Vector3(12, 34, 56);
+    (adapter as any).selectionCenter = mockCenter;
+    (adapter as any).nav.orbitAroundSelection = true;
+
+    const res = adapter.beginOrbit();
+    expect(res.ok).toBe(true);
+    expect(setOrbitPointSpy).toHaveBeenCalledWith(12, 34, 56);
+
+    // When orbitAroundSelection is false, beginOrbit does not change orbit point
+    setOrbitPointSpy.mockClear();
+    (adapter as any).nav.orbitAroundSelection = false;
+    adapter.beginOrbit();
+    expect(setOrbitPointSpy).not.toHaveBeenCalled();
+
+    adapter.dispose();
+  });
 });

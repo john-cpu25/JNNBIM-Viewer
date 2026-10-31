@@ -1517,6 +1517,18 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
+  beginOrbit(): AdapterResult {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    const controls = this.world.camera.controls;
+    if (this.nav.orbitAroundSelection && this.selectionCenter) {
+      ++this.anchorRequestId;
+      this.pendingRaycast = null;
+      OBC.setOrbitPoint(controls, this.selectionCenter);
+      this.showPivot(this.selectionCenter);
+    }
+    return okVoid;
+  }
+
   orbitBy(deltaAzimuth: number, deltaPolar: number, animate = false): AdapterResult {
     if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
     this.world.camera.controls.rotate(deltaAzimuth, deltaPolar, animate);
