@@ -92,6 +92,81 @@ describe('bcfExport - BCFTopics API Survey & Export (T16.1)', () => {
     expect(topic.comments.size).toBe(1);
   });
 
+  it('calculates BCF viewpoint camera proportional to clash bounds (D5)', () => {
+    const components = new OBC.Components();
+    // Bounding box with dimensions: dx=2, dy=2, dz=1 -> diag=3 -> d = 1.5 * 3 = 4.5
+    const clashWithBounds: ClashRecord = {
+      ...mockClash,
+      clashId: 'clash-bounds-1',
+      boxOverlap: {
+        min: [10, 20, 30],
+        max: [12, 22, 31],
+      },
+    };
+
+    const topic = clashToBcfTopic(clashWithBounds, mockTest, components);
+    const vpGuid = Array.from(topic.viewpoints)[0]!;
+    const viewpoints = components.get(OBC.Viewpoints);
+    const vp = viewpoints.list.get(vpGuid);
+
+    expect(vp).toBeDefined();
+
+    const cx = 11;
+    const cy = 21;
+    const cz = 30.5;
+    const dirLen = Math.hypot(-1, -1, -0.8);
+    const dirX = -1 / dirLen;
+    const dirY = -1 / dirLen;
+    const dirZ = -0.8 / dirLen;
+    const d = 4.5;
+
+    // View direction should be normalized (-1, -1, -0.8)
+    expect(vp?.camera.camera_direction.x).toBeCloseTo(dirX, 5);
+    expect(vp?.camera.camera_direction.y).toBeCloseTo(dirY, 5);
+    expect(vp?.camera.camera_direction.z).toBeCloseTo(dirZ, 5);
+
+    // Camera view point = center - dir * d
+    expect(vp?.camera.camera_view_point.x).toBeCloseTo(cx - dirX * d, 5);
+    expect(vp?.camera.camera_view_point.y).toBeCloseTo(cy - dirY * d, 5);
+    expect(vp?.camera.camera_view_point.z).toBeCloseTo(cz - dirZ * d, 5);
+  });
+
+  it('clamps minimum camera distance to 2 for small clash bounds (D5)', () => {
+    const components = new OBC.Components();
+    // dx=0.1, dy=0.1, dz=0.1 -> diag ≈ 0.173 -> 1.5 * diag ≈ 0.26 < 2 -> d = 2
+    const clashSmallBounds: ClashRecord = {
+      ...mockClash,
+      clashId: 'clash-bounds-small',
+      boxOverlap: {
+        min: [0, 0, 0],
+        max: [0.1, 0.1, 0.1],
+      },
+    };
+
+    const topic = clashToBcfTopic(clashSmallBounds, mockTest, components);
+    const vpGuid = Array.from(topic.viewpoints)[0]!;
+    const viewpoints = components.get(OBC.Viewpoints);
+    const vp = viewpoints.list.get(vpGuid);
+
+    expect(vp).toBeDefined();
+
+    const cx = 0.05;
+    const cy = 0.05;
+    const cz = 0.05;
+    const dirLen = Math.hypot(-1, -1, -0.8);
+    const dirX = -1 / dirLen;
+    const dirY = -1 / dirLen;
+    const dirZ = -0.8 / dirLen;
+    const d = 2.0;
+
+    expect(vp?.camera.camera_direction.x).toBeCloseTo(dirX, 5);
+    expect(vp?.camera.camera_direction.y).toBeCloseTo(dirY, 5);
+    expect(vp?.camera.camera_direction.z).toBeCloseTo(dirZ, 5);
+    expect(vp?.camera.camera_view_point.x).toBeCloseTo(cx - dirX * d, 5);
+    expect(vp?.camera.camera_view_point.y).toBeCloseTo(cy - dirY * d, 5);
+    expect(vp?.camera.camera_view_point.z).toBeCloseTo(cz - dirZ * d, 5);
+  });
+
   it('exports a single clash record into a valid BCF zip file with version, markup, and viewpoint', async () => {
     const blob = await exportSingleClashToBCF(mockClash, mockTest);
     expect(blob).toBeInstanceOf(Blob);

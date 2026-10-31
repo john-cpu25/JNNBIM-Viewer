@@ -83,7 +83,41 @@ export function clashToBcfTopic(
   const viewpoints = components.get(OBC.Viewpoints);
   const vp = viewpoints.create();
 
-  if (clash.point) {
+  if (clash.boxOverlap) {
+    const box = clash.boxOverlap;
+    const dx = box.max[0] - box.min[0];
+    const dy = box.max[1] - box.min[1];
+    const dz = box.max[2] - box.min[2];
+    const diag = Math.hypot(dx, dy, dz);
+    const d = Math.max(2, 1.5 * diag);
+
+    const cx = (box.min[0] + box.max[0]) / 2;
+    const cy = (box.min[1] + box.max[1]) / 2;
+    const cz = (box.min[2] + box.max[2]) / 2;
+
+    const dirLen = Math.hypot(-1, -1, -0.8);
+    const dirX = -1 / dirLen;
+    const dirY = -1 / dirLen;
+    const dirZ = -0.8 / dirLen;
+
+    vp.set({
+      perspective_camera: {
+        camera_view_point: {
+          x: cx - dirX * d,
+          y: cy - dirY * d,
+          z: cz - dirZ * d,
+        },
+        camera_direction: {
+          x: dirX,
+          y: dirY,
+          z: dirZ,
+        },
+        camera_up_vector: { x: 0, y: 0, z: 1 },
+        field_of_view: 60,
+        aspect_ratio: 1.0,
+      },
+    });
+  } else if (clash.point) {
     const [px, py, pz] = clash.point;
     vp.set({
       perspective_camera: {
