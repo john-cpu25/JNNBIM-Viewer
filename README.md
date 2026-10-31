@@ -1,4 +1,8 @@
-# JNN BIM Viewer (v0.3.0)
+<p align="center">
+  <img src="apps/Jnn.Web/public/brand/logo-tile-128.png" width="96" height="96" alt="JNN BIM Viewer Logo" />
+</p>
+
+# JNN BIM Viewer
 
 Trình xem và phân tích mô hình BIM thế hệ mới trên nền tảng Web & Desktop: React 19 + Three.js + That Open Engine (TypeScript/Wite), tối ưu hóa kiểm tra va chạm (Clash Detective) và kiểm soát chất lượng mô hình BIM (Rule Checker) chuẩn quốc tế.
 
