@@ -89,6 +89,35 @@ export const vi: Translations = {
   'tab.properties': 'Thuộc tính',
   'tab.clash': 'Va chạm',
   'tab.rules': 'Kiểm tra',
+  'tab.views': 'Góc nhìn',
+
+  // Saved Views
+  'savedViews.title': 'Góc nhìn đã lưu',
+  'savedViews.saveCurrent': '+ Lưu góc nhìn hiện tại',
+  'savedViews.defaultName': 'Góc nhìn',
+  'savedViews.empty': 'Chưa có góc nhìn nào được lưu.',
+  'savedViews.emptyHint': 'Lưu góc nhìn để ghi lại vị trí camera, mặt cắt và trạng thái ẩn hiện.',
+  'savedViews.export': 'Xuất JSON',
+  'savedViews.import': 'Nhập JSON',
+  'savedViews.apply': 'Khôi phục',
+  'savedViews.rename': 'Đổi tên',
+  'savedViews.delete': 'Xóa',
+  'savedViews.restored': 'Đã khôi phục góc nhìn: {name}',
+  'savedViews.saved': 'Đã lưu góc nhìn: {name}',
+  'savedViews.deleted': 'Đã xóa góc nhìn',
+  'savedViews.hasSection': 'Mặt cắt',
+  'savedViews.hasVisibility': 'Ẩn/Hiện',
+  'savedViews.hasXray': 'X-ray',
+
+  // Additional Autodesk Viewer Features
+  'topbar.fullscreen': 'Toàn màn hình',
+  'topbar.exitFullscreen': 'Thoát toàn màn hình',
+  'toolbar.screenshot': 'Chụp ảnh màn hình',
+  'toolbar.levels': 'Tầng',
+  'toolbar.walk': 'Đi bộ (First-person)',
+  'toolbar.walkExit': 'Thoát đi bộ (Esc)',
+  'levels.all': 'Tất cả tầng',
+  'levels.ghostOthers': 'Hiện mờ các tầng khác',
 
   // Explorer
   'explorer.title': 'Cấu trúc mô hình',

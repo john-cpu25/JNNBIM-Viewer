@@ -444,9 +444,9 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     return ok(this.cameraState());
   }
 
-  setCamera(cam: CameraState): AdapterResult {
+  setCamera(cam: CameraState, animate = false): AdapterResult {
     if (cam.projection !== this.cameraState().projection) this.setProjection(cam.projection);
-    this.startTween(toThree(cam.position), toThree(cam.target), false);
+    this.startTween(toThree(cam.position), toThree(cam.target), animate);
     return okVoid;
   }
 
@@ -862,6 +862,34 @@ export class ThreeViewerAdapter implements ViewerAdapter {
   }
   setMeasurementsVisible(_visible: boolean): AdapterResult {
     return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
+  }
+
+  async captureScreenshot(options?: {
+    mimeType?: string;
+    quality?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+  }): Promise<string | null> {
+    if (!this.renderer || !this.scene || !this.camera) return null;
+    this.renderer.render(this.scene, this.camera);
+    const dom = this.renderer.domElement;
+    const mime = options?.mimeType || 'image/png';
+    const quality = options?.quality ?? 0.92;
+    if (!options?.maxWidth && !options?.maxHeight) {
+      return dom.toDataURL(mime, quality);
+    }
+    const maxW = options.maxWidth || dom.width;
+    const maxH = options.maxHeight || dom.height;
+    const scale = Math.min(maxW / dom.width, maxH / dom.height, 1);
+    const w = Math.max(1, Math.round(dom.width * scale));
+    const h = Math.max(1, Math.round(dom.height * scale));
+    const thumb = document.createElement('canvas');
+    thumb.width = w;
+    thumb.height = h;
+    const ctx = thumb.getContext('2d');
+    if (!ctx) return dom.toDataURL(mime, quality);
+    ctx.drawImage(dom, 0, 0, w, h);
+    return thumb.toDataURL(mime, quality);
   }
 
   // ------------------------------------------------------------ test support

@@ -89,6 +89,35 @@ export const en: Translations = {
   'tab.properties': 'Properties',
   'tab.clash': 'Clash',
   'tab.rules': 'Rules',
+  'tab.views': 'Saved Views',
+
+  // Saved Views
+  'savedViews.title': 'Saved Views',
+  'savedViews.saveCurrent': '+ Save Current View',
+  'savedViews.defaultName': 'View',
+  'savedViews.empty': 'No saved views yet.',
+  'savedViews.emptyHint': 'Save viewpoints to capture camera, section, and visibility state.',
+  'savedViews.export': 'Export JSON',
+  'savedViews.import': 'Import JSON',
+  'savedViews.apply': 'Restore',
+  'savedViews.rename': 'Rename',
+  'savedViews.delete': 'Delete',
+  'savedViews.restored': 'Restored view: {name}',
+  'savedViews.saved': 'Saved view: {name}',
+  'savedViews.deleted': 'Deleted view',
+  'savedViews.hasSection': 'Section',
+  'savedViews.hasVisibility': 'Visibility',
+  'savedViews.hasXray': 'X-ray',
+
+  // Additional Autodesk Viewer Features
+  'topbar.fullscreen': 'Fullscreen',
+  'topbar.exitFullscreen': 'Exit Fullscreen',
+  'toolbar.screenshot': 'Take Screenshot',
+  'toolbar.levels': 'Levels',
+  'toolbar.walk': 'Walk (First-person)',
+  'toolbar.walkExit': 'Exit Walk (Esc)',
+  'levels.all': 'All Levels',
+  'levels.ghostOthers': 'Ghost other storeys',
 
   // Explorer
   'explorer.title': 'Model Tree',

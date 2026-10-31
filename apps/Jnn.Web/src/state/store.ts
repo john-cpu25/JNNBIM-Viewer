@@ -20,6 +20,7 @@ import {
   type Vec3,
 } from '../viewer/ViewerAdapter';
 import { loadSavedMeasureSettings, saveMeasureSettings } from '../lib/measure';
+import { loadSavedViews, saveSavedViews, MAX_SAVED_VIEWS, type SavedView } from '../lib/savedViews';
 
 export type Theme = 'light' | 'dark';
 export type MobilePane = 'explorer' | 'viewer' | 'properties';
@@ -53,7 +54,7 @@ export interface AppState {
   theme: Theme;
   explorerOpen: boolean;
   propertiesOpen: boolean;
-  rightTab: 'properties' | 'clash' | 'rules';
+  rightTab: 'properties' | 'clash' | 'rules' | 'views';
   gridVisible: boolean;
   navigation: NavigationSettings;
   settingsOpen: boolean;
@@ -64,6 +65,7 @@ export interface AppState {
   measurements: MeasureItem[];
   measurementsVisible: boolean;
   measurePanelOpen: boolean;
+  savedViews: SavedView[];
 }
 
 export type Action =
@@ -87,7 +89,12 @@ export type Action =
   | { type: 'setProjection'; projection: AppState['projection'] }
   | { type: 'setTheme'; theme: Theme }
   | { type: 'togglePanel'; panel: 'explorer' | 'properties'; open?: boolean }
-  | { type: 'setRightTab'; tab: 'properties' | 'clash' | 'rules' }
+  | { type: 'setRightTab'; tab: 'properties' | 'clash' | 'rules' | 'views' }
+  | { type: 'setSavedViews'; views: SavedView[] }
+  | { type: 'addSavedView'; view: SavedView }
+  | { type: 'deleteSavedView'; id: string }
+  | { type: 'renameSavedView'; id: string; name: string }
+  | { type: 'applySavedView'; view: SavedView }
   | { type: 'toggleGrid' }
   | { type: 'setGridVisible'; visible: boolean }
   | { type: 'setNavigation'; settings: Partial<NavigationSettings> }
@@ -163,6 +170,7 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     measurements: [],
     measurementsVisible: true,
     measurePanelOpen: false,
+    savedViews: loadSavedViews(model.modelId || model.name || 'default'),
   };
 }
 
@@ -399,6 +407,41 @@ export function reducer(state: AppState, action: Action): AppState {
         measurePanelOpen: action.open,
         measureTool: !action.open ? null : (state.measureTool ?? 'length'),
       };
+    case 'setSavedViews': {
+      const modelKey = state.model.modelId || state.model.name || 'default';
+      saveSavedViews(modelKey, action.views);
+      return { ...state, savedViews: action.views };
+    }
+    case 'addSavedView': {
+      const modelKey = state.model.modelId || state.model.name || 'default';
+      const nextViews = [action.view, ...state.savedViews.filter((v) => v.id !== action.view.id)].slice(0, MAX_SAVED_VIEWS);
+      saveSavedViews(modelKey, nextViews);
+      return { ...state, savedViews: nextViews };
+    }
+    case 'deleteSavedView': {
+      const modelKey = state.model.modelId || state.model.name || 'default';
+      const remainingViews = state.savedViews.filter((v) => v.id !== action.id);
+      saveSavedViews(modelKey, remainingViews);
+      return { ...state, savedViews: remainingViews };
+    }
+    case 'renameSavedView': {
+      const modelKey = state.model.modelId || state.model.name || 'default';
+      const renamedViews = state.savedViews.map((v) => (v.id === action.id ? { ...v, name: action.name } : v));
+      saveSavedViews(modelKey, renamedViews);
+      return { ...state, savedViews: renamedViews };
+    }
+    case 'applySavedView': {
+      return {
+        ...state,
+        section: action.view.section,
+        visibility: {
+          hidden: new Set(action.view.visibility.hidden),
+          isolated: new Set(action.view.visibility.isolated),
+        },
+        xray: action.view.xray,
+        projection: action.view.camera.projection,
+      };
+    }
   }
 }
 

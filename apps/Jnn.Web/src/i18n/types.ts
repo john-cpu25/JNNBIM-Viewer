@@ -89,6 +89,35 @@ export interface Translations {
   'tab.properties': string;
   'tab.clash': string;
   'tab.rules': string;
+  'tab.views': string;
+
+  // Saved Views
+  'savedViews.title': string;
+  'savedViews.saveCurrent': string;
+  'savedViews.defaultName': string;
+  'savedViews.empty': string;
+  'savedViews.emptyHint': string;
+  'savedViews.export': string;
+  'savedViews.import': string;
+  'savedViews.apply': string;
+  'savedViews.rename': string;
+  'savedViews.delete': string;
+  'savedViews.restored': string;
+  'savedViews.saved': string;
+  'savedViews.deleted': string;
+  'savedViews.hasSection': string;
+  'savedViews.hasVisibility': string;
+  'savedViews.hasXray': string;
+
+  // Additional Autodesk Viewer Features
+  'topbar.fullscreen': string;
+  'topbar.exitFullscreen': string;
+  'toolbar.screenshot': string;
+  'toolbar.levels': string;
+  'toolbar.walk': string;
+  'toolbar.walkExit': string;
+  'levels.all': string;
+  'levels.ghostOthers': string;
 
   // Explorer
   'explorer.title': string;

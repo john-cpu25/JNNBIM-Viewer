@@ -1642,12 +1642,12 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return okVoid;
   }
 
-  setCamera(state: CameraState): AdapterResult {
+  setCamera(state: CameraState, animate = false): AdapterResult {
     if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
     this.resetPivotOffset();
     const pos = toThree(state.position);
     const target = toThree(state.target);
-    this.world.camera.controls.setLookAt(pos.x, pos.y, pos.z, target.x, target.y, target.z, false);
+    this.world.camera.controls.setLookAt(pos.x, pos.y, pos.z, target.x, target.y, target.z, animate);
     if (state.projection !== this.currentProjection) {
       this.setProjection(state.projection);
     }
@@ -2799,6 +2799,34 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.events.emit('hover', { elementId: null });
     }
   };
+
+  async captureScreenshot(options?: {
+    mimeType?: string;
+    quality?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+  }): Promise<string | null> {
+    if (!this.world?.renderer?.three || !this.world.scene?.three || !this.world.camera?.three) return null;
+    this.world.renderer.three.render(this.world.scene.three, this.world.camera.three);
+    const dom = this.world.renderer.three.domElement;
+    const mime = options?.mimeType || 'image/png';
+    const quality = options?.quality ?? 0.92;
+    if (!options?.maxWidth && !options?.maxHeight) {
+      return dom.toDataURL(mime, quality);
+    }
+    const maxW = options.maxWidth || dom.width;
+    const maxH = options.maxHeight || dom.height;
+    const scale = Math.min(maxW / dom.width, maxH / dom.height, 1);
+    const w = Math.max(1, Math.round(dom.width * scale));
+    const h = Math.max(1, Math.round(dom.height * scale));
+    const thumb = document.createElement('canvas');
+    thumb.width = w;
+    thumb.height = h;
+    const ctx = thumb.getContext('2d');
+    if (!ctx) return dom.toDataURL(mime, quality);
+    ctx.drawImage(dom, 0, 0, w, h);
+    return thumb.toDataURL(mime, quality);
+  }
 
   on<K extends keyof ViewerEvents>(event: K, handler: (payload: ViewerEvents[K]) => void): () => void {
     return this.events.on(event, handler);

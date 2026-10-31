@@ -220,3 +220,70 @@ test.describe('Mốc 5: Group I - Measurement Tools on ThatOpen', () => {
     await expect(measurePanel).not.toBeVisible();
   });
 });
+
+test.describe('Mốc 5: Group J - Saved Views (J2) on ThatOpen', () => {
+  test.setTimeout(90_000);
+
+  test('J2: Save 2 viewpoints, restore camera & state, verify persistence in localStorage', async ({ page }) => {
+    await openThatOpenArch(page);
+
+    // 1. Switch to Saved Views tab in RightPanel
+    const viewsTabBtn = page.getByTestId('tab-views-btn');
+    await expect(viewsTabBtn).toBeVisible();
+    await viewsTabBtn.click();
+
+    const viewsPanel = page.getByTestId('saved-views-panel');
+    await expect(viewsPanel).toBeVisible();
+
+    // 2. Save View 1
+    const saveBtn = page.getByTestId('save-view-btn');
+    await saveBtn.click();
+    await page.waitForTimeout(400);
+
+    let cards = page.getByTestId('saved-view-card');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.first()).toContainText('Góc nhìn 1');
+
+    // 3. Change camera position
+    await page.evaluate(() => {
+      const v = (window as any).__jnn.viewer;
+      v.setCamera({
+        position: [50, 50, 50],
+        target: [0, 0, 0],
+        projection: 'perspective',
+      });
+    });
+    await page.waitForTimeout(300);
+
+    // Save View 2
+    await saveBtn.click();
+    await page.waitForTimeout(400);
+
+    cards = page.getByTestId('saved-view-card');
+    await expect(cards).toHaveCount(2);
+
+    // 4. Click View 1 card to restore
+    await cards.nth(1).click();
+    await page.waitForTimeout(400);
+
+    const camState = await page.evaluate(() => (window as any).__jnn.viewer.getCamera().value);
+    expect(camState.position[0]).not.toBeCloseTo(50, 0);
+
+    // 5. Verify savedViews exist in localStorage
+    const storedViews = await page.evaluate(() => {
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith('jnn-saved-views-'));
+      if (keys.length === 0) return [];
+      return JSON.parse(localStorage.getItem(keys[0]!) || '[]');
+    });
+    expect(storedViews.length).toBe(2);
+
+    // 6. Delete a view
+    const deleteBtn = cards.first().getByTestId('delete-view-btn');
+    await deleteBtn.click();
+    await page.waitForTimeout(300);
+
+    cards = page.getByTestId('saved-view-card');
+    await expect(cards).toHaveCount(1);
+  });
+});
+

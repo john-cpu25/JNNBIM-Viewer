@@ -209,7 +209,7 @@ export interface ViewerAdapter {
 
   fitToView(ids?: readonly string[]): AdapterResult;
   setViewPreset(preset: ViewPreset): AdapterResult;
-  setCamera(camera: CameraState): AdapterResult;
+  setCamera(camera: CameraState, animate?: boolean): AdapterResult;
   getCamera(): AdapterResult<CameraState>;
   setProjection(projection: CameraState['projection']): AdapterResult;
   setNavigationSettings?(s: NavigationSettings): AdapterResult;
@@ -232,6 +232,13 @@ export interface ViewerAdapter {
   clearMeasurements?(): AdapterResult;
   deleteMeasurement?(id: string): AdapterResult;
   setMeasurementsVisible?(visible: boolean): AdapterResult;
+
+  captureScreenshot?(options?: {
+    mimeType?: string;
+    quality?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+  }): Promise<string | null>;
 
   /** Screen-space position (CSS px, relative to the container) of an element's centre. */
   projectToScreen(id: string): AdapterResult<{ x: number; y: number; onScreen: boolean }>;
