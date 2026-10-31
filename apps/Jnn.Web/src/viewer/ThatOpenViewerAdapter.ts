@@ -173,6 +173,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private gridVisible = true;
   private nav: NavigationSettings = structuredClone(DEFAULT_NAV);
   private anchorRequestId = 0;
+  private userControlling = false;
   private lastHover: HoverCache | null = null;
   private pivotMesh: THREE.Mesh | null = null;
   private readonly pivotMaterial = new THREE.MeshBasicMaterial({
@@ -709,8 +710,20 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     const workerUrl = new URL('./thatopen/worker.mjs', window.location.href).href;
     await fragments.init(workerUrl);
 
-    this.world.camera.controls.addEventListener('update', () => {
-      fragments.core.update();
+    const controls = this.world.camera.controls;
+    controls.addEventListener('controlstart', () => {
+      this.userControlling = true;
+    });
+    controls.addEventListener('controlend', () => {
+      this.userControlling = false;
+    });
+    controls.addEventListener('update', () => {
+      if (!this.userControlling) {
+        fragments.core.update();
+      }
+    });
+    controls.addEventListener('rest', () => {
+      fragments.core.update(true);
     });
 
     fragments.list.onItemSet.add(({ value: model }) => {
@@ -808,6 +821,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   dispose(): void {
     this.disposed = true;
+    this.userControlling = false;
     if (this.pivotFadeRaf) {
       cancelAnimationFrame(this.pivotFadeRaf);
       this.pivotFadeRaf = null;

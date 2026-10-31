@@ -306,4 +306,16 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
     expect(mouseButtons.left).toBe(1); // ROTATE in classic preset
     adapter.dispose();
   });
+
+  it('F1: tracks userControlling flag on camera controls events', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    expect((adapter as any).userControlling).toBe(false);
+
+    // Simulate controlstart & controlend
+    (adapter as any).userControlling = true;
+    expect((adapter as any).userControlling).toBe(true);
+
+    adapter.dispose();
+    expect((adapter as any).userControlling).toBe(false);
+  });
 });
