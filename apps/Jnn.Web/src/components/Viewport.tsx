@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen, HelpCircle, Loader2, UploadCloud } from 'lucide-react';
+import { FolderOpen, Footprints, HelpCircle, Loader2, UploadCloud } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
 import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
@@ -340,6 +340,43 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
           {!compact && !isNarrow && <ViewCube />}
           {state.section && <SectionPanel compact={compact} />}
           {state.measurePanelOpen && <MeasurePanel compact={compact} />}
+          {state.walkMode && (
+            <div
+              data-testid="walk-mode-hud"
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 rounded-full border border-line bg-surface/95 px-4 py-1.5 shadow-float backdrop-blur text-xs text-ink"
+            >
+              <div className="flex items-center gap-1.5 font-medium text-accent">
+                <Footprints size={15} />
+                <span>Đi bộ (First-person)</span>
+              </div>
+              <div className="text-muted hidden sm:inline">
+                <span className="font-semibold text-ink">W A S D</span> di chuyển • <span className="font-semibold text-ink">Q E</span> lên xuống • <span className="font-semibold text-ink">Chuột</span> nhìn
+              </div>
+              <div className="flex items-center gap-1 border-l border-line pl-2">
+                <span className="text-[10.5px] text-muted">Tốc độ:</span>
+                {[1, 3, 6].map((spd) => (
+                  <button
+                    key={spd}
+                    type="button"
+                    onClick={() => viewer?.setWalkSpeed?.(spd)}
+                    className="rounded px-1.5 py-0.5 text-[10px] font-semibold hover:bg-surface-3 transition-colors text-muted hover:text-ink"
+                  >
+                    {spd}x
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  viewer?.setWalkMode?.(false);
+                  dispatch({ type: 'setWalkMode', enabled: false });
+                }}
+                className="rounded-full bg-accent px-2 py-0.5 text-[10.5px] font-semibold text-white hover:opacity-90"
+              >
+                Thoát (Esc)
+              </button>
+            </div>
+          )}
           {dragValueLabel && (
             <div
               data-testid="section-drag-tooltip"

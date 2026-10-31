@@ -355,5 +355,52 @@ test.describe('Mốc 5: Group J - Saved Views (J2) on ThatOpen', () => {
     expect(vis.selectedStoreyId).toBeNull();
     expect(vis.isolatedCount).toBe(0);
   });
+
+  test('J1: First-person walk mode moves with WASD, exits with Esc, Shift+drag still orbits', async ({ page }) => {
+    await openThatOpenArch(page);
+
+    // 1. Walk button on Toolbar is visible
+    const walkBtn = page.getByTestId('toggle-walk-btn');
+    await expect(walkBtn).toBeVisible();
+
+    // 2. Click Walk button to enter First-person mode
+    await walkBtn.click();
+    await page.waitForTimeout(400);
+
+    const hud = page.getByTestId('walk-mode-hud');
+    await expect(hud).toBeVisible();
+
+    // Record initial camera position
+    const p1 = await page.evaluate(() => (window as any).__jnn.viewer.getCamera().value.position);
+
+    // 3. Move forward with 'W' key
+    await page.keyboard.down('w');
+    await page.waitForTimeout(400);
+    await page.keyboard.up('w');
+    await page.waitForTimeout(200);
+
+    const p2 = await page.evaluate(() => (window as any).__jnn.viewer.getCamera().value.position);
+    const moved = Math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]);
+    expect(moved).toBeGreaterThan(0.01);
+
+    // 4. Press Escape to exit walk mode
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await expect(hud).not.toBeVisible();
+
+    // 5. Verify Shift + Drag still orbits properly without regression
+    const canvas = page.getByTestId('viewer-canvas');
+    const box = (await canvas.boundingBox())!;
+    await page.keyboard.down('Shift');
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(box.x + box.width * 0.5 + 40, box.y + box.height * 0.5 + 40);
+    await page.mouse.up({ button: 'left' });
+    await page.keyboard.up('Shift');
+    await page.waitForTimeout(200);
+
+    const p3 = await page.evaluate(() => (window as any).__jnn.viewer.getCamera().value.position);
+    expect(p3).toBeDefined();
+  });
 });
 

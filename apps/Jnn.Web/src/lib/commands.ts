@@ -19,6 +19,7 @@ export type CommandId =
   | 'selectAll'
   | 'toggleMeasure'
   | 'screenshot'
+  | 'toggleWalk'
   | 'clear';
 
 export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = {
@@ -32,6 +33,7 @@ export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = 
   sectionBox: 'sectionBox',
   projection: 'camera',
   toggleMeasure: 'measure',
+  toggleWalk: 'walk',
 };
 
 /**
@@ -193,7 +195,18 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
           });
       }
       return;
+    case 'toggleWalk': {
+      const next = !s.walkMode;
+      v?.setWalkMode?.(next);
+      dispatch({ type: 'setWalkMode', enabled: next });
+      return;
+    }
     case 'clear':
+      if (s.walkMode) {
+        v?.setWalkMode?.(false);
+        dispatch({ type: 'setWalkMode', enabled: false });
+        return;
+      }
       if (s.measureTool !== null || s.measurePanelOpen) {
         dispatch({ type: 'setMeasurePanelOpen', open: false });
         return;

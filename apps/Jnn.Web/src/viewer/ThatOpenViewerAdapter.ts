@@ -10,6 +10,7 @@
  *     toModel: (x, y, z) -> (x, -z, y)
  */
 import * as THREE from 'three';
+import CameraControls from 'camera-controls';
 import * as OBC from '@thatopen/components';
 import * as OBCF from '@thatopen/components-front';
 import * as WebIFC from 'web-ifc';
@@ -139,6 +140,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     'sectionPlane',
     'sectionBox',
     'measure',
+    'walk',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -162,6 +164,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private areaMeasurer: OBCF.AreaMeasurement | null = null;
   private volumeMeasurer: OBCF.VolumeMeasurement | null = null;
   private currentTheme: 'light' | 'dark' = 'dark';
+  private walkMode = false;
+  private walkSpeed = 3.0;
+  private walkActiveKeys = new Set<string>();
+  private walkRaf = 0;
+  private lastWalkTime = 0;
 
   private selection = new Set<string>();
   private visibility: VisibilityState = { hidden: new Set(), isolated: new Set() };
@@ -392,6 +399,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       ev.preventDefault();
     }
 
+    if (this.walkMode) {
+      this.gesture = null;
+      return;
+    }
+
     const intent =
       this.nav.preset === 'classic' && (ev.altKey || ev.ctrlKey) && ev.button === 0
         ? 'none'
@@ -490,7 +502,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       g.intent = 'orbit';
       this.applyMouseMapping(true);
     }
-    if (this.currentMeasureTool) return;
+    if (this.currentMeasureTool || this.walkMode) return;
     if (g.button === 0 && (g.intent === 'none' || g.intent === 'box-select') && moved > DRAG_THRESHOLD_PX) {
       g.intent = 'box-select';
       const mode = boxSelectMode({ x: g.x, y: g.y }, { x: ev.clientX, y: ev.clientY });
@@ -525,6 +537,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         this.setSection(finalSpec, true);
         this.events.emit('sectionEdit', { spec: finalSpec, phase: 'end' });
       }
+      return;
+    }
+
+    if (this.walkMode) {
       return;
     }
 
@@ -1082,6 +1098,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   dispose(): void {
+    if (this.walkMode) {
+      this.setWalkMode(false);
+    }
     this.disposed = true;
     this.userControlling = false;
     if (this.cameraChangeRaf !== null) {
@@ -2756,7 +2775,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   };
 
   private onPointerMove = async (ev: PointerEvent) => {
-    if (this.currentMeasureTool) return;
+    if (this.currentMeasureTool || this.walkMode) return;
     if (ev.buttons !== 0 || ev.pointerType === 'touch') return;
     const now = performance.now();
     if (now - this.lastHoverAt < 40) return;
@@ -2799,6 +2818,102 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.events.emit('hover', { elementId: null });
     }
   };
+
+  private updateWalkMovement = (time: number) => {
+    if (!this.walkMode || !this.world) return;
+    if (this.lastWalkTime === 0) this.lastWalkTime = time;
+    const dt = Math.min((time - this.lastWalkTime) / 1000, 0.1);
+    this.lastWalkTime = time;
+
+    const controls = this.world.camera.controls;
+    const dist = this.walkSpeed * dt;
+
+    if (this.walkActiveKeys.has('w') || this.walkActiveKeys.has('arrowup')) {
+      controls.forward(dist, false);
+    }
+    if (this.walkActiveKeys.has('s') || this.walkActiveKeys.has('arrowdown')) {
+      controls.forward(-dist, false);
+    }
+    if (this.walkActiveKeys.has('a') || this.walkActiveKeys.has('arrowleft')) {
+      controls.truck(-dist, 0, false);
+    }
+    if (this.walkActiveKeys.has('d') || this.walkActiveKeys.has('arrowright')) {
+      controls.truck(dist, 0, false);
+    }
+    if (this.walkActiveKeys.has('e')) {
+      controls.elevate(dist, false);
+    }
+    if (this.walkActiveKeys.has('q')) {
+      controls.elevate(-dist, false);
+    }
+
+    this.walkRaf = requestAnimationFrame(this.updateWalkMovement);
+  };
+
+  private onWalkKeyDown = (e: KeyboardEvent) => {
+    if (!this.walkMode) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const key = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      this.walkActiveKeys.add(key);
+      e.preventDefault();
+    } else if (key === 'escape') {
+      this.setWalkMode(false);
+      e.preventDefault();
+    }
+  };
+
+  private onWalkKeyUp = (e: KeyboardEvent) => {
+    if (!this.walkMode) return;
+    const key = e.key.toLowerCase();
+    this.walkActiveKeys.delete(key);
+  };
+
+  setWalkMode(enabled: boolean): AdapterResult {
+    if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    if (this.walkMode === enabled) return okVoid;
+
+    if (enabled) {
+      if (this.currentMeasureTool) {
+        this.setMeasureTool(null);
+      }
+      if (this.currentProjection !== 'perspective') {
+        this.setProjection('perspective');
+      }
+      this.world.camera.set('FirstPerson');
+      this.world.camera.controls.mouseButtons.left = CameraControls.ACTION.ROTATE;
+      this.walkMode = true;
+      this.walkActiveKeys.clear();
+      this.lastWalkTime = 0;
+      window.addEventListener('keydown', this.onWalkKeyDown);
+      window.addEventListener('keyup', this.onWalkKeyUp);
+      this.walkRaf = requestAnimationFrame(this.updateWalkMovement);
+      this.events.emit('walkModeChange', { enabled: true });
+    } else {
+      this.walkMode = false;
+      this.walkActiveKeys.clear();
+      window.removeEventListener('keydown', this.onWalkKeyDown);
+      window.removeEventListener('keyup', this.onWalkKeyUp);
+      if (this.walkRaf) {
+        cancelAnimationFrame(this.walkRaf);
+        this.walkRaf = 0;
+      }
+      this.world.camera.set('Orbit');
+      this.configureControls();
+      this.applyMouseMapping(false);
+      this.events.emit('walkModeChange', { enabled: false });
+    }
+    return okVoid;
+  }
+
+  isWalkMode(): boolean {
+    return this.walkMode;
+  }
+
+  setWalkSpeed(speed: number): void {
+    this.walkSpeed = Math.max(0.5, Math.min(speed, 20));
+  }
 
   async captureScreenshot(options?: {
     mimeType?: string;

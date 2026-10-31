@@ -69,6 +69,7 @@ export interface AppState {
   measurePanelOpen: boolean;
   savedViews: SavedView[];
   selectedStoreyId: string | null;
+  walkMode: boolean;
 }
 
 export type Action =
@@ -100,6 +101,8 @@ export type Action =
   | { type: 'renameSavedView'; id: string; name: string }
   | { type: 'applySavedView'; view: SavedView }
   | { type: 'selectStorey'; storeyId: string | null; ghostOthers?: boolean; applySection?: boolean }
+  | { type: 'setWalkMode'; enabled: boolean }
+  | { type: 'toggleWalkMode' }
   | { type: 'toggleGrid' }
   | { type: 'setGridVisible'; visible: boolean }
   | { type: 'setNavigation'; settings: Partial<NavigationSettings> }
@@ -177,6 +180,7 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     measurePanelOpen: false,
     savedViews: loadSavedViews(model.modelId || model.name || 'default'),
     selectedStoreyId: null,
+    walkMode: false,
   };
 }
 
@@ -483,6 +487,20 @@ export function reducer(state: AppState, action: Action): AppState {
         section: nextSection,
       };
     }
+    case 'setWalkMode':
+      return {
+        ...state,
+        walkMode: action.enabled,
+        measureTool: action.enabled ? null : state.measureTool,
+        measurePanelOpen: action.enabled ? false : state.measurePanelOpen,
+      };
+    case 'toggleWalkMode':
+      return {
+        ...state,
+        walkMode: !state.walkMode,
+        measureTool: !state.walkMode ? null : state.measureTool,
+        measurePanelOpen: !state.walkMode ? false : state.measurePanelOpen,
+      };
   }
 }
 

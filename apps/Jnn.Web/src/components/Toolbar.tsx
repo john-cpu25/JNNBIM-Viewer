@@ -5,6 +5,7 @@ import {
   Eye,
   EyeOff,
   Focus,
+  Footprints,
   Ghost,
   Grid3x3,
   Maximize,
@@ -110,6 +111,14 @@ export function Toolbar({ compact }: { compact: boolean }) {
         active={state.measurePanelOpen || state.measureTool !== null}
         onClick={() => run('toggleMeasure')}
         data-testid="toggle-measure-btn"
+      />
+      <IconButton
+        icon={Footprints}
+        label={state.walkMode ? t('toolbar.walkExit') : t('toolbar.walk')}
+        disabled={!viewer?.capabilities.has('walk')}
+        active={state.walkMode}
+        onClick={() => run('toggleWalk')}
+        data-testid="toggle-walk-btn"
       />
       <IconButton
         icon={Camera}

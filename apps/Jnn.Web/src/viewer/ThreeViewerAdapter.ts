@@ -864,6 +864,14 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     return fail('unsupported', 'ThreeViewerAdapter does not support measurements');
   }
 
+  setWalkMode(_enabled: boolean): AdapterResult {
+    return fail('unsupported', 'ThreeViewerAdapter does not support walk mode');
+  }
+
+  isWalkMode(): boolean {
+    return false;
+  }
+
   async captureScreenshot(options?: {
     mimeType?: string;
     quality?: number;

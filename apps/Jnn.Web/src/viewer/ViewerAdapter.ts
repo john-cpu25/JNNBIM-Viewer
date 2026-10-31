@@ -33,7 +33,8 @@ export type ViewerCapability =
   | 'sectionBox'
   | 'highlight'
   | 'xray'
-  | 'measure';
+  | 'measure'
+  | 'walk';
 
 export type ViewPreset =
   | 'iso'
@@ -174,6 +175,7 @@ export interface ViewerEvents {
   fpsStats: FpsStats;
   boxSelect: BoxSelectEvent;
   measureChange: { items: MeasureItem[] };
+  walkModeChange: { enabled: boolean };
 }
 
 export type ViewerEventName = keyof ViewerEvents;
@@ -232,6 +234,10 @@ export interface ViewerAdapter {
   clearMeasurements?(): AdapterResult;
   deleteMeasurement?(id: string): AdapterResult;
   setMeasurementsVisible?(visible: boolean): AdapterResult;
+
+  setWalkMode?(enabled: boolean): AdapterResult;
+  isWalkMode?(): boolean;
+  setWalkSpeed?(speed: number): void;
 
   captureScreenshot?(options?: {
     mimeType?: string;
