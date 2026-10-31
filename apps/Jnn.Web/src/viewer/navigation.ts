@@ -83,3 +83,31 @@ export function shouldUseHoverCache(
   if (now - cache.t >= maxAgeMs) return false;
   return Math.hypot(cache.x - clientX, cache.y - clientY) < maxDistPx;
 }
+
+/**
+ * Chooses the orbit pivot point when clicking into empty space.
+ * If planePoint falls outside the visible model bounds (expanded with margin),
+ * falls back to the center of the bounding box to avoid wild camera swings.
+ */
+export function choosePivot(
+  planePoint: THREE.Vector3,
+  bounds: THREE.Box3 | null,
+  marginRatio = 0.1,
+): THREE.Vector3 {
+  if (!bounds || bounds.isEmpty()) {
+    return planePoint.clone();
+  }
+  const size = bounds.getSize(new THREE.Vector3());
+  const margin = size.clone().multiplyScalar(marginRatio);
+  const expanded = bounds.clone();
+  expanded.min.sub(margin);
+  expanded.max.add(margin);
+
+  if (expanded.containsPoint(planePoint)) {
+    return planePoint.clone();
+  }
+
+  const center = new THREE.Vector3();
+  bounds.getCenter(center);
+  return center;
+}

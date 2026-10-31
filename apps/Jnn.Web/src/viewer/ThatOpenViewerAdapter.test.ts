@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import * as OBC from '@thatopen/components';
 import { ThatOpenViewerAdapter } from './ThatOpenViewerAdapter';
 import type { JnnModel } from '../domain/model';
 
@@ -272,6 +274,80 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.anchorPivotAt(102, 101);
     expect((adapter as any).lastHover?.point).toBe(testPoint);
+
+    adapter.dispose();
+  });
+
+  it('F2: falls back to model center when plane point lands outside model bounds', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    let setPointCalledWith: any = null;
+    const fakeControls = {
+      setOrbitPoint: (x: number, y: number, z: number) => {
+        setPointCalledWith = { x, y, z };
+      },
+      getTarget: (v: any) => v.set(0, 0, 0),
+      setFocalOffset: () => {},
+    };
+
+    (adapter as any).world = {
+      camera: {
+        controls: fakeControls,
+        three: {
+          getWorldDirection: (v: any) => v.set(0, 0, -1),
+          position: { distanceTo: () => 10 },
+        },
+      },
+      renderer: {
+        three: {
+          domElement: {
+            getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+            clientHeight: 600,
+          },
+        },
+      },
+    };
+
+    // Mock raycaster returning a planePoint far away (x: 100, y: 100, z: 0)
+    (adapter as any).components = {
+      dispose: () => {},
+      get: (comp: any) => {
+        if (comp === OBC.Raycasters) {
+          return {
+            get: () => ({
+              three: {
+                setFromCamera: () => {},
+                ray: {
+                  intersectPlane: (_plane: any, target: any) => target.set(100, 100, 0),
+                },
+              },
+              castRay: () => Promise.resolve(null),
+            }),
+          };
+        }
+        return null;
+      },
+    };
+
+    // Mock model bounds centered at (0, 0, 0), size 10x10x10
+    (adapter as any).modelsMap = new Map([
+      [
+        'm1',
+        {
+          model: {
+            object: { visible: true },
+            box: new THREE.Box3(new THREE.Vector3(-5, -5, -5), new THREE.Vector3(5, 5, 5)),
+            dispose: () => {},
+          },
+        },
+      ],
+    ]);
+
+    adapter.anchorPivotAt(10, 10);
+    // Because (100, 100, 0) is outside [-5..5], pivot must fall back to center (0, 0, 0)
+    expect(setPointCalledWith).not.toBeNull();
+    expect(setPointCalledWith.x).toBeCloseTo(0);
+    expect(setPointCalledWith.y).toBeCloseTo(0);
+    expect(setPointCalledWith.z).toBeCloseTo(0);
 
     adapter.dispose();
   });

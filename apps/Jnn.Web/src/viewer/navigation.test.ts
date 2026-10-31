@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import CameraControls from 'camera-controls';
 import {
   baseMapping,
+  choosePivot,
   intentOnDown,
   orbitMapping,
   shouldUseHoverCache,
@@ -93,5 +94,47 @@ describe('shouldUseHoverCache', () => {
     expect(shouldUseHoverCache(cache, 110, 100, 1050)).toBe(false);
     // Null cache
     expect(shouldUseHoverCache(null, 100, 100, 1050)).toBe(false);
+  });
+});
+
+describe('choosePivot (F2)', () => {
+  const modelBounds = new THREE.Box3(new THREE.Vector3(-10, -5, -20), new THREE.Vector3(10, 5, 20));
+  // Center is (0, 0, 0), size is (20, 10, 40)
+  // 10% margin expands by: x +/- 2, y +/- 1, z +/- 4
+  // Expanded box: [-12, -6, -24] to [12, 6, 24]
+
+  it('returns planePoint when bounds is null', () => {
+    const pt = new THREE.Vector3(50, 50, 50);
+    const res = choosePivot(pt, null);
+    expect(res.equals(pt)).toBe(true);
+  });
+
+  it('returns planePoint when bounds is empty', () => {
+    const pt = new THREE.Vector3(50, 50, 50);
+    const empty = new THREE.Box3();
+    const res = choosePivot(pt, empty);
+    expect(res.equals(pt)).toBe(true);
+  });
+
+  it('returns planePoint when point is inside model bounds', () => {
+    const pt = new THREE.Vector3(2, 1, 5);
+    const res = choosePivot(pt, modelBounds);
+    expect(res.equals(pt)).toBe(true);
+  });
+
+  it('returns planePoint when point is within 10% margin', () => {
+    // x = 11 is outside original [ -10, 10 ], but within expanded [ -12, 12 ]
+    const pt = new THREE.Vector3(11, 0, 0);
+    const res = choosePivot(pt, modelBounds);
+    expect(res.equals(pt)).toBe(true);
+  });
+
+  it('falls back to model center when point lands outside model bounds', () => {
+    // x = 50 is far outside model bounds
+    const pt = new THREE.Vector3(50, 0, 0);
+    const res = choosePivot(pt, modelBounds);
+    expect(res.x).toBeCloseTo(0);
+    expect(res.y).toBeCloseTo(0);
+    expect(res.z).toBeCloseTo(0);
   });
 });

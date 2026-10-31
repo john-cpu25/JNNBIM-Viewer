@@ -45,6 +45,7 @@ import {
 } from './ViewerAdapter';
 import {
   baseMapping,
+  choosePivot,
   DRAG_THRESHOLD_PX,
   intentOnDown,
   orbitMapping,
@@ -594,8 +595,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, target);
       const planePoint = caster.three.ray.intersectPlane(plane, new THREE.Vector3());
       if (planePoint) {
-        OBC.setOrbitPoint(controls, planePoint);
-        this.showPivot(planePoint);
+        const bounds = this.getCombinedThreeBounds();
+        const pivot = choosePivot(planePoint, bounds);
+        OBC.setOrbitPoint(controls, pivot);
+        this.showPivot(pivot);
       }
 
       // (c) Async raycast surface hit
@@ -796,7 +799,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
   }
 
-  private updateCombinedBoundsAndFit(fitCamera = false): Bounds | null {
+  getCombinedThreeBounds(): THREE.Box3 | null {
     if (!this.world) return null;
     const combined = new THREE.Box3();
     for (const entry of this.modelsMap.values()) {
@@ -805,12 +808,17 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         combined.union(entry.model.box);
       }
     }
-    if (!combined.isEmpty()) {
+    return combined.isEmpty() ? null : combined;
+  }
+
+  private updateCombinedBoundsAndFit(fitCamera = false): Bounds | null {
+    const combined = this.getCombinedThreeBounds();
+    if (combined && !combined.isEmpty()) {
       this.modelBounds = {
         min: [combined.min.x, -combined.max.z, combined.min.y],
         max: [combined.max.x, -combined.min.z, combined.max.y],
       };
-      if (fitCamera) {
+      if (fitCamera && this.world) {
         this.resetPivotOffset();
         this.world.camera.controls.fitToBox(combined, true);
       }
@@ -891,7 +899,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
     if (this.world) {
       for (const [, entry] of this.modelsMap) {
-        this.world.scene.three.remove(entry.model.object);
+        if (this.world.scene?.three) {
+          this.world.scene.three.remove(entry.model.object);
+        }
         entry.model.dispose();
       }
       this.modelsMap.clear();
