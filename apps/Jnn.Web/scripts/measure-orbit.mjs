@@ -87,6 +87,11 @@ server.listen(PORT, async () => {
   // Helper to run drag rotation and record rAF deltas
   async function runOrbitTest(name, dragSteps = 60, durationMs = 2000, startX = 800, startY = 450, endX = 350, endY = 450, button = 'left') {
     const camBefore = await page.evaluate(() => window.__jnn.viewer.getCamera());
+    const targetBefore = await page.evaluate(() => {
+      const v = window.__jnn?.viewer?.world?.camera?.controls?.getTarget?.({ x: 0, y: 0, z: 0 });
+      return v ? { x: v.x, y: v.y, z: v.z } : null;
+    });
+
     // Install rAF recorder
     await page.evaluate(() => {
       window.__frameDeltas = [];
@@ -102,10 +107,17 @@ server.listen(PORT, async () => {
       requestAnimationFrame(onFrame);
     });
 
-    // Perform Shift + drag
+    // Perform Shift + drag with simulated Shift key-repeat (~30 Hz)
     await page.keyboard.down('Shift');
     await page.mouse.move(startX, startY);
     await page.mouse.down({ button });
+
+    // Start auto-repeated Shift keydown events (~30 times/sec)
+    await page.evaluate(() => {
+      window.__shiftRepeatInterval = setInterval(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true, repeat: true }));
+      }, 33);
+    });
 
     const stepDelay = durationMs / dragSteps;
     for (let i = 1; i <= dragSteps; i++) {
@@ -114,6 +126,14 @@ server.listen(PORT, async () => {
       await page.mouse.move(x, y);
       await page.waitForTimeout(stepDelay);
     }
+
+    // Stop auto-repeated Shift keydown
+    await page.evaluate(() => {
+      if (window.__shiftRepeatInterval) {
+        clearInterval(window.__shiftRepeatInterval);
+        delete window.__shiftRepeatInterval;
+      }
+    });
 
     await page.mouse.up({ button });
     await page.keyboard.up('Shift');
@@ -125,6 +145,19 @@ server.listen(PORT, async () => {
       window.__recordActive = false;
       return window.__frameDeltas;
     });
+
+    const targetAfter = await page.evaluate(() => {
+      const v = window.__jnn?.viewer?.world?.camera?.controls?.getTarget?.({ x: 0, y: 0, z: 0 });
+      return v ? { x: v.x, y: v.y, z: v.z } : null;
+    });
+
+    const raycastCount = await page.evaluate(() => {
+      return (window).__jnn_raycast_count ?? window.__jnn?.viewer?.gestureRaycastCount ?? 0;
+    });
+
+    const targetDrift = targetBefore && targetAfter
+      ? Math.hypot(targetAfter.x - targetBefore.x, targetAfter.y - targetBefore.y, targetAfter.z - targetBefore.z)
+      : 0;
 
     // Discard the very first frame delta which can be setup delay
     const cleanDeltas = deltas.slice(1);
@@ -140,8 +173,8 @@ server.listen(PORT, async () => {
       camAfter.value.position[2] - camBefore.value.position[2]
     );
 
-    console.log(`[${name}] Moved: ${moved.toFixed(3)}, Frames: ${cleanDeltas.length}, Total: ${totalTime.toFixed(1)}ms, Avg FPS: ${avgFps.toFixed(1)}, Max: ${maxFrame.toFixed(1)}ms, >100ms: ${over100ms}`);
-    return { name, moved, frames: cleanDeltas.length, avgFps, maxFrame, over100ms, deltas: cleanDeltas };
+    console.log(`[${name}] Moved: ${moved.toFixed(3)}, Drift: ${targetDrift.toFixed(3)}, Raycasts: ${raycastCount}, Frames: ${cleanDeltas.length}, Total: ${totalTime.toFixed(1)}ms, Avg FPS: ${avgFps.toFixed(1)}, Max: ${maxFrame.toFixed(1)}ms, >100ms: ${over100ms}`);
+    return { name, moved, targetDrift, raycastCount, frames: cleanDeltas.length, avgFps, maxFrame, over100ms, deltas: cleanDeltas };
   }
 
   console.log('\n--- Kịch bản (a): Shift + kéo xoay toàn tháp (3 lần) ---');
@@ -172,19 +205,21 @@ server.listen(PORT, async () => {
   const avgAFps = (runsA.reduce((s, r) => s + r.avgFps, 0) / runsA.length).toFixed(1);
   const maxAFrame = Math.max(...runsA.map((r) => r.maxFrame)).toFixed(1);
   const totalAOver100 = runsA.reduce((s, r) => s + r.over100ms, 0);
+  const maxARaycasts = Math.max(...runsA.map((r) => r.raycastCount));
 
   const avgBFps = (runsB.reduce((s, r) => s + r.avgFps, 0) / runsB.length).toFixed(1);
   const maxBFrame = Math.max(...runsB.map((r) => r.maxFrame)).toFixed(1);
   const totalBOver100 = runsB.reduce((s, r) => s + r.over100ms, 0);
+  const maxBRaycasts = Math.max(...runsB.map((r) => r.raycastCount));
 
   console.log('\n======================================================');
-  console.log('TỔNG HỢP SỐ LIỆU ĐO:');
-  console.log(`Kịch bản (a) Xoay toàn tháp: Avg FPS = ${avgAFps}, Max Frame = ${maxAFrame} ms, Tổng frames >100ms = ${totalAOver100}`);
-  console.log(`Kịch bản (b) Zoom sát rồi xoay: Avg FPS = ${avgBFps}, Max Frame = ${maxBFrame} ms, Tổng frames >100ms = ${totalBOver100}`);
+  console.log('TỔNG HỢP SỐ LIỆU ĐO (Hotfix 2 - Có phím Shift lặp ~30Hz):');
+  console.log(`Kịch bản (a) Xoay toàn tháp: Avg FPS = ${avgAFps}, Max Frame = ${maxAFrame} ms, Tổng frames >100ms = ${totalAOver100}, Max raycasts/kéo = ${maxARaycasts}`);
+  console.log(`Kịch bản (b) Zoom sát rồi xoay: Avg FPS = ${avgBFps}, Max Frame = ${maxBFrame} ms, Tổng frames >100ms = ${totalBOver100}, Max raycasts/kéo = ${maxBRaycasts}`);
   console.log('======================================================');
 
   // Save after-fix JSON
-  const outputPath = path.resolve(webRoot, 'scripts/results/benchmark-orbit-after-fix.json');
+  const outputPath = path.resolve(webRoot, 'scripts/results/benchmark-orbit-hotfix2.json');
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(
     outputPath,
@@ -194,14 +229,14 @@ server.listen(PORT, async () => {
         fileSizeMb: (stat.size / (1024 * 1024)).toFixed(2),
         runsA,
         runsB,
-        summaryA: { avgFps: avgAFps, maxFrame: maxAFrame, over100ms: totalAOver100 },
-        summaryB: { avgFps: avgBFps, maxFrame: maxBFrame, over100ms: totalBOver100 },
+        summaryA: { avgFps: avgAFps, maxFrame: maxAFrame, over100ms: totalAOver100, maxRaycasts: maxARaycasts },
+        summaryB: { avgFps: avgBFps, maxFrame: maxBFrame, over100ms: totalBOver100, maxRaycasts: maxBRaycasts },
       },
       null,
       2
     )
   );
-  console.log(`Saved baseline to ${outputPath}`);
+  console.log(`Saved benchmark to ${outputPath}`);
 
   await browser.close();
   server.close();

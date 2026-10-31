@@ -215,5 +215,78 @@ test.describe('Mốc 4 ThatOpen Adapter: Revit navigation, section gizmo, projec
     );
     expect(distPan).toBeGreaterThan(0.05);
   });
+
+  test('Hotfix 2 (v0.4.2): Shift + drag with auto-repeated Shift keydown maintains invariant target (pivot stability)', async ({ page }) => {
+    test.setTimeout(75_000);
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    const archBtn = page.getByRole('button', { name: /(Kiến trúc|Architecture) \(90 KB\)/i });
+    await expect(archBtn).toBeVisible();
+    await archBtn.click();
+
+    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 50_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
+    await page.waitForTimeout(1000);
+
+    const canvas = page.getByTestId('viewer-host').locator('canvas');
+    await expect(canvas).toBeVisible();
+    const box = (await canvas.boundingBox())!;
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+
+    // Shift + drag with simulated keydown repeats (~30 Hz)
+    await page.keyboard.down('Shift');
+    await page.mouse.move(startX, startY);
+    await page.mouse.down({ button: 'left' });
+
+    // Wait a brief moment for anchor to resolve
+    await page.waitForTimeout(50);
+
+    const targetBefore = await page.evaluate(() => {
+      const v = (window.__jnn!.viewer as any).world?.camera?.controls?.getTarget({ x: 0, y: 0, z: 0 });
+      return v ? { x: v.x, y: v.y, z: v.z } : null;
+    });
+
+    // Simulate repeated Shift keydown during drag
+    await page.evaluate(() => {
+      (window as any).__shiftRepeatInterval = setInterval(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', shiftKey: true, repeat: true }));
+      }, 30);
+    });
+
+    // Drag 100px right and 50px down
+    for (let i = 1; i <= 15; i++) {
+      await page.mouse.move(startX + i * 8, startY + i * 4);
+      await page.waitForTimeout(30);
+    }
+
+    // Clear interval and release
+    await page.evaluate(() => {
+      if ((window as any).__shiftRepeatInterval) {
+        clearInterval((window as any).__shiftRepeatInterval);
+        delete (window as any).__shiftRepeatInterval;
+      }
+    });
+
+    const targetAfter = await page.evaluate(() => {
+      const v = (window.__jnn!.viewer as any).world?.camera?.controls?.getTarget({ x: 0, y: 0, z: 0 });
+      return v ? { x: v.x, y: v.y, z: v.z } : null;
+    });
+
+    await page.mouse.up({ button: 'left' });
+    await page.keyboard.up('Shift');
+
+    // Pivot must not drift across screen during drag
+    expect(targetBefore).not.toBeNull();
+    expect(targetAfter).not.toBeNull();
+    expect(targetAfter!.x).toBeCloseTo(targetBefore!.x, 2);
+    expect(targetAfter!.y).toBeCloseTo(targetBefore!.y, 2);
+    expect(targetAfter!.z).toBeCloseTo(targetBefore!.z, 2);
+
+    // Number of raycasts during this entire Shift+drag should be <= 2
+    const raycastCount = await page.evaluate(() => (window as any).__jnn_raycast_count ?? (window.__jnn!.viewer as any).gestureRaycastCount ?? 0);
+    expect(raycastCount).toBeLessThanOrEqual(2);
+  });
 });
 
