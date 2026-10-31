@@ -35,6 +35,17 @@ export function useShortcuts(state: AppState, dispatch: Dispatch<Action>, viewer
         runCommand('selectAll', ref.current.state, dispatch, ref.current.viewer);
         return;
       }
+      if (e.key === 'F11' || (e.shiftKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        if (typeof document !== 'undefined') {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.().catch?.(() => {});
+          } else {
+            document.exitFullscreen?.().catch?.(() => {});
+          }
+        }
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
       const { state: s, viewer: v } = ref.current;

@@ -1,5 +1,6 @@
 import {
   Box,
+  Camera,
   Crosshair,
   Eye,
   EyeOff,
@@ -108,6 +109,12 @@ export function Toolbar({ compact }: { compact: boolean }) {
         active={state.measurePanelOpen || state.measureTool !== null}
         onClick={() => run('toggleMeasure')}
         data-testid="toggle-measure-btn"
+      />
+      <IconButton
+        icon={Camera}
+        label={t('toolbar.screenshot')}
+        onClick={() => run('screenshot')}
+        data-testid="screenshot-btn"
       />
       {hasSel && (
         <>

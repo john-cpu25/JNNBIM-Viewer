@@ -18,6 +18,7 @@ export type CommandId =
   | 'toggleGrid'
   | 'selectAll'
   | 'toggleMeasure'
+  | 'screenshot'
   | 'clear';
 
 export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = {
@@ -168,6 +169,29 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
     }
     case 'toggleMeasure':
       dispatch({ type: 'setMeasurePanelOpen', open: !s.measurePanelOpen });
+      return;
+    case 'screenshot':
+      if (v?.captureScreenshot) {
+        v.captureScreenshot({ mimeType: 'image/png' })
+          .then((dataUrl) => {
+            if (!dataUrl) return;
+            const now = new Date();
+            const padNum = (n: number) => String(n).padStart(2, '0');
+            const timestamp = `${now.getFullYear()}${padNum(now.getMonth() + 1)}${padNum(now.getDate())}_${padNum(now.getHours())}${padNum(now.getMinutes())}`;
+            const modelName = s.model.name || 'model';
+            const filename = `JNN_${modelName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${timestamp}.png`;
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            dispatch({ type: 'notify', tone: 'info', text: `Đã lưu ảnh màn hình: ${filename}` });
+          })
+          .catch((err) => {
+            console.warn('Screenshot capture failed:', err);
+          });
+      }
       return;
     case 'clear':
       if (s.measureTool !== null || s.measurePanelOpen) {

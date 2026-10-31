@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { FolderOpen, FolderPlus, Moon, PanelLeft, PanelRight, Settings, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { FolderOpen, FolderPlus, Maximize2, Minimize2, Moon, PanelLeft, PanelRight, Settings, Sun } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import type { Layout } from '../lib/useLayout';
 import { IconButton } from './ui';
@@ -18,6 +18,23 @@ export function TopBar({ layout }: { layout: Layout }) {
   const appendFileInputRef = useRef<HTMLInputElement>(null);
   const m = state.model;
   const narrow = layout === 'narrow';
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch?.(() => {});
+    } else {
+      document.exitFullscreen?.().catch?.(() => {});
+    }
+  };
 
   const onLoadSample = () => {
     const url = new URL('./samples/building-arch-2x3.ifc', window.location.href).href;
@@ -132,6 +149,13 @@ export function TopBar({ layout }: { layout: Layout }) {
           </>
         )}
 
+        <IconButton
+          icon={isFullscreen ? Minimize2 : Maximize2}
+          label={isFullscreen ? t('topbar.exitFullscreen') : t('topbar.fullscreen')}
+          shortcut="F11"
+          onClick={toggleFullscreen}
+          data-testid="fullscreen-btn"
+        />
         <IconButton
           icon={Settings}
           label={t('topbar.settings')}

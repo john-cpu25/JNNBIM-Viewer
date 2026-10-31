@@ -285,5 +285,26 @@ test.describe('Mốc 5: Group J - Saved Views (J2) on ThatOpen', () => {
     cards = page.getByTestId('saved-view-card');
     await expect(cards).toHaveCount(1);
   });
+
+  test('J4 & J7: Fullscreen button and Screenshot PNG download', async ({ page }) => {
+    await openThatOpenArch(page);
+
+    // 1. Verify Fullscreen button is visible on TopBar
+    const fsBtn = page.getByTestId('fullscreen-btn');
+    await expect(fsBtn).toBeVisible();
+    await fsBtn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Screenshot button on Toolbar triggers PNG download
+    const screenshotBtn = page.getByTestId('screenshot-btn');
+    await expect(screenshotBtn).toBeVisible();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      screenshotBtn.click(),
+    ]);
+
+    expect(download.suggestedFilename()).toMatch(/^JNN_.*\.png$/);
+  });
 });
 
