@@ -130,26 +130,53 @@ server.listen(PORT, async () => {
   await page.keyboard.press('m');
   await page.waitForTimeout(800);
 
-  console.log('Action 3b: Click 2 points on canvas...');
-  const canvas = page.getByTestId('viewer-canvas');
-  const box = await canvas.boundingBox();
-  if (box) {
-    const pt1X = box.x + box.width * 0.45;
-    const pt1Y = box.y + box.height * 0.45;
-    const pt2X = box.x + box.width * 0.55;
-    const pt2Y = box.y + box.height * 0.55;
+  console.log('Action 3b: Find 2 points on model geometry using pickAt and click...');
+  const points = await page.evaluate(async () => {
+    const v = window.__jnn?.viewer;
+    const canvas = document.querySelector('[data-testid="viewer-canvas"]');
+    if (!canvas || !v) return null;
+    const rect = canvas.getBoundingClientRect();
+    const hits = [];
+    for (let y = rect.top + 100; y < rect.bottom - 100; y += 30) {
+      for (let x = rect.left + 200; x < rect.right - 200; x += 30) {
+        const h = await v.pickAt(x, y);
+        if (h && h.point) {
+          hits.push({ x: Math.round(x), y: Math.round(y), point: [h.point[0], h.point[1], h.point[2]] });
+        }
+      }
+    }
+    if (hits.length < 2) return null;
+    const p1 = hits[0];
+    let p2 = hits[hits.length - 1];
+    for (let i = hits.length - 1; i >= 1; i--) {
+      const d = Math.hypot(hits[i].point[0] - p1.point[0], hits[i].point[1] - p1.point[1], hits[i].point[2] - p1.point[2]);
+      if (d >= 0.5) {
+        p2 = hits[i];
+        break;
+      }
+    }
+    return { p1, p2 };
+  });
 
-    await page.mouse.click(pt1X, pt1Y);
-    await page.waitForTimeout(500);
-    await page.mouse.click(pt2X, pt2Y);
-    await page.waitForTimeout(1000);
+  if (points) {
+    const { p1, p2 } = points;
+    console.log(`Clicking p1 at (${p1.x}, ${p1.y}) and p2 at (${p2.x}, ${p2.y})...`);
+    await page.mouse.move(p1.x, p1.y, { steps: 5 });
+    await page.waitForTimeout(200);
+    await page.mouse.click(p1.x, p1.y);
+    await page.waitForTimeout(400);
+
+    await page.mouse.move(p2.x, p2.y, { steps: 5 });
+    await page.waitForTimeout(400);
+    await page.mouse.click(p2.x, p2.y);
+    await page.waitForTimeout(1500);
   }
 
   console.log('Action 3c: Change unit to m...');
-  const unitMBtn = page.getByRole('button', { name: 'm', exact: true });
-  if (await unitMBtn.isVisible()) {
-    await unitMBtn.click();
-    await page.waitForTimeout(800);
+  const unitMRadio = page.getByRole('radio', { name: 'm', exact: true });
+  if (await unitMRadio.isVisible()) {
+    await unitMRadio.click();
+    await page.waitForTimeout(1200);
   }
 
   console.log('Action 3d: Clear measurements (if any) and exit...');
@@ -166,30 +193,34 @@ server.listen(PORT, async () => {
   const viewsTab = page.getByTestId('tab-views-btn');
   if (await viewsTab.isVisible()) {
     await viewsTab.click();
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1000);
 
-    const addViewBtn = page.locator('[data-testid="add-view-btn"]');
+    const addViewBtn = page.locator('[data-testid="save-view-btn"]');
     if (await addViewBtn.isVisible()) {
       await addViewBtn.click();
-      await page.waitForTimeout(1200);
+      console.log('Waiting for saved view card with thumbnail image...');
+      await page.waitForSelector('[data-testid="saved-view-card"] img', { timeout: 10000 });
+      await page.waitForTimeout(2000);
 
       // Orbit slightly
+      console.log('Orbiting camera slightly to demonstrate restore...');
       await page.keyboard.down('Shift');
       await page.mouse.move(650, 400);
       await page.mouse.down({ button: 'left' });
-      for (let i = 1; i <= 15; i++) {
-        await page.mouse.move(650 + i * 8, 400 + i * 2);
+      for (let i = 1; i <= 20; i++) {
+        await page.mouse.move(650 + i * 10, 400 + i * 4);
         await page.waitForTimeout(20);
       }
       await page.mouse.up({ button: 'left' });
       await page.keyboard.up('Shift');
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(1200);
 
       // Restore saved view
-      const viewItem = page.locator('[data-testid="saved-view-item"]').first();
+      console.log('Clicking saved view card to restore viewpoint...');
+      const viewItem = page.locator('[data-testid="saved-view-card"]').first();
       if (await viewItem.isVisible()) {
         await viewItem.click();
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(2000);
       }
     }
   }
