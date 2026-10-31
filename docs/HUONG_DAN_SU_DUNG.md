@@ -157,3 +157,87 @@ Chuyển sang tab **"Rules"** ở thanh bên phải để truy cập bảng ki�
 ## 7. LƯU Ý KỸ THUẬT & TỐI ƯU HÓA
 - **Trình duyệt khuyến nghị:** Google Chrome, Microsoft Edge hoặc Firefox phiên bản mới nhất hỗ trợ WebGL 2.0 và WebAssembly.
 - **Độ phân giải hiển thị:** Giao diện co giãn tự động tối ưu trên cả màn hình máy tính để bàn (≥ 1280px), máy tính bảng (768–1279px) và điện thoại di động (< 768px).
+
+---
+
+## 8. CHỌN NHIỀU CẤU KIỆN — MULTI-SELECT & BOX SELECTION (MỐC 5)
+
+### 8.1. Chọn nhiều cấu kiện linh hoạt
+- **Phím tắt Ctrl + A:** Chọn tức thì tất cả các cấu kiện đang hiển thị trong khung nhìn (tự động loại trừ các cấu kiện đã bị ẩn hoặc bị mặt cắt Section cắt bỏ).
+- **Phím Ctrl + Click:** Thêm hoặc bớt từng cấu kiện vào vùng chọn hiện thời. Hỗ trợ thao tác đồng bộ trực tiếp trên không gian 3D lẫn trên Cây mô hình Explorer.
+- **Huy hiệu số lượng chọn (Selection Badge):** Hiển thị trực quan số cấu kiện đang được chọn trên thanh công cụ Toolbar kèm nút hủy chọn nhanh (`Esc`).
+- **Tổng hợp khối lượng tự động:** Bảng thuộc tính bên phải tự động tính toán tổng số lượng, chiều dài, diện tích và thể tích của tất cả cấu kiện đang được chọn.
+
+### 8.2. Kéo khung chọn vùng (Window & Crossing Selection)
+Thao tác rê chuột kéo khung trên nền mô hình 3D theo chuẩn CAD/BIM chuyên nghiệp:
+- **Kéo từ TRÁI sang PHẢI (Window Selection):**
+  - Khung chữ nhật hiển thị viền **xanh dương nét liền** (solid).
+  - Chỉ chọn các cấu kiện nằm **hoàn toàn bên trong** khung chọn.
+- **Kéo từ PHẢI sang TRÁI (Crossing Selection):**
+  - Khung chữ nhật hiển thị viền **xanh lá cây nét đứt** (dashed).
+  - Chọn mọi cấu kiện **chạm vào hoặc giao cắt** với khung chọn.
+- **Hủy chọn nhanh:** Rê kéo chuột tại bất kỳ vùng trống nào ở góc màn hình để xóa nhanh vùng chọn hiện tại.
+
+---
+
+## 9. CÔNG CỤ ĐO LƯỜNG 3D — MEASUREMENT TOOLS (MỐC 5)
+
+### 9.1. Bảng công cụ Đo đạc (MeasurePanel)
+Nhấn phím tắt **`M`** hoặc nhấp vào biểu tượng chiếc thước kẻ (**Ruler**) trên Toolbar để mở bảng điều khiển đo lường:
+- **Đo khoảng cách (Distance):** Nhấp chuột chọn 2 điểm bất kỳ trên bề mặt mô hình để đo khoảng cách thực theo tọa độ không gian 3D.
+- **Đo theo cạnh (Edge):** Tự động nhận diện và đo chiều dài đoạn thẳng/cạnh cấu kiện.
+- **Đo góc (Angle):** Đo góc hợp bởi các đường thẳng hoặc giữa hai mặt phẳng cấu kiện.
+- **Đo diện tích (Area):** Nhấp tuần tự các đỉnh của đa giác cần đo, nhấn phím **Enter** để hoàn tất và xem diện tích bề mặt.
+- **Đo thể tích (Volume):** Tính toán thể tích bao của cấu kiện hoặc khu vực lựa chọn.
+
+### 9.2. Bắt điểm thông minh & Tùy chọn hiển thị
+- **Chế độ bắt điểm (Snapping):** Bật/tắt linh hoạt các chế độ bắt điểm:
+  - **Đỉnh (Vertex):** Bắt chính xác vào các góc, đỉnh hình học của cấu kiện.
+  - **Cạnh (Edge):** Bắt vào tim hoặc mép các cạnh thẳng.
+  - **Mặt (Face):** Bắt điểm nằm trên bề mặt phẳng của cấu kiện.
+- **Chuyển đổi đơn vị tức thì:** Chuyển đổi linh hoạt giữa các đơn vị `mm`, `cm`, `m` — nhãn kích thước trên không gian 3D và bảng đo sẽ cập nhật ngay lập tức.
+- **Độ chính xác (Precision):** Tùy chỉnh làm tròn từ 0 đến 3 chữ số sau dấu phẩy.
+- **Tương thích với Mặt cắt (Section):** Các đường gióng và nhãn đo tự động ẩn đi nếu nằm trong vùng không gian đã bị mặt cắt Section che khuất.
+- **Xuất bảng kết quả đo ra CSV:** Nhấn nút **"Xuất CSV"** để tải về danh sách các phép đo định dạng UTF-8 BOM, sẵn sàng mở bằng Microsoft Excel.
+
+---
+
+## 10. BỘ CÔNG CỤ CHUYÊN NGHIỆP KIỂU AUTODESK VIEWER (MỐC 5)
+
+### 10.1. Lưu và Khôi phục Góc nhìn (Saved Views / Viewpoints)
+- **Truy cập:** Mở tab **"Góc nhìn"** (biểu tượng thẻ đánh dấu `Bookmark`) tại thanh công cụ bên phải.
+- **Lưu góc nhìn (+ Lưu góc nhìn hiện tại):** Hệ thống tự động trích xuất:
+  - Vị trí và hướng nhìn camera (Perspective / Orthographic).
+  - Trạng thái mặt cắt Section (Section Box / Plane).
+  - Danh sách cấu kiện ẩn/hiện hoặc cô lập (`isolate`).
+  - Chế độ trong suốt X-ray.
+  - **Ảnh thu nhỏ (Thumbnail 160×100):** Tự động render ảnh chụp viewport thực tế gắn kèm góc nhìn.
+- **Khôi phục góc nhìn:** Nhấp vào bất kỳ thẻ góc nhìn nào để camera mượt mà bay về vị trí đã lưu và phục hồi đầy đủ trạng thái mô hình.
+- **Quản lý dữ liệu:**
+  - Tự động lưu trữ cục bộ theo từng mô hình vào `localStorage` (tối đa 50 góc nhìn/mô hình).
+  - Hỗ trợ đổi tên, xóa góc nhìn.
+  - **Xuất / Nhập JSON:** Dễ dàng xuất toàn bộ danh sách góc nhìn ra file `.json` để gửi và chia sẻ đồng bộ với đồng nghiệp.
+
+### 10.2. Chế độ Toàn màn hình (Fullscreen)
+- Nhấn nút **Toàn màn hình** (góc trên bên phải TopBar) hoặc phím tắt **`F11`** / **`Shift + F`** để mở rộng không gian quan sát mô hình ra toàn bộ màn hình trình duyệt.
+
+### 10.3. Chụp ảnh Màn hình chất lượng cao (Screenshot PNG)
+- Nhấp biểu tượng **Máy ảnh (Camera)** trên Toolbar để lưu ảnh khung nhìn hiện tại.
+- Xử lý đồng bộ buffer render giúp ảnh tải về **luôn rõ nét, đúng tỷ lệ viewport và không bao giờ bị trắng ảnh**. Tên file lưu tự động theo quy chuẩn: `JNN_<TênModel>_<ThờiGian>.png`.
+
+### 10.4. Lọc cấu kiện theo Tầng (Levels Dropdown)
+- Menu thả xuống **"Tầng"** (icon `Layers`) trên thanh công cụ Toolbar:
+  - Liệt kê toàn bộ các tầng của công trình kèm cao độ chuẩn (`+0.00m`, `+3.60m`...).
+  - **Chọn tầng:** Lập tức cô lập (`isolate`) các cấu kiện thuộc tầng đó để kiểm tra chuyên sâu.
+  - **Hiện mờ các tầng khác (Ghost):** Bật chế độ X-ray trong suốt cho phần còn lại của tòa nhà thay vì ẩn hoàn toàn.
+  - **Cắt hộp theo tầng (Section Box):** Tự động tạo Section Box ôm sát không gian tầng đã chọn.
+  - Chọn **"Tất cả tầng"** để khôi phục toàn bộ tòa nhà về trạng thái ban đầu.
+
+### 10.5. Chế độ Đi bộ góc nhìn thứ nhất (First-person Walk)
+- Nhấn biểu tượng bước chân (**Footprints**) trên Toolbar để kích hoạt chế độ đi bộ thị sát công trình:
+  - **W / S:** Di chuyển tiến tới / lùi lại.
+  - **A / D:** Đi ngang sang trái / sang phải (strafe).
+  - **Q / E:** Nâng cao độ lên / hạ xuống.
+  - **Chuột trái:** Rê chuột để xoay hướng nhìn tự nhiên.
+  - **Thanh trượt tốc độ:** Lựa chọn tốc độ đi bộ 1x, 3x, 6x.
+  - **Thoát an toàn (Esc):** Nhấn phím `Esc` để thoát chế độ đi bộ, hệ thống tự động quay về chế độ xoay Orbit và **giữ nguyên toàn bộ cấu hình chuột cùng điểm tụ pivot** an toàn tuyệt đối.
