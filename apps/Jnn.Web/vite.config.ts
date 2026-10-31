@@ -25,9 +25,9 @@ export default defineConfig({
       input: process.env.BUILD_SPIKES === 'true'
         ? {
             main: path.resolve(import.meta.dirname, 'index.html'),
-            spike: path.resolve(import.meta.dirname, 'spike-ifc.html'),
-            spikeGeometry: path.resolve(import.meta.dirname, 'spike-geometry.html'),
-            spikeClash: path.resolve(import.meta.dirname, 'spike-clash.html'),
+            spike: path.resolve(import.meta.dirname, 'spike/spike-ifc.html'),
+            spikeGeometry: path.resolve(import.meta.dirname, 'spike/spike-geometry.html'),
+            spikeClash: path.resolve(import.meta.dirname, 'spike/spike-clash.html'),
           }
         : {
             main: path.resolve(import.meta.dirname, 'index.html'),
