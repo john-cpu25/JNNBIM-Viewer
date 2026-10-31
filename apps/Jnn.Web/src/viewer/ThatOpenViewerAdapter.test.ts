@@ -452,4 +452,74 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('Hotfix 2 - F3: avoids overlapping raycasts and buffers latest pending request', async () => {
+    const adapter = new ThatOpenViewerAdapter();
+    let resolveFirstRaycast!: (value: any) => void;
+    const firstPromise = new Promise((resolve) => {
+      resolveFirstRaycast = resolve;
+    });
+
+    const castRaySpy = vi
+      .fn()
+      .mockImplementationOnce(() => firstPromise)
+      .mockResolvedValueOnce({ point: new THREE.Vector3(1, 2, 3) });
+
+    const mockCaster = {
+      three: {
+        setFromCamera: vi.fn(),
+        ray: {
+          intersectPlane: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0)),
+        },
+      },
+      castRay: castRaySpy,
+    };
+
+    const mockRaycasters = {
+      get: vi.fn().mockReturnValue(mockCaster),
+    };
+
+    (adapter as any).components = {
+      get: vi.fn().mockReturnValue(mockRaycasters),
+      dispose: vi.fn(),
+    };
+
+    (adapter as any).world = {
+      camera: {
+        controls: {
+          setOrbitPoint: vi.fn(),
+          getTarget: vi.fn().mockReturnValue(new THREE.Vector3()),
+        },
+        three: {
+          getWorldDirection: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, -1)),
+        },
+      },
+      renderer: {
+        three: {
+          domElement: {
+            getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+          },
+        },
+      },
+    };
+
+    // First call initiates raycast
+    adapter.anchorPivotAt(100, 100);
+    expect(castRaySpy).toHaveBeenCalledTimes(1);
+    expect((adapter as any).raycastInFlight).toBe(true);
+
+    // Concurrent second call while first is in-flight: should NOT call castRay immediately
+    adapter.anchorPivotAt(200, 200);
+    expect(castRaySpy).toHaveBeenCalledTimes(1);
+    expect((adapter as any).pendingRaycastNdc).not.toBeNull();
+
+    // Resolving first raycast should flush the pending raycast
+    resolveFirstRaycast({ point: new THREE.Vector3(0, 0, 0) });
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(castRaySpy).toHaveBeenCalledTimes(2);
+    expect((adapter as any).raycastInFlight).toBe(false);
+
+    adapter.dispose();
+  });
 });

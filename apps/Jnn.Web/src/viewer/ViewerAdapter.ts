@@ -117,6 +117,7 @@ export interface FpsStats {
   maxFrameMs: number;
   over100Count: number;
   active: boolean;
+  raycastCount?: number;
 }
 
 export interface ViewerEvents {

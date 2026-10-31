@@ -176,6 +176,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private nav: NavigationSettings = structuredClone(DEFAULT_NAV);
   private anchorRequestId = 0;
   private userControlling = false;
+  private raycastInFlight = false;
+  private pendingRaycastNdc: THREE.Vector2 | null = null;
+  public raycastCount = 0;
+  public gestureRaycastCount = 0;
   private lastHover: HoverCache | null = null;
   private pivotMesh: THREE.Mesh | null = null;
   private readonly pivotMaterial = new THREE.MeshBasicMaterial({
@@ -631,18 +635,47 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         this.showPivot(pivot);
       }
 
-      // (c) Async raycast surface hit
-      const id = ++this.anchorRequestId;
-      caster
-        .castRay({ position: ndc })
-        .then((hit: any) => {
-          if (id !== this.anchorRequestId || this.disposed || !hit?.point) return;
-          if (this.clipPlanes.some((p) => p.distanceToPoint(hit.point) < -1e-6)) return;
-          OBC.setOrbitPoint(controls, hit.point);
-          this.showPivot(hit.point);
-        })
-        .catch(() => {});
+      // (c) Async raycast surface hit (avoid overlapping raycasts)
+      if (this.raycastInFlight) {
+        this.pendingRaycastNdc = ndc;
+      } else {
+        this.executeRaycast(ndc);
+      }
     }
+  }
+
+  private executeRaycast(ndc: THREE.Vector2) {
+    if (!this.world || this.disposed) return;
+    const caster = this.components?.get(OBC.Raycasters)?.get(this.world);
+    if (!caster) return;
+
+    this.raycastInFlight = true;
+    this.raycastCount++;
+    this.gestureRaycastCount++;
+    if (typeof window !== 'undefined') {
+      (window as any).__jnn_raycast_count = this.gestureRaycastCount;
+    }
+    const id = ++this.anchorRequestId;
+
+    caster
+      .castRay({ position: ndc })
+      .then((hit: any) => {
+        if (id !== this.anchorRequestId || this.disposed || !hit?.point) return;
+        if (this.clipPlanes.some((p) => p.distanceToPoint(hit.point) < -1e-6)) return;
+        if (this.world?.camera?.controls) {
+          OBC.setOrbitPoint(this.world.camera.controls, hit.point);
+          this.showPivot(hit.point);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        this.raycastInFlight = false;
+        if (this.pendingRaycastNdc && !this.disposed) {
+          const nextNdc = this.pendingRaycastNdc;
+          this.pendingRaycastNdc = null;
+          this.executeRaycast(nextNdc);
+        }
+      });
   }
 
   mount(container: HTMLElement): void {
@@ -714,6 +747,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
     });
     world.camera.controls.addEventListener('controlstart', () => {
+      this.gestureRaycastCount = 0;
+      if (typeof window !== 'undefined') {
+        (window as any).__jnn_raycast_count = 0;
+      }
       this.fpsDeltas = [];
       this.fpsLastTime = performance.now();
       const onRaf = (now: number) => {
@@ -732,6 +769,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
           maxFrameMs,
           over100Count,
           active: true,
+          raycastCount: this.gestureRaycastCount,
         });
         this.fpsRafId = requestAnimationFrame(onRaf);
       };
@@ -754,6 +792,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         maxFrameMs,
         over100Count,
         active: false,
+        raycastCount: this.gestureRaycastCount,
       });
     });
 
@@ -992,10 +1031,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
     }
     if (this.components) {
-      this.components.dispose();
+      if (typeof this.components.dispose === 'function') {
+        this.components.dispose();
+      }
       this.components = null;
     }
     this.world = null;
+    this.raycastInFlight = false;
+    this.pendingRaycastNdc = null;
     this.events.clear();
   }
 

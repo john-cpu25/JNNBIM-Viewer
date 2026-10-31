@@ -58,6 +58,12 @@ export function FpsOverlay({ viewer }: { viewer: ViewerAdapter | null }) {
               {stats.over100Count}
             </span>
           </div>
+          {typeof stats.raycastCount === 'number' && (
+            <div className="flex justify-between gap-4">
+              <span>Số castRay / kéo:</span>
+              <span className="font-semibold text-ink">{stats.raycastCount}</span>
+            </div>
+          )}
           {stats.active && (
             <div className="pt-0.5 text-[10px] font-medium text-accent">Đang kéo...</div>
           )}
