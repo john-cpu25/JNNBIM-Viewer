@@ -17,6 +17,7 @@ export type CommandId =
   | 'projection'
   | 'toggleGrid'
   | 'selectAll'
+  | 'toggleMeasure'
   | 'clear';
 
 export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = {
@@ -29,6 +30,7 @@ export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = 
   sectionPlane: 'sectionPlane',
   sectionBox: 'sectionBox',
   projection: 'camera',
+  toggleMeasure: 'measure',
 };
 
 /**
@@ -164,7 +166,14 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
       }
       return;
     }
+    case 'toggleMeasure':
+      dispatch({ type: 'setMeasurePanelOpen', open: !s.measurePanelOpen });
+      return;
     case 'clear':
+      if (s.measureTool !== null || s.measurePanelOpen) {
+        dispatch({ type: 'setMeasurePanelOpen', open: false });
+        return;
+      }
       if (s.sectionPickMode) {
         dispatch({ type: 'setSectionPickMode', on: false });
         return;

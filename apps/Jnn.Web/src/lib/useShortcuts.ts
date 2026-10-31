@@ -13,6 +13,7 @@ const KEYMAP: Record<string, CommandId> = {
   b: 'sectionBox',
   p: 'projection',
   g: 'toggleGrid',
+  m: 'toggleMeasure',
   escape: 'clear',
 };
 

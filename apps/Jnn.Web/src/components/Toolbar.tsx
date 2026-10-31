@@ -7,6 +7,7 @@ import {
   Ghost,
   Grid3x3,
   Maximize,
+  Ruler,
   Scissors,
   SquareDashed,
   View,
@@ -98,6 +99,15 @@ export function Toolbar({ compact }: { compact: boolean }) {
         active={state.gridVisible}
         onClick={() => run('toggleGrid')}
         data-testid="toggle-grid-btn"
+      />
+      <IconButton
+        icon={Ruler}
+        label={t('toolbar.measure')}
+        shortcut="M"
+        disabled={!viewer?.capabilities.has('measure')}
+        active={state.measurePanelOpen || state.measureTool !== null}
+        onClick={() => run('toggleMeasure')}
+        data-testid="toggle-measure-btn"
       />
       {hasSel && (
         <>

@@ -43,7 +43,29 @@ export interface Translations {
   'toolbar.xray': string;
   'toolbar.projection': string;
   'toolbar.grid': string;
+  'toolbar.measure': string;
   'toolbar.clearSelection': string;
+
+  // Measure Panel
+  'measure.title': string;
+  'measure.toolDistance': string;
+  'measure.toolEdge': string;
+  'measure.toolAngle': string;
+  'measure.toolArea': string;
+  'measure.toolVolume': string;
+  'measure.unit': string;
+  'measure.precision': string;
+  'measure.snapping': string;
+  'measure.snapVertex': string;
+  'measure.snapEdge': string;
+  'measure.snapFace': string;
+  'measure.clearAll': string;
+  'measure.showAll': string;
+  'measure.hideAll': string;
+  'measure.exportCsv': string;
+  'measure.noMeasurements': string;
+  'measure.pointsCount': string;
+  'measure.delete': string;
 
   // Navigation Help Popover
   'nav.helpTitle': string;

@@ -9,6 +9,7 @@ import { useApp } from '../state/AppContext';
 import { Toolbar } from './Toolbar';
 import { ViewCube } from './ViewCube';
 import { SectionPanel } from './SectionPanel';
+import { MeasurePanel } from './MeasurePanel';
 import { FpsOverlay } from './FpsOverlay';
 import { loadIfcFile } from '../lib/ifcLoaderHelper';
 import { cn } from '../lib/cn';
@@ -123,6 +124,9 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
         }
       }
     });
+    const offMeasure = adapter.on('measureChange', ({ items }) => {
+      dispatch({ type: 'setMeasurements', items });
+    });
 
     if (sample) {
       adapter.loadModel(model).then((r) => {
@@ -147,6 +151,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       offPick();
       offHover();
       offBoxSelect();
+      offMeasure();
       onViewer(null);
       adapter.dispose();
       if (window.__jnn?.viewer === adapter) delete window.__jnn;
@@ -198,6 +203,18 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
   useEffect(() => {
     viewer?.setNavigationSettings?.(state.navigation);
   }, [viewer, state.navigation]);
+  useEffect(() => {
+    if (!viewer) return;
+    report(viewer.setMeasureTool?.(state.measureTool));
+  }, [viewer, state.measureTool]);
+  useEffect(() => {
+    if (!viewer) return;
+    report(viewer.setMeasureSettings?.(state.measureSettings));
+  }, [viewer, state.measureSettings]);
+  useEffect(() => {
+    if (!viewer) return;
+    report(viewer.setMeasurementsVisible?.(state.measurementsVisible));
+  }, [viewer, state.measurementsVisible]);
   useEffect(() => {
     if (!viewer) return;
     return viewer.on('navHint', (hint) => {
@@ -322,6 +339,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
         <>
           {!compact && !isNarrow && <ViewCube />}
           {state.section && <SectionPanel compact={compact} />}
+          {state.measurePanelOpen && <MeasurePanel compact={compact} />}
           {dragValueLabel && (
             <div
               data-testid="section-drag-tooltip"

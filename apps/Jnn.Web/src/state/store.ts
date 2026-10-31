@@ -9,7 +9,17 @@ import {
   type TreeNode,
 } from '../domain/tree';
 import { EMPTY_VISIBILITY, hide, isolate, show, toggleGroup, type VisibilityState } from '../domain/visibility';
-import { DEFAULT_NAV, type NavigationSettings, type SectionAxis, type SectionSpec, type Vec3 } from '../viewer/ViewerAdapter';
+import {
+  DEFAULT_NAV,
+  type MeasureItem,
+  type MeasureSettings,
+  type MeasureTool,
+  type NavigationSettings,
+  type SectionAxis,
+  type SectionSpec,
+  type Vec3,
+} from '../viewer/ViewerAdapter';
+import { loadSavedMeasureSettings, saveMeasureSettings } from '../lib/measure';
 
 export type Theme = 'light' | 'dark';
 export type MobilePane = 'explorer' | 'viewer' | 'properties';
@@ -49,6 +59,11 @@ export interface AppState {
   settingsOpen: boolean;
   mobilePane: MobilePane;
   notices: Notice[];
+  measureTool: MeasureTool | null;
+  measureSettings: MeasureSettings;
+  measurements: MeasureItem[];
+  measurementsVisible: boolean;
+  measurePanelOpen: boolean;
 }
 
 export type Action =
@@ -84,7 +99,14 @@ export type Action =
   | { type: 'setModel'; model: JnnModel }
   | { type: 'appendModel'; model: JnnModel }
   | { type: 'removeModel'; modelId: string }
-  | { type: 'toggleModelVisibility'; modelId: string; visible?: boolean };
+  | { type: 'toggleModelVisibility'; modelId: string; visible?: boolean }
+  | { type: 'setMeasureTool'; tool: MeasureTool | null }
+  | { type: 'setMeasureSettings'; settings: Partial<MeasureSettings> }
+  | { type: 'setMeasurements'; items: MeasureItem[] }
+  | { type: 'clearMeasurements' }
+  | { type: 'deleteMeasurement'; id: string }
+  | { type: 'toggleMeasurementsVisible' }
+  | { type: 'setMeasurePanelOpen'; open: boolean };
 
 let noticeSeq = 1;
 
@@ -136,6 +158,11 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     settingsOpen: false,
     mobilePane: 'viewer',
     notices: [],
+    measureTool: null,
+    measureSettings: loadSavedMeasureSettings(),
+    measurements: [],
+    measurementsVisible: true,
+    measurePanelOpen: false,
   };
 }
 
@@ -347,6 +374,31 @@ export function reducer(state: AppState, action: Action): AppState {
         selection: isNowVisible ? state.selection : state.selection.filter((id) => !targetIds.includes(id)),
       };
     }
+    case 'setMeasureTool':
+      return {
+        ...state,
+        measureTool: action.tool,
+        measurePanelOpen: action.tool !== null ? true : state.measurePanelOpen,
+      };
+    case 'setMeasureSettings': {
+      const nextSettings = { ...state.measureSettings, ...action.settings };
+      saveMeasureSettings(nextSettings);
+      return { ...state, measureSettings: nextSettings };
+    }
+    case 'setMeasurements':
+      return { ...state, measurements: action.items };
+    case 'clearMeasurements':
+      return { ...state, measurements: [] };
+    case 'deleteMeasurement':
+      return { ...state, measurements: state.measurements.filter((m) => m.id !== action.id) };
+    case 'toggleMeasurementsVisible':
+      return { ...state, measurementsVisible: !state.measurementsVisible };
+    case 'setMeasurePanelOpen':
+      return {
+        ...state,
+        measurePanelOpen: action.open,
+        measureTool: !action.open ? null : (state.measureTool ?? 'length'),
+      };
   }
 }
 
