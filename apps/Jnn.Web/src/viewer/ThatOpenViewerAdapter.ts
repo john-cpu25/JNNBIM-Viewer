@@ -179,7 +179,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private selectionCenter: THREE.Vector3 | null = null;
   private selectionCenterReq = 0;
   private raycastInFlight = false;
-  private pendingRaycastNdc: THREE.Vector2 | null = null;
+  private pendingRaycast: { ndc: THREE.Vector2; id: number } | null = null;
   public raycastCount = 0;
   public gestureRaycastCount = 0;
   private lastHover: HoverCache | null = null;
@@ -612,10 +612,11 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   anchorPivotAt(clientX: number, clientY: number) {
     if (!this.world) return;
     const controls = this.world.camera.controls;
+    const id = ++this.anchorRequestId;
 
     // (1) Selection center priority: if selection exists and orbitAroundSelection is enabled
     if (this.nav.orbitAroundSelection && this.selectionCenter) {
-      this.pendingRaycastNdc = null;
+      this.pendingRaycast = null;
       OBC.setOrbitPoint(controls, this.selectionCenter);
       this.showPivot(this.selectionCenter);
       return;
@@ -626,6 +627,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     // (a) Fast path: reuse recent hover if fresh (< 150ms) and close (< 4px)
     const now = performance.now();
     if (shouldUseHoverCache(this.lastHover, clientX, clientY, now)) {
+      this.pendingRaycast = null;
       OBC.setOrbitPoint(controls, this.lastHover!.point);
       this.showPivot(this.lastHover!.point);
       return;
@@ -649,25 +651,24 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
       // (c) Async raycast surface hit (avoid overlapping raycasts)
       if (this.raycastInFlight) {
-        this.pendingRaycastNdc = ndc;
+        this.pendingRaycast = { ndc, id };
       } else {
-        this.executeRaycast(ndc);
+        this.executeRaycast(ndc, id);
       }
     }
   }
 
-  private executeRaycast(ndc: THREE.Vector2) {
+  private executeRaycast(ndc: THREE.Vector2, id: number) {
     if (!this.world || this.disposed) return;
     const caster = this.components?.get(OBC.Raycasters)?.get(this.world);
     if (!caster) return;
 
     this.raycastInFlight = true;
-    this.raycastCount++;
-    this.gestureRaycastCount++;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1') {
+      this.raycastCount++;
+      this.gestureRaycastCount++;
       (window as any).__jnn_raycast_count = this.gestureRaycastCount;
     }
-    const id = ++this.anchorRequestId;
 
     caster
       .castRay({ position: ndc })
@@ -682,10 +683,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       .catch(() => {})
       .finally(() => {
         this.raycastInFlight = false;
-        if (this.pendingRaycastNdc && !this.disposed) {
-          const nextNdc = this.pendingRaycastNdc;
-          this.pendingRaycastNdc = null;
-          this.executeRaycast(nextNdc);
+        if (this.pendingRaycast && !this.disposed) {
+          const next = this.pendingRaycast;
+          this.pendingRaycast = null;
+          this.executeRaycast(next.ndc, next.id);
         }
       });
   }
@@ -759,6 +760,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
     });
     world.camera.controls.addEventListener('controlstart', () => {
+      const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+      if (!isDebug) return;
       this.gestureRaycastCount = 0;
       if (typeof window !== 'undefined') {
         (window as any).__jnn_raycast_count = 0;
@@ -794,6 +797,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
         cancelAnimationFrame(this.fpsRafId);
         this.fpsRafId = null;
       }
+      const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
+      if (!isDebug) return;
       const total = this.fpsDeltas.reduce((a, b) => a + b, 0);
       const avgFps = this.fpsDeltas.length > 0 && total > 0 ? this.fpsDeltas.length / (total / 1000) : 0;
       const maxFrameMs = this.fpsDeltas.length > 0 ? Math.max(...this.fpsDeltas) : 0;
@@ -1051,7 +1056,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.world = null;
     this.selectionCenter = null;
     this.raycastInFlight = false;
-    this.pendingRaycastNdc = null;
+    this.pendingRaycast = null;
     this.events.clear();
   }
 

@@ -513,7 +513,7 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
     // Concurrent second call while first is in-flight: should NOT call castRay immediately
     adapter.anchorPivotAt(200, 200);
     expect(castRaySpy).toHaveBeenCalledTimes(1);
-    expect((adapter as any).pendingRaycastNdc).not.toBeNull();
+    expect((adapter as any).pendingRaycast).not.toBeNull();
 
     // Resolving first raycast should flush the pending raycast
     resolveFirstRaycast({ point: new THREE.Vector3(0, 0, 0) });
@@ -521,6 +521,72 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     expect(castRaySpy).toHaveBeenCalledTimes(2);
     expect((adapter as any).raycastInFlight).toBe(false);
+
+    adapter.dispose();
+  });
+
+  it('Hotfix 2 - M1: late raycast from request 1 does not overwrite pivot of request 2', async () => {
+    const adapter = new ThatOpenViewerAdapter();
+    let resolveFirstRaycast!: (value: any) => void;
+    const firstPromise = new Promise((resolve) => {
+      resolveFirstRaycast = resolve;
+    });
+
+    const setOrbitPointSpy = vi.fn();
+    const castRaySpy = vi.fn().mockReturnValue(firstPromise);
+
+    const mockCaster = {
+      three: {
+        setFromCamera: vi.fn(),
+        ray: {
+          intersectPlane: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0)),
+        },
+      },
+      castRay: castRaySpy,
+    };
+
+    (adapter as any).components = {
+      get: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(mockCaster) }),
+      dispose: vi.fn(),
+    };
+
+    (adapter as any).world = {
+      camera: {
+        controls: {
+          setOrbitPoint: setOrbitPointSpy,
+          getTarget: vi.fn().mockReturnValue(new THREE.Vector3()),
+        },
+        three: {
+          getWorldDirection: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, -1)),
+        },
+      },
+      renderer: {
+        three: {
+          domElement: {
+            getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+          },
+        },
+      },
+    };
+
+    // First anchor request initiates raycast 1
+    adapter.anchorPivotAt(100, 100);
+    expect((adapter as any).anchorRequestId).toBe(1);
+
+    // Second anchor request immediately (e.g. user drags elsewhere)
+    adapter.anchorPivotAt(400, 400);
+    expect((adapter as any).anchorRequestId).toBe(2);
+
+    // Now late raycast 1 resolves with point (1, 1, 1)
+    setOrbitPointSpy.mockClear();
+    resolveFirstRaycast({ point: new THREE.Vector3(1, 1, 1) });
+    await new Promise((r) => setTimeout(r, 10));
+
+    // setOrbitPoint should NOT be called with raycast 1 point
+    const calledWithPoint1 = setOrbitPointSpy.mock.calls.some(
+      (args) => args[1]?.x === 1 && args[1]?.y === 1 && args[1]?.z === 1,
+    );
+    expect(calledWithPoint1).toBe(false);
 
     adapter.dispose();
   });
