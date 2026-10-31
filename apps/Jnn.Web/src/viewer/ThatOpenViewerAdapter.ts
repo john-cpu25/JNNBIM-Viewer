@@ -2884,8 +2884,19 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     const key = e.key.toLowerCase();
     if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      const isNewPress = !this.walkActiveKeys.has(key);
       this.walkActiveKeys.add(key);
       e.preventDefault();
+      if (isNewPress && this.world) {
+        const controls = this.world.camera.controls;
+        const minStep = Math.max(0.05, this.walkSpeed * 0.05);
+        if (key === 'w' || key === 'arrowup') controls.forward(minStep, false);
+        else if (key === 's' || key === 'arrowdown') controls.forward(-minStep, false);
+        else if (key === 'a' || key === 'arrowleft') controls.truck(-minStep, 0, false);
+        else if (key === 'd' || key === 'arrowright') controls.truck(minStep, 0, false);
+        else if (key === 'e') controls.elevate(minStep, false);
+        else if (key === 'q') controls.elevate(-minStep, false);
+      }
     } else if (key === 'escape') {
       this.setWalkMode(false);
       e.preventDefault();

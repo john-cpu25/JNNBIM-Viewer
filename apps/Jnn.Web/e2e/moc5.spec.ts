@@ -373,9 +373,9 @@ test.describe('Mốc 5: Group J - Saved Views (J2) on ThatOpen', () => {
     // Record initial camera position
     const p1 = await page.evaluate(() => (window as any).__jnn.viewer.getCamera().value.position);
 
-    // 3. Move forward with 'W' key
+    // 3. Move forward with 'W' key (hold >= 500ms)
     await page.keyboard.down('w');
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600);
     await page.keyboard.up('w');
     await page.waitForTimeout(200);
 
