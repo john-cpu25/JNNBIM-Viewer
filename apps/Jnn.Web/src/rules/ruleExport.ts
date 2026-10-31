@@ -1,5 +1,6 @@
 import type { RuleCheckResult, RuleDefinition, RuleViolation } from './types';
 import { escapeHtml } from '../lib/escapeHtml';
+import { JNN_LOGO_TILE_64_DATA_URI } from '../lib/brandLogo';
 
 /**
  * Generates a clean, standalone, zero-dependency HTML quality check report
@@ -148,10 +149,18 @@ export function exportRuleReportHTML(
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       flex-wrap: wrap;
       gap: 16px;
     }
+
+    .header-brand { display: flex; align-items: center; gap: 16px; }
+    .header-logo {
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; overflow: hidden; flex-shrink: 0;
+    }
+    .header-logo img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; display: block; }
 
     .header-info h1 {
       font-size: 24px;
@@ -326,9 +335,14 @@ export function exportRuleReportHTML(
 <body>
   <div class="container">
     <header>
-      <div class="header-info">
-        <h1>${isEn ? 'BIM Model Quality Rule Report' : 'Báo cáo Kiểm tra Chất lượng Mô hình BIM'}</h1>
-        <p><strong>${isEn ? 'Model:' : 'Mô hình:'}</strong> ${escapeHtml(modelName)} | <strong>${isEn ? 'Date:' : 'Ngày tạo:'}</strong> ${generatedAt} | <strong>${isEn ? 'Duration:' : 'Thời gian chạy:'}</strong> ${durationStr}</p>
+      <div class="header-brand">
+        <div class="header-logo">
+          <img src="${JNN_LOGO_TILE_64_DATA_URI}" width="44" height="44" alt="JNN" />
+        </div>
+        <div class="header-info">
+          <h1>${isEn ? 'BIM Model Quality Rule Report' : 'Báo cáo Kiểm tra Chất lượng Mô hình BIM'}</h1>
+          <p><strong>${isEn ? 'Model:' : 'Mô hình:'}</strong> ${escapeHtml(modelName)} | <strong>${isEn ? 'Date:' : 'Ngày tạo:'}</strong> ${generatedAt} | <strong>${isEn ? 'Duration:' : 'Thời gian chạy:'}</strong> ${durationStr}</p>
+        </div>
       </div>
       <div class="actions">
         <button class="btn btn-primary" onclick="window.print()">${isEn ? 'Print / Export PDF' : 'In / Xuất PDF'}</button>

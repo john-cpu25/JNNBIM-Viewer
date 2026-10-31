@@ -427,6 +427,9 @@ describe('clashExport - CSV & Excel Export (T15.1, T15.2)', () => {
       // Title & Header
       expect(doc.title).toContain('Kiểm tra Kết cấu x MEP');
       expect(doc.querySelector('h1')?.textContent).toBe('Kiểm tra Kết cấu x MEP');
+      const logoImg = doc.querySelector('.header-logo img') as HTMLImageElement;
+      expect(logoImg).not.toBeNull();
+      expect(logoImg.src.startsWith('data:image/png;base64,')).toBe(true);
 
       // Summary Cards Counts
       expect(doc.querySelector('.stat-total .count')?.textContent).toBe('5');

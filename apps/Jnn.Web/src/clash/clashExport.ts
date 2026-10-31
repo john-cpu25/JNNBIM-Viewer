@@ -383,6 +383,7 @@ export async function exportClashExcel(test: ClashTestItem, locale: 'vi' | 'en' 
 }
 
 import { escapeHtml } from '../lib/escapeHtml';
+import { JNN_LOGO_TILE_64_DATA_URI } from '../lib/brandLogo';
 export { escapeHtml };
 
 /**
@@ -498,9 +499,12 @@ export function exportClashHTML(test: ClashTestItem, locale: 'vi' | 'en' = 'vi')
     }
     .header-brand { display: flex; align-items: center; gap: 12px; }
     .header-logo {
-      width: 40px; height: 40px; background: #1e293b; color: #fff;
+      width: 40px; height: 40px;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 8px; font-weight: bold; font-size: 18px;
+      border-radius: 8px; overflow: hidden; flex-shrink: 0;
+    }
+    .header-logo img {
+      width: 100%; height: 100%; object-fit: contain; border-radius: 8px; display: block;
     }
     .header-title h1 { font-size: 20px; font-weight: 700; color: var(--text); }
     .header-title p { font-size: 13px; color: var(--text-muted); }
@@ -623,11 +627,7 @@ export function exportClashHTML(test: ClashTestItem, locale: 'vi' | 'en' = 'vi')
     <div class="header">
       <div class="header-brand">
         <div class="header-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-            <line x1="12" y1="22.08" x2="12" y2="12"></line>
-          </svg>
+          <img src="${JNN_LOGO_TILE_64_DATA_URI}" width="40" height="40" alt="JNN" />
         </div>
         <div class="header-title">
           <h1>${testName}</h1>
