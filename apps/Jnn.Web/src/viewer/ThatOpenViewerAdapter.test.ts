@@ -200,6 +200,7 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
       rotateSpeed: 0.6,
       zoomSpeed: 1.2,
       orbitAroundCursor: false,
+      orbitAroundSelection: false,
       showPivot: false,
     });
     expect(setNavRes.ok).toBe(true);
@@ -376,6 +377,7 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
       rotateSpeed: 0.4,
       zoomSpeed: 1.0,
       orbitAroundCursor: true,
+      orbitAroundSelection: true,
       showPivot: true,
     });
     (adapter as any).applyMouseMapping(false);

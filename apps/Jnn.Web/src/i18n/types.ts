@@ -298,6 +298,7 @@ export interface Translations {
   'settings.revitOptionDesc': string;
   'settings.classicOptionDesc': string;
   'settings.orbitAroundCursor': string;
+  'settings.orbitAroundSelection': string;
   'settings.langVi': string;
   'settings.langEn': string;
   'settings.cacheStatusLabel': string;

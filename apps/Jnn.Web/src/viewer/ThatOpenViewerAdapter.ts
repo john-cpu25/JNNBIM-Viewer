@@ -176,6 +176,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private nav: NavigationSettings = structuredClone(DEFAULT_NAV);
   private anchorRequestId = 0;
   private userControlling = false;
+  private selectionCenter: THREE.Vector3 | null = null;
+  private selectionCenterReq = 0;
   private raycastInFlight = false;
   private pendingRaycastNdc: THREE.Vector2 | null = null;
   public raycastCount = 0;
@@ -608,8 +610,18 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   anchorPivotAt(clientX: number, clientY: number) {
-    if (!this.nav.orbitAroundCursor || !this.world) return;
+    if (!this.world) return;
     const controls = this.world.camera.controls;
+
+    // (1) Selection center priority: if selection exists and orbitAroundSelection is enabled
+    if (this.nav.orbitAroundSelection && this.selectionCenter) {
+      this.pendingRaycastNdc = null;
+      OBC.setOrbitPoint(controls, this.selectionCenter);
+      this.showPivot(this.selectionCenter);
+      return;
+    }
+
+    if (!this.nav.orbitAroundCursor) return;
 
     // (a) Fast path: reuse recent hover if fresh (< 150ms) and close (< 4px)
     const now = performance.now();
@@ -1037,6 +1049,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.components = null;
     }
     this.world = null;
+    this.selectionCenter = null;
     this.raycastInFlight = false;
     this.pendingRaycastNdc = null;
     this.events.clear();
@@ -1348,6 +1361,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.fragments.baseCoordinationMatrix = new THREE.Matrix4();
     }
     this.updateCombinedBoundsAndFit(false);
+    this.refreshSelectionCenter();
     return okVoid;
   }
 
@@ -1360,6 +1374,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.fragments) {
       this.fragments.core.update(true);
     }
+    this.refreshSelectionCenter();
     return okVoid;
   }
 
@@ -1585,6 +1600,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.xray) {
       this.applyXray();
     }
+    this.refreshSelectionCenter();
     return okVoid;
   }
 
@@ -1659,12 +1675,14 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   setHidden(ids: readonly string[]): AdapterResult {
     this.visibility = { hidden: new Set(ids), isolated: this.visibility.isolated };
     this.applyVisibility();
+    this.refreshSelectionCenter();
     return okVoid;
   }
 
   isolate(ids: readonly string[]): AdapterResult {
     this.visibility = { hidden: this.visibility.hidden, isolated: new Set(ids) };
     this.applyVisibility();
+    this.refreshSelectionCenter();
     return okVoid;
   }
 
@@ -2171,6 +2189,35 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.fragments) {
       this.fragments.core.update(true);
     }
+  }
+
+  private async refreshSelectionCenter(): Promise<void> {
+    const req = ++this.selectionCenterReq;
+    const ids = [...this.selection].filter((id) => isVisible(id, this.visibility));
+    if (!ids.length) {
+      this.selectionCenter = null;
+      return;
+    }
+    const box = new THREE.Box3();
+    const modelMap = this.toModelIdMap(ids);
+    for (const [modelKey, localIds] of Object.entries(modelMap)) {
+      const entry = this.modelsMap.get(modelKey);
+      if (!entry?.model?.object?.visible) continue;
+      if (typeof (entry.model as any).getMergedBox === 'function') {
+        try {
+          const modelBox = await (entry.model as any).getMergedBox([...localIds]);
+          if (modelBox && !modelBox.isEmpty()) {
+            box.union(modelBox);
+          }
+        } catch (err) {
+          console.warn('getMergedBox failed:', err);
+        }
+      } else if (entry.model?.box && !entry.model.box.isEmpty()) {
+        box.union(entry.model.box);
+      }
+    }
+    if (req !== this.selectionCenterReq || this.disposed) return;
+    this.selectionCenter = box.isEmpty() ? null : box.getCenter(new THREE.Vector3());
   }
 
   async pickAt(clientX: number, clientY: number): Promise<PickResult | null> {

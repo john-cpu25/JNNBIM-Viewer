@@ -77,6 +77,7 @@ export interface NavigationSettings {
   rotateSpeed: number;             // 0.1–1.0, default 0.4
   zoomSpeed: number;               // 0.3–2.0, default 1.0
   orbitAroundCursor: boolean;      // default true
+  orbitAroundSelection: boolean;   // default true
   showPivot: boolean;              // default true
 }
 
@@ -85,6 +86,7 @@ export const DEFAULT_NAV: NavigationSettings = {
   rotateSpeed: 0.4,
   zoomSpeed: 1.0,
   orbitAroundCursor: true,
+  orbitAroundSelection: true,
   showPivot: true,
 };
 

@@ -298,6 +298,7 @@ export const en: Translations = {
   'settings.revitOptionDesc': 'Revit (Shift + drag left / middle to orbit)',
   'settings.classicOptionDesc': 'Classic (Drag left to orbit)',
   'settings.orbitAroundCursor': 'Orbit around point under cursor',
+  'settings.orbitAroundSelection': 'Orbit around selection',
   'settings.langVi': 'Vietnamese (VI)',
   'settings.langEn': 'English (EN)',
   'settings.cacheStatusLabel': 'Status',

@@ -298,6 +298,7 @@ export const vi: Translations = {
   'settings.revitOptionDesc': 'Revit (Shift + kéo trái / giữa để xoay)',
   'settings.classicOptionDesc': 'Cổ điển (Kéo trái để xoay)',
   'settings.orbitAroundCursor': 'Xoay quanh điểm dưới con trỏ',
+  'settings.orbitAroundSelection': 'Xoay quanh đối tượng đang chọn',
   'settings.langVi': 'Tiếng Việt (VI)',
   'settings.langEn': 'English (EN)',
   'settings.cacheStatusLabel': 'Trạng thái',

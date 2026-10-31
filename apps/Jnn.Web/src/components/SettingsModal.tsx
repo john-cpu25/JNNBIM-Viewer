@@ -185,6 +185,21 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
                   <input
                     type="checkbox"
+                    data-testid="orbit-around-selection-checkbox"
+                    checked={state.navigation.orbitAroundSelection}
+                    onChange={(e) =>
+                      dispatch({
+                        type: 'setNavigation',
+                        settings: { orbitAroundSelection: e.target.checked },
+                      })
+                    }
+                    className="rounded border-line accent-accent"
+                  />
+                  <span>{t('settings.orbitAroundSelection')}</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
+                  <input
+                    type="checkbox"
                     checked={state.navigation.orbitAroundCursor}
                     onChange={(e) =>
                       dispatch({
