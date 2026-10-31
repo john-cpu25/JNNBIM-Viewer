@@ -42,6 +42,13 @@ jobs:
         run: npm run test:e2e
         env:
           CI: 'true'
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-pages
+          path: apps/Jnn.Web/test-results/
+          retention-days: 7
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
