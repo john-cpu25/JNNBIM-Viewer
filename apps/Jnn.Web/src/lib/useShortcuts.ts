@@ -29,6 +29,11 @@ export function useShortcuts(state: AppState, dispatch: Dispatch<Action>, viewer
         if (e.key === 'Escape') t.blur();
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        runCommand('selectAll', ref.current.state, dispatch, ref.current.viewer);
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.toLowerCase();
       const { state: s, viewer: v } = ref.current;

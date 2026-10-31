@@ -2,6 +2,7 @@ import type { Dispatch } from 'react';
 import type { Action, AppState } from '../state/store';
 import { defaultPlane } from '../state/store';
 import { boundsOf, isEmpty, pad } from '../domain/bounds';
+import { isVisible } from '../domain/visibility';
 import type { ViewerAdapter, ViewerCapability } from '../viewer/ViewerAdapter';
 
 export type CommandId =
@@ -15,6 +16,7 @@ export type CommandId =
   | 'sectionBox'
   | 'projection'
   | 'toggleGrid'
+  | 'selectAll'
   | 'clear';
 
 export const COMMAND_CAPABILITY: Partial<Record<CommandId, ViewerCapability>> = {
@@ -128,6 +130,40 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
     case 'toggleGrid':
       dispatch({ type: 'toggleGrid' });
       return;
+    case 'selectAll': {
+      const visibleIds: string[] = [];
+      const section = s.section;
+      for (const el of s.model.elements) {
+        if (!isVisible(el.id, s.visibility)) continue;
+        if (section) {
+          const elBounds = boundsOf([el]);
+          if (!isEmpty(elBounds)) {
+            if (section.kind === 'box') {
+              if (
+                elBounds.max[0] < section.min[0] || elBounds.min[0] > section.max[0] ||
+                elBounds.max[1] < section.min[1] || elBounds.min[1] > section.max[1] ||
+                elBounds.max[2] < section.min[2] || elBounds.min[2] > section.max[2]
+              ) {
+                continue;
+              }
+            } else if (section.kind === 'plane') {
+              const axisIdx = section.axis === 'x' ? 0 : section.axis === 'y' ? 1 : 2;
+              const offset = section.offset;
+              if (section.flipped) {
+                if (elBounds.min[axisIdx] > offset) continue;
+              } else {
+                if (elBounds.max[axisIdx] < offset) continue;
+              }
+            }
+          }
+        }
+        visibleIds.push(el.id);
+      }
+      if (visibleIds.length > 0) {
+        dispatch({ type: 'select', ids: visibleIds, mode: 'replace' });
+      }
+      return;
+    }
     case 'clear':
       if (s.sectionPickMode) {
         dispatch({ type: 'setSectionPickMode', on: false });

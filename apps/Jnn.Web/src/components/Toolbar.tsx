@@ -102,7 +102,12 @@ export function Toolbar({ compact }: { compact: boolean }) {
       {hasSel && (
         <>
           <Divider vertical />
-          <IconButton icon={XCircle} label={t('toolbar.clearSelection')} shortcut="Esc" onClick={() => run('clear')} />
+          <div className="flex items-center gap-1 pl-1" data-testid="selection-badge">
+            <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[11px] font-semibold text-accent tabular">
+              {state.selection.length}
+            </span>
+            <IconButton icon={XCircle} label={t('toolbar.clearSelection')} shortcut="Esc" onClick={() => run('clear')} />
+          </div>
         </>
       )}
     </div>
