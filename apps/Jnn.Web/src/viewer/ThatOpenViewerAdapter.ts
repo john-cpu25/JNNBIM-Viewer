@@ -18,7 +18,7 @@ import * as FRAGS from '@thatopen/fragments';
 import type { FragmentsModel } from '@thatopen/fragments';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { IDENTITY_TRANSFORM, type JnnElement, type JnnModel, type PropertySet } from '../domain/model';
-import { boundsOf, center as boundsCenter, isEmpty, size as boundsSize } from '../domain/bounds';
+import { center as boundsCenter, size as boundsSize } from '../domain/bounds';
 import { isVisible, type VisibilityState } from '../domain/visibility';
 import {
   mapIfcToJnnModel,
@@ -590,34 +590,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
               for (const localId of res.localIds) {
                 const elementId = `${entry.jnnModel.modelId}:${localId}`;
                 if (!isVisible(elementId, this.visibility)) continue;
-
-                if (this.currentSection) {
-                  const el = entry.jnnModel.elements.find((e) => e.id === elementId);
-                  if (el) {
-                    const b = boundsOf([el]);
-                    if (!isEmpty(b)) {
-                      if (this.currentSection.kind === 'box') {
-                        const sec = this.currentSection;
-                        if (
-                          b.max[0] < sec.min[0] || b.min[0] > sec.max[0] ||
-                          b.max[1] < sec.min[1] || b.min[1] > sec.max[1] ||
-                          b.max[2] < sec.min[2] || b.min[2] > sec.max[2]
-                        ) {
-                          continue;
-                        }
-                      } else if (this.currentSection.kind === 'plane') {
-                        const sec = this.currentSection;
-                        const axisIdx = sec.axis === 'x' ? 0 : sec.axis === 'y' ? 1 : 2;
-                        if (sec.flipped) {
-                          if (b.min[axisIdx] > sec.offset) continue;
-                        } else {
-                          if (b.max[axisIdx] < sec.offset) continue;
-                        }
-                      }
-                    }
-                  }
-                }
-
                 allSelectedIds.push(elementId);
               }
             }
@@ -2663,10 +2635,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   private async refreshSelectionCenter(): Promise<void> {
+    this.selectionCenter = null;
     const req = ++this.selectionCenterReq;
     const ids = [...this.selection].filter((id) => isVisible(id, this.visibility));
     if (!ids.length) {
-      this.selectionCenter = null;
       return;
     }
     const box = new THREE.Box3();
