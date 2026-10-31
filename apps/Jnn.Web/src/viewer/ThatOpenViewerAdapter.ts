@@ -527,6 +527,26 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
   };
 
+  private onControlsStart = () => {
+    this.userControlling = true;
+  };
+
+  private onControlsEnd = () => {
+    this.userControlling = false;
+  };
+
+  private onControlsUpdate = () => {
+    if (!this.userControlling && this.fragments) {
+      this.fragments.core.update();
+    }
+  };
+
+  private onControlsRest = () => {
+    if (!this.userControlling && this.fragments) {
+      this.fragments.core.update(true);
+    }
+  };
+
   private showPivot(point: THREE.Vector3) {
     if (!this.pivotMesh || !this.nav.showPivot) return;
     if (this.pivotFadeRaf) {
@@ -767,20 +787,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     await fragments.init(workerUrl);
 
     const controls = this.world.camera.controls;
-    controls.addEventListener('controlstart', () => {
-      this.userControlling = true;
-    });
-    controls.addEventListener('controlend', () => {
-      this.userControlling = false;
-    });
-    controls.addEventListener('update', () => {
-      if (!this.userControlling) {
-        fragments.core.update();
-      }
-    });
-    controls.addEventListener('rest', () => {
-      fragments.core.update(true);
-    });
+    controls.addEventListener('controlstart', this.onControlsStart);
+    controls.addEventListener('controlend', this.onControlsEnd);
+    controls.addEventListener('update', this.onControlsUpdate);
+    controls.addEventListener('rest', this.onControlsRest);
 
     fragments.list.onItemSet.add(({ value: model }) => {
       if (this.world) {
@@ -961,6 +971,12 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.highlighter = null;
     }
     if (this.world) {
+      if (typeof this.world.camera?.controls?.removeEventListener === 'function') {
+        this.world.camera.controls.removeEventListener('controlstart', this.onControlsStart);
+        this.world.camera.controls.removeEventListener('controlend', this.onControlsEnd);
+        this.world.camera.controls.removeEventListener('update', this.onControlsUpdate);
+        this.world.camera.controls.removeEventListener('rest', this.onControlsRest);
+      }
       for (const [, entry] of this.modelsMap) {
         if (this.world.scene?.three) {
           this.world.scene.three.remove(entry.model.object);

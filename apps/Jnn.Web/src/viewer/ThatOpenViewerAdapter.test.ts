@@ -429,4 +429,27 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     adapter.dispose();
   });
+
+  it('Hotfix 2 - F2: skip forced fragments update on rest while user is still dragging', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const updateSpy = vi.fn();
+    (adapter as any).fragments = {
+      core: {
+        update: updateSpy,
+      },
+    };
+
+    // User is dragging (userControlling is true)
+    (adapter as any).userControlling = true;
+    (adapter as any).onControlsRest();
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    // User releases control (userControlling becomes false)
+    (adapter as any).userControlling = false;
+    (adapter as any).onControlsRest();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledWith(true);
+
+    adapter.dispose();
+  });
 });
