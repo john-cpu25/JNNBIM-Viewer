@@ -169,54 +169,95 @@ test.describe('Mốc 5: Group I - Measurement Tools on ThatOpen', () => {
     await expect(page.getByTestId('snap-edge')).toBeVisible();
     await expect(page.getByTestId('snap-face')).toBeVisible();
 
-    // 2. Perform distance measurement by clicking 2 points on the canvas
-    const canvas = page.getByTestId('viewer-canvas');
-    const box = (await canvas.boundingBox())!;
-    expect(box).toBeTruthy();
+    // 2. Find 2 distinct points on the model geometry using pickAt
+    const points = await page.evaluate(async () => {
+      const v = (window as any).__jnn?.viewer;
+      const canvas = document.querySelector('[data-testid="viewer-canvas"]') as HTMLCanvasElement;
+      if (!canvas || !v) return null;
+      const rect = canvas.getBoundingClientRect();
+      const hits: Array<{ x: number; y: number; point: [number, number, number] }> = [];
+      for (let y = rect.top + 100; y < rect.bottom - 100; y += 30) {
+        for (let x = rect.left + 200; x < rect.right - 200; x += 30) {
+          const h = await v.pickAt(x, y);
+          if (h && h.point) {
+            hits.push({ x: Math.round(x), y: Math.round(y), point: [h.point[0], h.point[1], h.point[2]] });
+          }
+        }
+      }
+      if (hits.length < 2) return null;
+      const p1 = hits[0]!;
+      let p2 = hits[hits.length - 1]!;
+      for (let i = hits.length - 1; i >= 1; i--) {
+        const d = Math.hypot(hits[i]!.point[0] - p1.point[0], hits[i]!.point[1] - p1.point[1], hits[i]!.point[2] - p1.point[2]);
+        if (d >= 0.5) {
+          p2 = hits[i]!;
+          break;
+        }
+      }
+      return { p1, p2 };
+    });
 
-    const pt1X = box.x + box.width * 0.45;
-    const pt1Y = box.y + box.height * 0.45;
-    const pt2X = box.x + box.width * 0.55;
-    const pt2Y = box.y + box.height * 0.55;
+    expect(points).not.toBeNull();
+    const { p1, p2 } = points!;
 
-    // Click point 1
-    await page.mouse.move(pt1X, pt1Y);
-    await page.mouse.click(pt1X, pt1Y);
-    await page.waitForTimeout(400);
-
-    // Click point 2
-    await page.mouse.move(pt2X, pt2Y);
-    await page.mouse.click(pt2X, pt2Y);
-    await page.waitForTimeout(600);
-
-    // Verify measurement item is added in the list or state
-    let items = await page.evaluate(() => (window as any).__jnn.getState().measurements);
-    if (items.length === 0) {
-      // Trigger via viewer API to ensure integration test passes regardless of GPU click coordinates
-      await page.evaluate(() => {
-        const v = (window as any).__jnn.viewer;
-        v.setMeasureTool('length');
-      });
-      await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5);
-      await page.waitForTimeout(300);
-      await page.mouse.click(box.x + box.width * 0.52, box.y + box.height * 0.52);
-      await page.waitForTimeout(500);
-      items = await page.evaluate(() => (window as any).__jnn.getState().measurements);
-    }
-
-    // 3. Clear all measurements
-    const clearBtn = page.getByTestId('measure-clear-btn');
-    if (items.length > 0) {
-      expect(items[0].value).toBeGreaterThan(0);
-      await clearBtn.click();
-      await page.waitForTimeout(300);
-      items = await page.evaluate(() => (window as any).__jnn.getState().measurements);
-      expect(items.length).toBe(0);
-    }
-
-    // 4. Press Escape to close MeasurePanel
-    await page.keyboard.press('Escape');
+    // 3. Test R3: Esc cancels in-progress measurement first, closes panel on second Esc
+    await page.mouse.move(p1.x, p1.y, { steps: 5 });
+    await page.waitForTimeout(150);
+    await page.mouse.click(p1.x, p1.y);
     await page.waitForTimeout(300);
+
+    // Press Esc once -> cancels in-progress line, panel remains visible
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await expect(measurePanel).toBeVisible();
+
+    // 4. Click p1 and p2 to create a real distance measurement
+    await page.mouse.move(p1.x, p1.y, { steps: 5 });
+    await page.waitForTimeout(150);
+    await page.mouse.click(p1.x, p1.y);
+    await page.waitForTimeout(300);
+
+    await page.mouse.move(p2.x, p2.y, { steps: 5 });
+    await page.waitForTimeout(300);
+    await page.mouse.click(p2.x, p2.y);
+    await page.waitForTimeout(500);
+
+    // 5. Assert exactly 1 measurement item, unit 'mm', value matches Euclidean distance within 1 mm
+    const items = await page.evaluate(() => (window as any).__jnn.getState().measurements);
+    expect(items.length).toBe(1);
+    expect(items[0].unit).toBe('mm');
+
+    const expectedDistMm = Math.hypot(
+      items[0].points[0][0] - items[0].points[1][0],
+      items[0].points[0][1] - items[0].points[1][1],
+      items[0].points[0][2] - items[0].points[1][2],
+    ) * 1000;
+    expect(Math.abs(items[0].value - expectedDistMm)).toBeLessThan(1.0);
+
+    // Verify 3D item is displayed in panel list
+    const measureItems = page.locator('[data-testid="measure-item"]');
+    await expect(measureItems).toHaveCount(1);
+    await expect(measureItems.first()).toContainText('mm');
+
+    // 6. Change unit to 'm' -> value updates to meters
+    await page.getByRole('radio', { name: 'm', exact: true }).click();
+    await page.waitForTimeout(200);
+    const itemsM = await page.evaluate(() => (window as any).__jnn.getState().measurements);
+    expect(itemsM[0].unit).toBe('m');
+    const expectedDistM = Number((expectedDistMm / 1000).toFixed(1));
+    expect(Math.abs(itemsM[0].value - expectedDistM)).toBeLessThan(0.01);
+
+    // 7. Clear all measurements
+    const clearBtn = page.getByTestId('measure-clear-btn');
+    await expect(clearBtn).toBeEnabled();
+    await clearBtn.click();
+    await page.waitForTimeout(200);
+    const clearedItems = await page.evaluate(() => (window as any).__jnn.getState().measurements);
+    expect(clearedItems.length).toBe(0);
+
+    // 8. Press Escape to close MeasurePanel
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
     await expect(measurePanel).not.toBeVisible();
   });
 });

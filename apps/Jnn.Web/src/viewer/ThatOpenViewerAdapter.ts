@@ -2788,9 +2788,12 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     const moved = Math.hypot(ev.clientX - d.x, ev.clientY - d.y);
     if (moved > 5) return;
     if (this.currentMeasureTool) {
-      const m = this.currentMeasurer;
+      const m = this.currentMeasurer as any;
       if (m) {
-        await (m as any).create();
+        if (typeof m.updatePreviewLine === 'function') {
+          m.updatePreviewLine();
+        }
+        await m.create();
         this.emitMeasureChange();
       }
       return;
