@@ -1,17 +1,5 @@
 import type { RuleCheckResult, RuleDefinition, RuleViolation } from './types';
-
-/**
- * Escapes HTML characters for safe embedding into HTML templates.
- */
-function escapeHtml(str: string | undefined | null): string {
-  if (str === undefined || str === null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from '../lib/escapeHtml';
 
 /**
  * Generates a clean, standalone, zero-dependency HTML quality check report

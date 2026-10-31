@@ -382,18 +382,8 @@ export async function exportClashExcel(test: ClashTestItem, locale: 'vi' | 'en' 
   });
 }
 
-/**
- * Escapes special HTML characters to prevent XSS and preserve text structure.
- */
-export function escapeHtml(str: string | number | undefined | null): string {
-  if (str === undefined || str === null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+import { escapeHtml } from '../lib/escapeHtml';
+export { escapeHtml };
 
 /**
  * Exports clash test details to a completely self-contained, standalone HTML report
