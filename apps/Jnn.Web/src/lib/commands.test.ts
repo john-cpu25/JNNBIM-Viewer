@@ -54,3 +54,33 @@ describe('commands: selectAll', () => {
     expect(calls?.[0]?.type).toBe('select');
   });
 });
+
+describe('commands: clear in measure mode', () => {
+  it('cancels in-progress measurement on first clear without closing panel', () => {
+    const model = createSampleModel();
+    const state = { ...createInitialState(model, 'light'), measurePanelOpen: true, measureTool: 'length' as const };
+    const dispatch = vi.fn();
+    const mockViewer = {
+      cancelMeasureCreation: vi.fn().mockReturnValue(true),
+    } as any;
+
+    runCommand('clear', state, dispatch, mockViewer);
+
+    expect(mockViewer.cancelMeasureCreation).toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('closes measure panel on second clear when no in-progress measurement exists', () => {
+    const model = createSampleModel();
+    const state = { ...createInitialState(model, 'light'), measurePanelOpen: true, measureTool: 'length' as const };
+    const dispatch = vi.fn();
+    const mockViewer = {
+      cancelMeasureCreation: vi.fn().mockReturnValue(false),
+    } as any;
+
+    runCommand('clear', state, dispatch, mockViewer);
+
+    expect(mockViewer.cancelMeasureCreation).toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({ type: 'setMeasurePanelOpen', open: false });
+  });
+});

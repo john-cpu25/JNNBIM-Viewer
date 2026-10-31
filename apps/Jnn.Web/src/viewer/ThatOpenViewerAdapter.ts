@@ -610,14 +610,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   private onWindowKeyDown = (ev: KeyboardEvent) => {
     if (this.currentMeasureTool) {
-      if (ev.key === 'Escape') {
-        const m = this.currentMeasurer;
-        if (m) {
-          (m as any).cancelCreation?.();
-          this.emitMeasureChange();
-        }
-        return;
-      }
       if (ev.key === 'Enter') {
         if (this.currentMeasureTool === 'area') {
           this.areaMeasurer?.endCreation();
@@ -2522,6 +2514,41 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     if (this.areaMeasurer) this.areaMeasurer.visible = visible;
     if (this.volumeMeasurer) this.volumeMeasurer.visible = visible;
     return okVoid;
+  }
+
+  cancelMeasureCreation(): boolean {
+    if (!this.currentMeasureTool) return false;
+
+    if (this.currentMeasureTool === 'length' || this.currentMeasureTool === 'edge') {
+      const m = this.lengthMeasurer as any;
+      if (m && (m.isDragging || m._temp?.dimension)) {
+        m.cancelCreation();
+        this.emitMeasureChange();
+        return true;
+      }
+    } else if (this.currentMeasureTool === 'area') {
+      const m = this.areaMeasurer as any;
+      if (m && (m._temp?.isDragging || (m._temp?.area?.points?.size ?? 0) > 0)) {
+        m.cancelCreation();
+        this.emitMeasureChange();
+        return true;
+      }
+    } else if (this.currentMeasureTool === 'angle') {
+      const m = this.angleMeasurer as any;
+      if (m && (m._temp?.clickCount > 0 || m._temp?.firstPreview || m._temp?.anglePreview)) {
+        m.cancelCreation();
+        this.emitMeasureChange();
+        return true;
+      }
+    } else if (this.currentMeasureTool === 'volume') {
+      const m = this.volumeMeasurer as any;
+      if (m && m._temp?.preview) {
+        m.cancelCreation();
+        this.emitMeasureChange();
+        return true;
+      }
+    }
+    return false;
   }
 
   debugState() {

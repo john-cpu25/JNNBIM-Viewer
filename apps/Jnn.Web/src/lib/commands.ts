@@ -208,6 +208,10 @@ export function runCommand(id: CommandId, s: AppState, dispatch: Dispatch<Action
         return;
       }
       if (s.measureTool !== null || s.measurePanelOpen) {
+        const cancelled = v?.cancelMeasureCreation?.() ?? false;
+        if (cancelled) {
+          return;
+        }
         dispatch({ type: 'setMeasurePanelOpen', open: false });
         return;
       }

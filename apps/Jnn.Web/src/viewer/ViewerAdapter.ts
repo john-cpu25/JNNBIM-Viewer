@@ -234,6 +234,7 @@ export interface ViewerAdapter {
   clearMeasurements?(): AdapterResult;
   deleteMeasurement?(id: string): AdapterResult;
   setMeasurementsVisible?(visible: boolean): AdapterResult;
+  cancelMeasureCreation?(): boolean;
 
   setWalkMode?(enabled: boolean): AdapterResult;
   isWalkMode?(): boolean;
