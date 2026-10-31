@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 import { ThatOpenViewerAdapter } from './ThatOpenViewerAdapter';
@@ -620,5 +620,189 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
     expect(setOrbitPointSpy).not.toHaveBeenCalled();
 
     adapter.dispose();
+  });
+
+  describe('Selection center caching & pivot priority', () => {
+    it('refreshSelectionCenter: computes centre for 1 element using getMergedBox', async () => {
+      const adapter = new ThatOpenViewerAdapter();
+      const mockBox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 20, 30));
+      const getMergedBoxSpy = vi.fn().mockResolvedValue(mockBox);
+
+      (adapter as any).modelsMap.set('modelA', {
+        id: 'modelA',
+        model: {
+          object: { visible: true },
+          getMergedBox: getMergedBoxSpy,
+        },
+      });
+
+      (adapter as any).selection = new Set(['modelA:42']);
+      await (adapter as any).refreshSelectionCenter();
+
+      expect(getMergedBoxSpy).toHaveBeenCalledWith([42]);
+      expect((adapter as any).selectionCenter).toEqual(new THREE.Vector3(5, 10, 15));
+
+      adapter.dispose();
+    });
+
+    it('refreshSelectionCenter: computes union centre for multiple elements across models', async () => {
+      const adapter = new ThatOpenViewerAdapter();
+      const box1 = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 10, 10)); // center (5, 5, 5)
+      const box2 = new THREE.Box3(new THREE.Vector3(10, 10, 10), new THREE.Vector3(20, 20, 20)); // union: (0,0,0) to (20,20,20) -> center (10, 10, 10)
+
+      (adapter as any).modelsMap.set('modelA', {
+        id: 'modelA',
+        model: {
+          object: { visible: true },
+          getMergedBox: vi.fn().mockResolvedValue(box1),
+        },
+      });
+      (adapter as any).modelsMap.set('modelB', {
+        id: 'modelB',
+        model: {
+          object: { visible: true },
+          getMergedBox: vi.fn().mockResolvedValue(box2),
+        },
+      });
+
+      (adapter as any).selection = new Set(['modelA:1', 'modelB:2']);
+      await (adapter as any).refreshSelectionCenter();
+
+      expect((adapter as any).selectionCenter).toEqual(new THREE.Vector3(10, 10, 10));
+
+      adapter.dispose();
+    });
+
+    it('refreshSelectionCenter: excludes hidden elements and sets selectionCenter null if empty/all hidden', async () => {
+      const adapter = new ThatOpenViewerAdapter();
+      const getMergedBoxSpy = vi.fn();
+
+      (adapter as any).modelsMap.set('modelA', {
+        id: 'modelA',
+        model: {
+          object: { visible: true },
+          getMergedBox: getMergedBoxSpy,
+        },
+      });
+
+      // Empty selection
+      (adapter as any).selection = new Set();
+      await (adapter as any).refreshSelectionCenter();
+      expect((adapter as any).selectionCenter).toBeNull();
+      expect(getMergedBoxSpy).not.toHaveBeenCalled();
+
+      // Selected element is hidden
+      (adapter as any).selection = new Set(['modelA:10']);
+      (adapter as any).visibility = { hidden: new Set(['modelA:10']), isolated: new Set() };
+      await (adapter as any).refreshSelectionCenter();
+      expect((adapter as any).selectionCenter).toBeNull();
+      expect(getMergedBoxSpy).not.toHaveBeenCalled();
+
+      adapter.dispose();
+    });
+
+    it('refreshSelectionCenter: discards stale async responses when selection changes rapidly', async () => {
+      const adapter = new ThatOpenViewerAdapter();
+      let resolveFirst!: (val: any) => void;
+      const firstPromise = new Promise((resolve) => {
+        resolveFirst = resolve;
+      });
+
+      const fastBox = new THREE.Box3(new THREE.Vector3(100, 100, 100), new THREE.Vector3(100, 100, 100));
+
+      (adapter as any).modelsMap.set('modelA', {
+        id: 'modelA',
+        model: {
+          object: { visible: true },
+          getMergedBox: vi.fn().mockImplementation((ids: number[]) => {
+            if (ids.includes(1)) return firstPromise;
+            return Promise.resolve(fastBox);
+          }),
+        },
+      });
+
+      // Request 1: slow
+      (adapter as any).selection = new Set(['modelA:1']);
+      const p1 = (adapter as any).refreshSelectionCenter();
+
+      // Request 2: fast
+      (adapter as any).selection = new Set(['modelA:2']);
+      const p2 = (adapter as any).refreshSelectionCenter();
+      await p2;
+
+      expect((adapter as any).selectionCenter).toEqual(new THREE.Vector3(100, 100, 100));
+
+      // Now resolve request 1 late with (0, 0, 0)
+      const slowBox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
+      resolveFirst(slowBox);
+      await p1;
+
+      // Selection center must remain (100, 100, 100)
+      expect((adapter as any).selectionCenter).toEqual(new THREE.Vector3(100, 100, 100));
+
+      adapter.dispose();
+    });
+
+    it('priority order: selectionCenter > hover cache > plane fallback', () => {
+      const adapter = new ThatOpenViewerAdapter();
+      const setOrbitPointSpy = vi.fn();
+
+      const mockCaster = {
+        three: {
+          setFromCamera: vi.fn(),
+          ray: {
+            intersectPlane: vi.fn().mockImplementation((_plane: any, out: THREE.Vector3) => out.set(0, 0, 0)),
+          },
+        },
+        castRay: vi.fn().mockResolvedValue(null),
+      };
+
+      (adapter as any).components = {
+        get: vi.fn().mockReturnValue({ get: vi.fn().mockReturnValue(mockCaster) }),
+        dispose: vi.fn(),
+      };
+
+      (adapter as any).world = {
+        camera: {
+          controls: {
+            setOrbitPoint: setOrbitPointSpy,
+            getTarget: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0)),
+          },
+          three: {
+            getWorldDirection: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, -1)),
+          },
+        },
+        renderer: {
+          three: {
+            domElement: {
+              getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+            },
+          },
+        },
+      };
+
+      const selCenter = new THREE.Vector3(1, 2, 3);
+      const hoverPoint = new THREE.Vector3(4, 5, 6);
+
+      // (1) Selection active and setting true -> uses selCenter
+      (adapter as any).selectionCenter = selCenter;
+      (adapter as any).nav.orbitAroundSelection = true;
+      (adapter as any).lastHover = { point: hoverPoint, x: 100, y: 100, t: performance.now() };
+
+      adapter.anchorPivotAt(100, 100);
+      expect(setOrbitPointSpy).toHaveBeenLastCalledWith(1, 2, 3);
+
+      // (2) orbitAroundSelection is false -> skips selection, uses hover cache
+      (adapter as any).nav.orbitAroundSelection = false;
+      adapter.anchorPivotAt(100, 100);
+      expect(setOrbitPointSpy).toHaveBeenLastCalledWith(4, 5, 6);
+
+      // (3) Hover cache empty -> falls back to plane/model fallback
+      (adapter as any).lastHover = null;
+      adapter.anchorPivotAt(100, 100);
+      expect(setOrbitPointSpy).toHaveBeenLastCalledWith(0, 0, 0);
+
+      adapter.dispose();
+    });
   });
 });

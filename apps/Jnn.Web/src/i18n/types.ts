@@ -61,6 +61,7 @@ export interface Translations {
   'nav.fitAllDesc': string;
   'nav.fitSelectionDesc': string;
   'nav.changeSettings': string;
+  'nav.pivotNote': string;
 
   // Right Panel Tabs
   'tab.properties': string;

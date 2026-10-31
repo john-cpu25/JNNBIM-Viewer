@@ -61,6 +61,7 @@ export const vi: Translations = {
   'nav.fitAllDesc': 'Click đúp chuột giữa (hoặc phím F)',
   'nav.fitSelectionDesc': 'Phím F khi đang chọn',
   'nav.changeSettings': 'Đổi sơ đồ chuột trong Cài đặt',
+  'nav.pivotNote': '💡 Khi chọn cấu kiện: xoay quanh tâm đối tượng đang chọn.',
 
   // Right Panel Tabs
   'tab.properties': 'Thuộc tính',

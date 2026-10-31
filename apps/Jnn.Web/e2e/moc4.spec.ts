@@ -288,5 +288,97 @@ test.describe('Mốc 4 ThatOpen Adapter: Revit navigation, section gizmo, projec
     const raycastCount = await page.evaluate(() => (window as any).__jnn_raycast_count ?? (window.__jnn!.viewer as any).gestureRaycastCount ?? 0);
     expect(raycastCount).toBeLessThanOrEqual(2);
   });
+
+  test('Task v0.4.3: Orbit around selection centre with ThatOpen adapter', async ({ page }) => {
+    test.setTimeout(75_000);
+    await page.goto('/?debug=1');
+    await expect(page.getByTestId('viewer-host')).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+
+    const archBtn = page.getByRole('button', { name: /(Kiến trúc|Architecture) \(90 KB\)/i });
+    await expect(archBtn).toBeVisible();
+    await archBtn.click();
+
+    await expect(page.getByText('Mở file IFC để bắt đầu')).not.toBeVisible({ timeout: 50_000 });
+    await expect(page.locator('text=Mở thành công')).toBeVisible({ timeout: 50_000 });
+    await page.waitForTimeout(1000);
+
+    // 1. Search and select an element via tree
+    const searchInput = page.getByLabel('Search elements');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('right front');
+
+    const treeEl = page.getByTestId('tree-element').first();
+    await expect(treeEl).toBeVisible();
+    await treeEl.click();
+
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).selected.length).toBe(1);
+
+    // Ensure selectionCenter is computed
+    await expect.poll(async () => {
+      return await page.evaluate(() => !!(window.__jnn!.viewer as any).selectionCenter);
+    }).toBe(true);
+
+    const expectedCenter = await page.evaluate(() => {
+      const c = (window.__jnn!.viewer as any).selectionCenter;
+      return { x: c.x, y: c.y, z: c.z };
+    });
+
+    // 2. Shift + drag starting at corner of viewport (away from model)
+    const canvas = page.getByTestId('viewer-host').locator('canvas');
+    const box = (await canvas.boundingBox())!;
+    const cornerX = box.x + 30;
+    const cornerY = box.y + 30;
+
+    await page.keyboard.down('Shift');
+    await page.mouse.move(cornerX, cornerY);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(cornerX + 50, cornerY + 30);
+    await page.waitForTimeout(100);
+
+    const actualTarget = await page.evaluate(() => {
+      const controls = (window.__jnn!.viewer as any).world?.camera?.controls;
+      const t = controls?.getTarget({ x: 0, y: 0, z: 0 });
+      return t ? { x: t.x, y: t.y, z: t.z } : null;
+    });
+
+    await page.mouse.up({ button: 'left' });
+    await page.keyboard.up('Shift');
+
+    expect(actualTarget).not.toBeNull();
+    const delta = Math.hypot(
+      actualTarget!.x - expectedCenter.x,
+      actualTarget!.y - expectedCenter.y,
+      actualTarget!.z - expectedCenter.z,
+    );
+    // Delta must be < 0.01m (1 cm)
+    expect(delta).toBeLessThan(0.01);
+
+    // 3. Clear selection (Escape) and verify orbiting returns to cursor/fallback
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => (await page.evaluate(() => window.__jnn!.viewer.debugState())).selected.length).toBe(0);
+
+    await page.keyboard.down('Shift');
+    await page.mouse.move(cornerX, cornerY);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(cornerX + 50, cornerY + 30);
+    await page.waitForTimeout(100);
+
+    const targetNoSel = await page.evaluate(() => {
+      const controls = (window.__jnn!.viewer as any).world?.camera?.controls;
+      const t = controls?.getTarget({ x: 0, y: 0, z: 0 });
+      return t ? { x: t.x, y: t.y, z: t.z } : null;
+    });
+
+    await page.mouse.up({ button: 'left' });
+    await page.keyboard.up('Shift');
+
+    expect(targetNoSel).not.toBeNull();
+    const deltaNoSel = Math.hypot(
+      targetNoSel!.x - expectedCenter.x,
+      targetNoSel!.y - expectedCenter.y,
+      targetNoSel!.z - expectedCenter.z,
+    );
+    expect(deltaNoSel).toBeGreaterThan(0.05);
+  });
 });
 

@@ -61,6 +61,7 @@ export const en: Translations = {
   'nav.fitAllDesc': 'Double-click Middle Button (or F)',
   'nav.fitSelectionDesc': 'F key while elements selected',
   'nav.changeSettings': 'Change mouse scheme in Settings',
+  'nav.pivotNote': '💡 When elements are selected: camera orbits around selection centre.',
 
   // Right Panel Tabs
   'tab.properties': 'Properties',

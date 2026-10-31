@@ -353,7 +353,10 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                     <span>{t('nav.fitSelectionDesc')}</span>
                   </div>
                 </div>
-                <div className="mt-2.5 pt-2 border-t border-line flex justify-end">
+                <div className="mt-2 pt-1.5 border-t border-line/60 text-[10px] text-muted leading-tight">
+                  {t('nav.pivotNote')}
+                </div>
+                <div className="mt-2 pt-1.5 border-t border-line flex justify-end">
                   <button
                     type="button"
                     onClick={() => {

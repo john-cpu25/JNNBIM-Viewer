@@ -51,6 +51,15 @@ JNN BIM Viewer hỗ trợ 2 sơ đồ điều khiển chuột linh hoạt: **Rev
 | **Góc nhìn chuẩn (Top, Front, Iso...)** | Bấm trực tiếp trên ViewCube 3D hoặc phím số | Bấm trên ViewCube hoặc phím số | Phím `1` – `6` |
 | **Hủy thao tác / Đóng công cụ** | — | — | `Esc` |
 
+> **Tính năng Xoay quanh đối tượng đang chọn (Orbit around selection - v0.4.3):**
+> - Khi bạn chọn 1 hoặc nhiều cấu kiện, camera sẽ tự động lấy **tâm hộp bao hình học (Bounding Box Center)** của toàn bộ cấu kiện đang chọn làm điểm xoay cố định. Chấm pivot màu vàng hiển thị chính xác tại tâm đối tượng và đứng yên trong suốt quá trình kéo xoay (áp dụng cho cả xoay chuột và kéo xoay ViewCube).
+> - **Thứ tự ưu tiên tâm xoay:**
+>   1. *Có cấu kiện được chọn (và bật tùy chọn trong Cài đặt):* Xoay quanh tâm vùng chọn.
+>   2. *Không chọn cấu kiện:* Xoay quanh điểm bề mặt cấu kiện dưới con trỏ chuột.
+>   3. *Bấm vào khoảng trống:* Fallback xoay quanh tâm mô hình trên mặt phẳng camera.
+> - **Bỏ chọn / Ẩn cấu kiện:** Nhấn `Esc` hoặc click ra khoảng trống để bỏ chọn (hoặc nhấn `H` ẩn cấu kiện đang chọn), viewer lập tức chuyển lại chế độ xoay quanh con trỏ chuột.
+> - **Bật/Tắt:** Bạn có thể bật hoặc tắt tùy chọn này tại **Cài đặt** (biểu tượng bánh răng) → tab **Điều hướng** → ☑ **"Xoay quanh đối tượng đang chọn"** (mặc định luôn Bật).
+
 ### 2.2. Khối Điều Hướng ViewCube 3D (Mốc 4)
 - **Tương tác trực quan góc trên bên phải:** Khối ViewCube 3D định hướng góc nhìn thời gian thực theo mô hình.
 - **Bấm mặt lập phương:** Bấm mặt TOP, FRONT, BACK, LEFT, RIGHT, BOTTOM để xoay camera mượt mà về hình chiếu tương ứng.

@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import * as THREE from 'three';
 import { render, screen } from '@testing-library/react';
 import { ViewCube } from './ViewCube';
 import { AppContext } from '../state/AppContext';
