@@ -1,11 +1,30 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
+  convertMeasureValue,
   exportMeasurementsCsv,
   formatMeasure,
   loadSavedMeasureSettings,
   saveMeasureSettings,
 } from './measure';
 import type { MeasureItem } from '../viewer/ViewerAdapter';
+
+describe('convertMeasureValue', () => {
+  it('converts meters to mm, cm, m with precision', () => {
+    expect(convertMeasureValue(8.1206, 'length', 'mm', 1)).toEqual({ value: 8120.6, unit: 'mm' });
+    expect(convertMeasureValue(8.1206, 'length', 'cm', 2)).toEqual({ value: 812.06, unit: 'cm' });
+    expect(convertMeasureValue(8.1206, 'length', 'm', 3)).toEqual({ value: 8.121, unit: 'm' });
+  });
+
+  it('converts area m2 to mm2, cm2, m2', () => {
+    expect(convertMeasureValue(2.5, 'area', 'mm', 0)).toEqual({ value: 2500000, unit: 'mm2' });
+    expect(convertMeasureValue(2.5, 'area', 'cm', 1)).toEqual({ value: 25000, unit: 'cm2' });
+    expect(convertMeasureValue(2.5, 'area', 'm', 2)).toEqual({ value: 2.5, unit: 'm2' });
+  });
+
+  it('converts radians to degrees', () => {
+    expect(convertMeasureValue(Math.PI / 2, 'angle', 'mm', 1)).toEqual({ value: 90, unit: 'deg' });
+  });
+});
 
 describe('formatMeasure', () => {
   it('formats linear measurements with mm/cm/m', () => {

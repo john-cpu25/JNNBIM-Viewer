@@ -65,6 +65,7 @@ import {
 } from './navigation';
 import { SectionGizmo, type HandleId } from './sectionGizmo';
 import { axisDragParam, clampBox, snapValue } from './sectionMath';
+import { convertMeasureValue } from '../lib/measure';
 
 // Global patch for WebIFC 0.0.78 StreamMeshes signature mismatch
 let webIfcPatched = false;
@@ -2220,7 +2221,20 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       this.lengthMeasurer.units = this.measureSettings.unit;
       this.lengthMeasurer.rounding = this.measureSettings.precision;
       this.applySnappingsTo(this.lengthMeasurer);
-      this.lengthMeasurer.list.onItemAdded.add(() => this.emitMeasureChange());
+      this.lengthMeasurer.list.onItemAdded.add((line: any) => {
+        if (line) {
+          line.units = this.measureSettings.unit;
+          line.rounding = this.measureSettings.precision;
+        }
+        if (this.lengthMeasurer?.lines) {
+          for (const dimLine of this.lengthMeasurer.lines) {
+            dimLine.units = this.measureSettings.unit;
+            dimLine.rounding = this.measureSettings.precision;
+            (dimLine as any).updateLabel?.();
+          }
+        }
+        this.emitMeasureChange();
+      });
       this.lengthMeasurer.list.onItemDeleted.add(() => this.emitMeasureChange());
       this.lengthMeasurer.list.onCleared.add(() => this.emitMeasureChange());
       this.lengthMeasurer.applyPlanesVisibility(this.clipPlanes);
@@ -2307,44 +2321,52 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     const items: MeasureItem[] = [];
     if (this.lengthMeasurer) {
       for (const line of this.lengthMeasurer.list) {
+        const rawDistM = typeof line.distance === 'function' ? line.distance() : Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y, line.end.z - line.start.z);
+        const { value, unit } = convertMeasureValue(rawDistM, (line as any)._mode === 'edge' ? 'edge' : 'length', this.measureSettings.unit, this.measureSettings.precision);
         items.push({
           id: line.id,
           tool: (line as any)._mode === 'edge' ? 'edge' : 'length',
-          value: line.value,
-          unit: line.units,
+          value,
+          unit,
           points: [toModel(line.start), toModel(line.end)],
         });
       }
     }
     if (this.angleMeasurer) {
       for (const angle of this.angleMeasurer.list) {
+        const rawRad = typeof angle.rawValue === 'number' ? angle.rawValue : ((angle.value ?? 0) * Math.PI) / 180;
+        const { value, unit } = convertMeasureValue(rawRad, 'angle', this.measureSettings.unit, this.measureSettings.precision);
         items.push({
           id: angle.id,
           tool: 'angle',
-          value: angle.value,
-          unit: angle.units,
+          value,
+          unit,
           points: [toModel(angle.start), toModel(angle.vertex), toModel(angle.end)],
         });
       }
     }
     if (this.areaMeasurer) {
       for (const area of this.areaMeasurer.list) {
+        const rawAreaM2 = typeof area.rawValue === 'number' ? area.rawValue : (area.value ?? 0);
+        const { value, unit } = convertMeasureValue(rawAreaM2, 'area', this.measureSettings.unit, this.measureSettings.precision);
         items.push({
           id: area.id,
           tool: 'area',
-          value: area.value,
-          unit: area.units,
+          value,
+          unit,
           points: [...area.points].map((p) => toModel(p)),
         });
       }
     }
     if (this.volumeMeasurer) {
       for (const vol of this.volumeMeasurer.list) {
+        const rawVolM3 = (vol as any)._cachedValue ?? (vol as any).value ?? 0;
+        const { value, unit } = convertMeasureValue(rawVolM3, 'volume', this.measureSettings.unit, this.measureSettings.precision);
         items.push({
           id: vol.id,
           tool: 'volume',
-          value: (vol as any)._cachedValue ?? 0,
-          unit: vol.units,
+          value,
+          unit,
           points: [],
         });
       }
@@ -2409,6 +2431,13 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       for (const line of this.lengthMeasurer.list) {
         line.units = s.unit;
         line.rounding = s.precision;
+      }
+      if (this.lengthMeasurer.lines) {
+        for (const dimLine of this.lengthMeasurer.lines) {
+          dimLine.units = s.unit;
+          dimLine.rounding = s.precision;
+          (dimLine as any).updateLabel?.();
+        }
       }
       this.applySnappingsTo(this.lengthMeasurer);
     }

@@ -1,4 +1,4 @@
-import type { MeasureItem, MeasureSettings, MeasureUnit } from '../viewer/ViewerAdapter';
+import type { MeasureItem, MeasureSettings, MeasureTool, MeasureUnit } from '../viewer/ViewerAdapter';
 
 export const MEASURE_SETTINGS_STORAGE_KEY = 'jnn-measure-settings';
 
@@ -34,6 +34,52 @@ export function saveMeasureSettings(settings: MeasureSettings): void {
   } catch (err) {
     console.warn('Failed to save measure settings to localStorage:', err);
   }
+}
+
+export function convertMeasureValue(
+  rawValueInBase: number,
+  tool: MeasureTool,
+  unit: MeasureUnit,
+  precision: number,
+): { value: number; unit: string } {
+  let value = rawValueInBase;
+  let targetUnit: string = unit;
+
+  if (tool === 'length' || tool === 'edge') {
+    if (unit === 'mm') value = rawValueInBase * 1000;
+    else if (unit === 'cm') value = rawValueInBase * 100;
+    else value = rawValueInBase;
+    targetUnit = unit;
+  } else if (tool === 'area') {
+    if (unit === 'mm') {
+      value = rawValueInBase * 1_000_000;
+      targetUnit = 'mm2';
+    } else if (unit === 'cm') {
+      value = rawValueInBase * 10_000;
+      targetUnit = 'cm2';
+    } else {
+      value = rawValueInBase;
+      targetUnit = 'm2';
+    }
+  } else if (tool === 'volume') {
+    if (unit === 'mm') {
+      value = rawValueInBase * 1_000_000_000;
+      targetUnit = 'mm3';
+    } else if (unit === 'cm') {
+      value = rawValueInBase * 1_000_000;
+      targetUnit = 'cm3';
+    } else {
+      value = rawValueInBase;
+      targetUnit = 'm3';
+    }
+  } else if (tool === 'angle') {
+    value = (rawValueInBase * 180) / Math.PI;
+    targetUnit = 'deg';
+  }
+
+  const factor = Math.pow(10, precision);
+  const roundedValue = Math.round(value * factor) / factor;
+  return { value: roundedValue, unit: targetUnit };
 }
 
 export function formatMeasure(value: number, unit: string, precision = 1): string {
@@ -81,3 +127,4 @@ export function downloadMeasurementsCsv(items: MeasureItem[], filename = 'measur
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+

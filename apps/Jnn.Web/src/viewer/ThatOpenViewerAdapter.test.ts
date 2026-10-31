@@ -804,5 +804,48 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
       adapter.dispose();
     });
+
+    it('getMeasureItems calculates correct values and converts units even when Line has default units "m"', () => {
+      const adapter = new ThatOpenViewerAdapter();
+      // Set measure settings to mm and precision 1
+      adapter.setMeasureSettings({
+        unit: 'mm',
+        precision: 1,
+        snap: { vertex: true, edge: true, face: false },
+      });
+
+      // Mock a Line3 object with ThatOpen default properties (_units = "m", distance = 8.1206)
+      const mockLine = {
+        id: 'test-line-1',
+        _mode: 'length',
+        units: 'm', // ThatOpen default from Line3.clone()
+        value: 8.12, // Old raw value in meters
+        distance: () => 8.1206,
+        start: new THREE.Vector3(0, 0, 0),
+        end: new THREE.Vector3(8.1206, 0, 0),
+      };
+
+      (adapter as any).lengthMeasurer = {
+        list: [mockLine],
+        dispose: vi.fn(),
+      };
+
+      const items = (adapter as any).getMeasureItems();
+      expect(items.length).toBe(1);
+      expect(items[0].unit).toBe('mm');
+      expect(items[0].value).toBe(8120.6); // Converted to mm with precision 1
+
+      // Test changing settings to cm with precision 2
+      adapter.setMeasureSettings({
+        unit: 'cm',
+        precision: 2,
+        snap: { vertex: true, edge: true, face: false },
+      });
+      const itemsCm = (adapter as any).getMeasureItems();
+      expect(itemsCm[0].unit).toBe('cm');
+      expect(itemsCm[0].value).toBe(812.06);
+
+      adapter.dispose();
+    });
   });
 });
