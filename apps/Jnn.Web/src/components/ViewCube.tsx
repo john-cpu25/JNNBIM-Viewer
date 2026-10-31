@@ -152,20 +152,33 @@ export function ViewCube() {
       renderer.render(scene, camera);
     };
 
+    // Reusable math objects to eliminate per-frame allocations
+    const posVec = new THREE.Vector3();
+    const targetVec = new THREE.Vector3();
+    const dirVec = new THREE.Vector3();
+    const upVec = new THREE.Vector3();
+    const zeroVec = new THREE.Vector3(0, 0, 0);
+    const rotMatrix = new THREE.Matrix4();
+    const quat = new THREE.Quaternion();
+
     // Update cube orientation from main viewer camera
     const updateFromCamera = () => {
       if (!viewer) return;
       const camRes = viewer.getCamera();
       if (!camRes.ok) return;
       const { position, target } = camRes.value;
-      const p = new THREE.Vector3(position[0], position[2], -position[1]);
-      const t = new THREE.Vector3(target[0], target[2], -target[1]);
-      const dir = p.clone().sub(t).normalize();
-      if (dir.lengthSq() < 1e-4) return;
+      posVec.set(position[0], position[2], -position[1]);
+      targetVec.set(target[0], target[2], -target[1]);
+      dirVec.copy(posVec).sub(targetVec).normalize();
+      if (dirVec.lengthSq() < 1e-4) return;
 
-      const up = Math.abs(dir.y) > 0.99 ? new THREE.Vector3(0, 0, -Math.sign(dir.y)) : new THREE.Vector3(0, 1, 0);
-      const rotMatrix = new THREE.Matrix4().lookAt(dir, new THREE.Vector3(0, 0, 0), up);
-      const quat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix).invert();
+      if (Math.abs(dirVec.y) > 0.99) {
+        upVec.set(0, 0, -Math.sign(dirVec.y));
+      } else {
+        upVec.set(0, 1, 0);
+      }
+      rotMatrix.lookAt(dirVec, zeroVec, upVec);
+      quat.setFromRotationMatrix(rotMatrix).invert();
       cubeGroup.quaternion.copy(quat);
       render();
     };

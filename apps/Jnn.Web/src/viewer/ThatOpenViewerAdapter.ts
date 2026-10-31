@@ -184,6 +184,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     opacity: 0.9,
   });
   private pivotFadeRaf: number | null = null;
+  private cameraChangeRaf: number | null = null;
   private sectionHelper: THREE.Object3D | null = null;
   private sectionGizmo: SectionGizmo | null = null;
   private sectionFrameVisible = true;
@@ -663,12 +664,24 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     this.sectionGizmo = sectionGizmo;
     world.scene.three.add(sectionGizmo.group);
 
+    // Single consolidated per-frame controls listener: pivot, section gizmo, throttled cameraChange
     world.camera.controls.addEventListener('update', () => {
+      if (this.disposed) return;
       if (this.pivotMesh?.visible) {
         this.updatePivotScale();
       }
       if (this.sectionGizmo?.visible) {
         this.sectionGizmo.updateScale(world.camera.three, container.clientHeight);
+      }
+      if (this.cameraChangeRaf === null) {
+        this.cameraChangeRaf = requestAnimationFrame(() => {
+          this.cameraChangeRaf = null;
+          if (this.disposed) return;
+          const cam = this.getCamera();
+          if (cam.ok) {
+            this.events.emit('cameraChange', cam.value);
+          }
+        });
       }
     });
     world.camera.controls.addEventListener('controlend', () => {
@@ -694,15 +707,6 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     window.addEventListener('keydown', this.onWindowKeyDown);
     window.addEventListener('keyup', this.onWindowKeyUp);
     container.addEventListener('auxclick', this.onAuxClick);
-
-    // Camera change event listener
-    world.camera.controls.addEventListener('update', () => {
-      if (this.disposed) return;
-      const cam = this.getCamera();
-      if (cam.ok) {
-        this.events.emit('cameraChange', cam.value);
-      }
-    });
   }
 
   private async initEngine(): Promise<void> {
@@ -830,6 +834,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   dispose(): void {
     this.disposed = true;
     this.userControlling = false;
+    if (this.cameraChangeRaf !== null) {
+      cancelAnimationFrame(this.cameraChangeRaf);
+      this.cameraChangeRaf = null;
+    }
     if (this.pivotFadeRaf) {
       cancelAnimationFrame(this.pivotFadeRaf);
       this.pivotFadeRaf = null;
