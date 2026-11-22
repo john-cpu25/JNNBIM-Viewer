@@ -112,6 +112,7 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     'sectionBox',
     'highlight',
     'xray',
+    'autoRotate',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -484,6 +485,15 @@ export class ThreeViewerAdapter implements ViewerAdapter {
     if (this.controls) {
       this.controls.rotateSpeed = this.nav.rotateSpeed * 2.5;
     }
+    return okVoid;
+  }
+
+  /** Chế độ ?sample: dùng autoRotate có sẵn của OrbitControls (1 vòng / 60 giây ở 60 fps). */
+  setAutoRotate(on: boolean): AdapterResult {
+    if (!this.controls) return fail('not-loaded', 'Viewer is not mounted.');
+    this.controls.autoRotate = on;
+    this.controls.autoRotateSpeed = 1;
+    this.requestRender();
     return okVoid;
   }
 

@@ -23,6 +23,7 @@ import {
 } from '../viewer/ViewerAdapter';
 import { loadSavedMeasureSettings, saveMeasureSettings } from '../lib/measure';
 import { loadSavedViews, saveSavedViews, MAX_SAVED_VIEWS, type SavedView } from '../lib/savedViews';
+import { loadAutoRotate, saveAutoRotate } from '../lib/autoRotatePref';
 
 export type Theme = 'light' | 'dark';
 export type MobilePane = 'explorer' | 'viewer' | 'properties';
@@ -58,6 +59,8 @@ export interface AppState {
   propertiesOpen: boolean;
   rightTab: 'properties' | 'clash' | 'rules' | 'views';
   gridVisible: boolean;
+  /** Tự xoay chậm quanh trục đứng (lưu localStorage `jnn-auto-rotate`). */
+  autoRotate: boolean;
   navigation: NavigationSettings;
   settingsOpen: boolean;
   mobilePane: MobilePane;
@@ -107,6 +110,7 @@ export type Action =
   | { type: 'setGridVisible'; visible: boolean }
   | { type: 'setNavigation'; settings: Partial<NavigationSettings> }
   | { type: 'resetNavigation' }
+  | { type: 'setAutoRotate'; on: boolean }
   | { type: 'setSettingsOpen'; open: boolean }
   | { type: 'setMobilePane'; pane: MobilePane }
   | { type: 'notify'; tone: Notice['tone']; text: string }
@@ -125,10 +129,38 @@ export type Action =
 
 let noticeSeq = 1;
 
+/** Phiên bản dữ liệu `jnn-nav-settings`. v2 (v0.6.0): preset mặc định đổi sang 'standard'. */
+export const NAV_SETTINGS_VERSION = 2;
+const NAV_PRESETS: readonly NavigationSettings['preset'][] = ['standard', 'revit', 'classic'];
+
+/**
+ * Đọc cài đặt điều hướng đã lưu. Bản lưu cũ (không có `version` hoặc < 2) được chuyển sang
+ * preset 'standard', giữ các giá trị khác (tốc độ xoay / zoom…), rồi lưu lại với version 2.
+ */
+export function migrateNavSettings(raw: unknown): { settings: NavigationSettings; migrated: boolean } {
+  if (!raw || typeof raw !== 'object') return { settings: structuredClone(DEFAULT_NAV), migrated: false };
+  const { version, ...rest } = raw as Partial<NavigationSettings> & { version?: number };
+  const merged: NavigationSettings = { ...DEFAULT_NAV, ...rest };
+  const migrated = typeof version !== 'number' || version < NAV_SETTINGS_VERSION;
+  if (migrated) merged.preset = 'standard';
+  if (!NAV_PRESETS.includes(merged.preset)) merged.preset = DEFAULT_NAV.preset;
+  return { settings: merged, migrated };
+}
+
+function saveNav(settings: NavigationSettings) {
+  try {
+    localStorage.setItem('jnn-nav-settings', JSON.stringify({ ...settings, version: NAV_SETTINGS_VERSION }));
+  } catch {}
+}
+
 function loadSavedNav(): NavigationSettings {
   try {
     const raw = localStorage.getItem('jnn-nav-settings');
-    if (raw) return { ...DEFAULT_NAV, ...JSON.parse(raw) };
+    if (raw) {
+      const { settings, migrated } = migrateNavSettings(JSON.parse(raw));
+      if (migrated) saveNav(settings);
+      return settings;
+    }
   } catch {}
   return structuredClone(DEFAULT_NAV);
 }
@@ -170,6 +202,7 @@ export function createInitialState(model: JnnModel, theme: Theme): AppState {
     rightTab: 'properties',
     gridVisible: true,
     navigation: loadSavedNav(),
+    autoRotate: loadAutoRotate(),
     settingsOpen: false,
     mobilePane: 'viewer',
     notices: [],
@@ -290,9 +323,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, gridVisible: action.visible };
     case 'setNavigation': {
       const next = { ...state.navigation, ...action.settings };
-      try {
-        localStorage.setItem('jnn-nav-settings', JSON.stringify(next));
-      } catch {}
+      saveNav(next);
       return { ...state, navigation: next };
     }
     case 'resetNavigation': {
@@ -302,6 +333,9 @@ export function reducer(state: AppState, action: Action): AppState {
       } catch {}
       return { ...state, navigation: next };
     }
+    case 'setAutoRotate':
+      saveAutoRotate(action.on);
+      return { ...state, autoRotate: action.on };
     case 'setSettingsOpen':
       return { ...state, settingsOpen: action.open };
     case 'setTheme':
@@ -329,6 +363,7 @@ export function reducer(state: AppState, action: Action): AppState {
         mobilePane: state.mobilePane,
         gridVisible: state.gridVisible,
         navigation: state.navigation,
+        autoRotate: state.autoRotate,
         settingsOpen: state.settingsOpen,
         sectionFrameVisible: state.sectionFrameVisible,
       };

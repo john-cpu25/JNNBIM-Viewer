@@ -60,6 +60,13 @@ import {
   shouldReanchorOnShift,
   shouldUseHoverCache,
   worldUnitsPerPixel,
+  usesPivotAnchoring,
+  dollyToCursorFor,
+  smoothTimeFor,
+  autoRotateStep,
+  shouldPauseAutoRotate,
+  isPlanPolar,
+  AUTO_ROTATE_LOD_INTERVAL_MS,
   type GestureIntent,
   type HoverCache,
 } from './navigation';
@@ -142,6 +149,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     'sectionBox',
     'measure',
     'walk',
+    'autoRotate',
   ]);
 
   private readonly events = new Emitter<ViewerEvents>();
@@ -199,6 +207,16 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   private nav: NavigationSettings = structuredClone(DEFAULT_NAV);
   private anchorRequestId = 0;
   private userControlling = false;
+  /** Setting tự xoay (chỉ nút trên UI đổi được). */
+  private autoRotateOn = false;
+  private autoRotateRaf: number | null = null;
+  private autoRotateLastT = 0;
+  /** true khi frame trước thực sự đã xoay (không bị tạm dừng). */
+  private autoRotateActive = false;
+  private autoRotateLastLod = 0;
+  /** Camera đang chạy animation có chủ đích (fit, view preset, ViewCube, góc nhìn đã lưu…). */
+  private cameraAnimating = false;
+  private cameraAnimTimer: ReturnType<typeof setTimeout> | null = null;
   private selectionCenter: THREE.Vector3 | null = null;
   private selectionCenterReq = 0;
   private raycastInFlight = false;
@@ -250,8 +268,50 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     return getIfcCacheStats();
   }
 
+  /**
+   * Gọi ngay trước mọi lần di chuyển camera có chủ đích (fit, view preset, setCamera…).
+   * Ngoài việc reset focal offset, nó đánh dấu camera đang animation để tự xoay tạm dừng
+   * cho đến khi camera `rest` (hoặc tối đa 1,5 giây).
+   */
   private resetPivotOffset() {
     this.world?.camera.controls.setFocalOffset(0, 0, 0, false);
+    this.markCameraAnimating();
+  }
+
+  private markCameraAnimating(ms = 1500) {
+    this.cameraAnimating = true;
+    if (this.cameraAnimTimer) clearTimeout(this.cameraAnimTimer);
+    this.cameraAnimTimer = setTimeout(() => {
+      this.cameraAnimating = false;
+      this.cameraAnimTimer = null;
+    }, ms);
+  }
+
+  private clearCameraAnimating() {
+    this.cameraAnimating = false;
+    if (this.cameraAnimTimer) {
+      clearTimeout(this.cameraAnimTimer);
+      this.cameraAnimTimer = null;
+    }
+  }
+
+  /**
+   * Đưa tâm xoay về đúng tâm màn hình mà không làm khung nhìn nhảy:
+   * bỏ focal offset (do preset Revit/Cổ điển để lại) và đặt target trên trục nhìn.
+   */
+  private recenterOrbitOnView() {
+    if (!this.world) return;
+    const c = this.world.camera.controls;
+    const off = new THREE.Vector3();
+    c.getFocalOffset(off);
+    if (off.lengthSq() < 1e-12) return;
+    const cam = this.world.camera.three;
+    const pos = cam.position.clone();
+    const dir = new THREE.Vector3();
+    cam.getWorldDirection(dir);
+    const target = pos.clone().addScaledVector(dir, c.distance);
+    c.setFocalOffset(0, 0, 0, false);
+    c.setLookAt(pos.x, pos.y, pos.z, target.x, target.y, target.z, false);
   }
 
   private applyMouseMapping(orbiting: boolean) {
@@ -272,9 +332,9 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     c.polarRotateSpeed = this.nav.rotateSpeed;
     c.dollySpeed = this.nav.zoomSpeed;
     c.truckSpeed = 2.0;
-    c.smoothTime = 0.2;
+    c.smoothTime = smoothTimeFor(this.nav.preset);
     c.draggingSmoothTime = 0.05;
-    c.dollyToCursor = true;
+    c.dollyToCursor = dollyToCursorFor(this.nav.preset);
     c.infinityDolly = true;
     c.maxDistance = Infinity;
     this.applyMouseMapping(false);
@@ -409,7 +469,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     const intent =
       this.nav.preset === 'classic' && (ev.altKey || ev.ctrlKey) && ev.button === 0
         ? 'none'
-        : intentOnDown(this.nav.preset, ev.button, ev.shiftKey);
+        : intentOnDown(this.nav.preset, ev.button, ev.shiftKey, ev.ctrlKey || ev.metaKey);
     this.gesture = {
       intent,
       x: ev.clientX,
@@ -420,6 +480,10 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       pointerId: ev.pointerId,
     };
     this.applyMouseMapping(false);
+    if (this.nav.preset === 'standard' && ev.button === 0 && intent !== 'orbit' && this.world) {
+      // Ctrl + kéo trái = kéo khung chọn: camera không được xoay theo.
+      this.world.camera.controls.mouseButtons.left = CameraControls.ACTION.NONE;
+    }
     if (intent === 'orbit-pending') {
       this.anchorPivotAt(ev.clientX, ev.clientY);
     }
@@ -631,6 +695,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
       }
     }
     if (ev.key !== 'Shift') return;
+    if (!usesPivotAnchoring(this.nav.preset)) return;
     if (!shouldReanchorOnShift(ev.repeat, this.gesture)) return;
     const g = this.gesture!;
     g.intent = 'orbit';
@@ -642,6 +707,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   private onWindowKeyUp = (ev: KeyboardEvent) => {
     if (ev.key !== 'Shift') return;
+    if (!usesPivotAnchoring(this.nav.preset)) return;
     const g = this.gesture;
     if (!g || (g.button !== 0 && g.button !== 1)) return;
     if (this.nav.preset === 'revit') {
@@ -659,18 +725,99 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   private onControlsEnd = () => {
     this.userControlling = false;
+    // Chờ quán tính sau khi thả chuột lắng xuống (`rest`) rồi tự xoay mới chạy tiếp.
+    if (this.autoRotateOn) this.markCameraAnimating(800);
   };
 
   private onControlsUpdate = () => {
-    if (!this.userControlling && this.fragments) {
-      this.fragments.core.update();
+    if (this.userControlling || !this.fragments) return;
+    if (this.autoRotateActive) {
+      // Tự xoay đổi camera mỗi frame: KHÔNG update fragments mỗi frame (gây khựng, xem v0.4.1).
+      const now = performance.now();
+      if (now - this.autoRotateLastLod < AUTO_ROTATE_LOD_INTERVAL_MS) return;
+      this.autoRotateLastLod = now;
     }
+    this.fragments.core.update();
   };
 
   private onControlsRest = () => {
-    if (!this.userControlling && this.fragments) {
+    this.clearCameraAnimating();
+    if (!this.userControlling && !this.autoRotateActive && this.fragments) {
       this.fragments.core.update(true);
     }
+  };
+
+  /* ---------------------------------------------------------------- */
+  /* Tự xoay                                                           */
+  /* ---------------------------------------------------------------- */
+
+  setAutoRotate(on: boolean): AdapterResult {
+    this.autoRotateOn = on;
+    if (on) {
+      if (this.autoRotateRaf === null && !this.disposed) {
+        this.autoRotateLastT = performance.now();
+        this.autoRotateRaf = requestAnimationFrame(this.autoRotateTick);
+      }
+    } else {
+      this.stopAutoRotateLoop();
+    }
+    return okVoid;
+  }
+
+  isAutoRotating(): boolean {
+    return this.autoRotateActive;
+  }
+
+  private stopAutoRotateLoop() {
+    if (this.autoRotateRaf !== null) {
+      cancelAnimationFrame(this.autoRotateRaf);
+      this.autoRotateRaf = null;
+    }
+    this.setAutoRotateActive(false);
+  }
+
+  private setAutoRotateActive(active: boolean) {
+    if (this.autoRotateActive === active) return;
+    this.autoRotateActive = active;
+    if (active) {
+      this.autoRotateLastLod = performance.now();
+    } else if (!this.userControlling && this.fragments && !this.disposed) {
+      // Dừng / tạm dừng: cập nhật LOD đầy đủ một lần.
+      this.fragments.core.update(true);
+    }
+  }
+
+  private autoRotatePaused(): boolean {
+    const controls = this.world?.camera.controls;
+    return shouldPauseAutoRotate({
+      userControlling: this.userControlling,
+      gestureActive: this.gesture !== null,
+      gizmoDrag: this.gizmoDrag !== null,
+      walkMode: this.walkMode,
+      measureTool: this.currentMeasureTool !== null,
+      cameraAnimating: this.cameraAnimating,
+      documentHidden: typeof document !== 'undefined' && document.hidden,
+      hasModel: this.modelsMap.size > 0,
+      orthoPlanView:
+        this.currentProjection === 'orthographic' && !!controls && isPlanPolar(controls.polarAngle),
+    });
+  }
+
+  private autoRotateTick = (now: number) => {
+    this.autoRotateRaf = null;
+    if (this.disposed || !this.autoRotateOn || !this.world) {
+      this.setAutoRotateActive(false);
+      return;
+    }
+    const dt = (now - this.autoRotateLastT) / 1000;
+    this.autoRotateLastT = now;
+    if (this.autoRotatePaused()) {
+      this.setAutoRotateActive(false);
+    } else {
+      this.setAutoRotateActive(true);
+      this.world.camera.controls.rotate(autoRotateStep(dt), 0, false);
+    }
+    this.autoRotateRaf = requestAnimationFrame(this.autoRotateTick);
   };
 
   private showPivot(point: THREE.Vector3) {
@@ -731,6 +878,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   anchorPivotAt(clientX: number, clientY: number) {
     if (!this.world) return;
+    // Preset 'standard': luôn xoay quanh tâm đang nhìn (không anchor, không chấm pivot).
+    if (!usesPivotAnchoring(this.nav.preset)) return;
     const controls = this.world.camera.controls;
     const id = ++this.anchorRequestId;
 
@@ -1072,6 +1221,13 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
     }
     this.disposed = true;
     this.userControlling = false;
+    this.autoRotateOn = false;
+    if (this.autoRotateRaf !== null) {
+      cancelAnimationFrame(this.autoRotateRaf);
+      this.autoRotateRaf = null;
+    }
+    this.autoRotateActive = false;
+    this.clearCameraAnimating();
     if (this.cameraChangeRaf !== null) {
       cancelAnimationFrame(this.cameraChangeRaf);
       this.cameraChangeRaf = null;
@@ -1644,7 +1800,12 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   }
 
   setNavigationSettings(s: NavigationSettings): AdapterResult {
+    const prev = this.nav.preset;
     this.nav = { ...s };
+    if (prev !== s.preset && !usesPivotAnchoring(s.preset)) {
+      this.hidePivot();
+      this.recenterOrbitOnView();
+    }
     this.configureControls();
     return okVoid;
   }
@@ -1652,7 +1813,7 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
   beginOrbit(): AdapterResult {
     if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
     const controls = this.world.camera.controls;
-    if (this.nav.orbitAroundSelection && this.selectionCenter) {
+    if (usesPivotAnchoring(this.nav.preset) && this.nav.orbitAroundSelection && this.selectionCenter) {
       ++this.anchorRequestId;
       this.pendingRaycast = null;
       OBC.setOrbitPoint(controls, this.selectionCenter);
@@ -1663,6 +1824,8 @@ export class ThatOpenViewerAdapter implements ViewerAdapter {
 
   orbitBy(deltaAzimuth: number, deltaPolar: number, animate = false): AdapterResult {
     if (!this.world) return fail('not-loaded', 'Viewer is not mounted.');
+    // ViewCube drag: tạm dừng tự xoay trong lúc kéo.
+    this.markCameraAnimating(400);
     this.world.camera.controls.rotate(deltaAzimuth, deltaPolar, animate);
     return okVoid;
   }

@@ -30,6 +30,23 @@ export function baseMapping(preset: NavigationPreset, ortho: boolean): MouseMapp
     : { left: A.ROTATE, middle: A.TRUCK, right: A.TRUCK, wheel };
 }
 
+/** Preset 'standard' xoay quanh tâm đang nhìn: không anchor pivot theo con trỏ / vùng chọn. */
+export function usesPivotAnchoring(preset: NavigationPreset): boolean {
+  return preset !== 'standard';
+}
+
+/** Preset 'standard' zoom vào giữa màn hình; các preset khác zoom theo con trỏ. */
+export function dollyToCursorFor(preset: NavigationPreset): boolean {
+  return preset !== 'standard';
+}
+
+/** Quán tính khi thả chuột / cuộn (camera-controls smoothTime, giây). */
+export const STANDARD_SMOOTH_TIME = 0.25;
+export const LEGACY_SMOOTH_TIME = 0.2;
+export function smoothTimeFor(preset: NavigationPreset): number {
+  return preset === 'standard' ? STANDARD_SMOOTH_TIME : LEGACY_SMOOTH_TIME;
+}
+
 /** Sơ đồ khi gesture xoay đã vượt ngưỡng. */
 export function orbitMapping(base: MouseMapping): MouseMapping {
   return { ...base, left: A.ROTATE, middle: A.ROTATE };
@@ -76,7 +93,19 @@ export function normalizeRect(
 }
 
 /** Xác định ý định từ nút + Shift ở thời điểm pointerdown. */
-export function intentOnDown(preset: NavigationPreset, button: number, shift: boolean): GestureIntent {
+export function intentOnDown(
+  preset: NavigationPreset,
+  button: number,
+  shift: boolean,
+  ctrl = false,
+): GestureIntent {
+  if (preset === 'standard') {
+    // Kéo trái = xoay ngay (không ngưỡng, không anchor). Ctrl + kéo trái = kéo khung chọn
+    // (Ctrl + click ≤ 4px vẫn là thêm / bớt chọn).
+    if (button === 0) return ctrl ? 'none' : 'orbit';
+    if (button === 1 || button === 2) return 'pan';
+    return 'none';
+  }
   if (shift && (button === 0 || button === 1)) return 'orbit-pending';
   if (button === 0) return preset === 'classic' ? 'orbit-pending' : 'none';
   if (button === 1 || button === 2) return 'pan';
@@ -166,3 +195,55 @@ export function shouldReanchorOnShift(
   if (gesture.intent === 'orbit' || gesture.intent === 'orbit-pending') return false;
   return true;
 }
+
+/* ------------------------------------------------------------------ */
+/* Tự xoay (auto-rotate)                                               */
+/* ------------------------------------------------------------------ */
+
+/** 1 vòng / 60 giây. */
+export const AUTO_ROTATE_RAD_PER_SEC = (2 * Math.PI) / 60;
+/** Kẹp dt để không nhảy góc sau khi tab bị ẩn / frame bị treo. */
+export const AUTO_ROTATE_MAX_DT = 0.1;
+
+/** Góc azimuth (rad) cần xoay cho một frame dài `dtSec` giây. Âm = ngược chiều kim đồng hồ nhìn từ trên. */
+export function autoRotateStep(dtSec: number): number {
+  if (!Number.isFinite(dtSec) || dtSec <= 0) return 0;
+  return -AUTO_ROTATE_RAD_PER_SEC * Math.min(dtSec, AUTO_ROTATE_MAX_DT);
+}
+
+export interface AutoRotatePauseState {
+  userControlling: boolean;
+  gestureActive: boolean;
+  gizmoDrag: boolean;
+  walkMode: boolean;
+  measureTool: boolean;
+  cameraAnimating: boolean;
+  documentHidden: boolean;
+  hasModel: boolean;
+  /** Ortho nhìn thẳng từ trên / dưới: quay quanh trục đứng chỉ làm bản vẽ quay vòng. */
+  orthoPlanView: boolean;
+}
+
+/** true = tạm dừng tự xoay frame này (setting vẫn bật). */
+export function shouldPauseAutoRotate(s: AutoRotatePauseState): boolean {
+  return (
+    s.userControlling ||
+    s.gestureActive ||
+    s.gizmoDrag ||
+    s.walkMode ||
+    s.measureTool ||
+    s.cameraAnimating ||
+    s.documentHidden ||
+    !s.hasModel ||
+    s.orthoPlanView
+  );
+}
+
+/** Ngưỡng góc polar (rad) coi là đang nhìn thẳng từ trên / dưới. */
+export const PLAN_VIEW_POLAR_EPS = (5 * Math.PI) / 180;
+export function isPlanPolar(polarAngle: number): boolean {
+  return polarAngle < PLAN_VIEW_POLAR_EPS || polarAngle > Math.PI - PLAN_VIEW_POLAR_EPS;
+}
+
+/** Khoảng tối thiểu giữa 2 lần fragments.core.update() khi đang tự xoay (ms). */
+export const AUTO_ROTATE_LOD_INTERVAL_MS = 1000;

@@ -34,7 +34,8 @@ export type ViewerCapability =
   | 'highlight'
   | 'xray'
   | 'measure'
-  | 'walk';
+  | 'walk'
+  | 'autoRotate';
 
 export type ViewPreset =
   | 'iso'
@@ -72,10 +73,16 @@ export interface CameraState {
   projection: 'perspective' | 'orthographic';
 }
 
-export type NavigationPreset = 'revit' | 'classic';
+/**
+ * - 'standard' (mặc định từ v0.6.0): kéo trái xoay quanh tâm màn hình, kéo giữa/phải pan,
+ *   cuộn zoom vào giữa màn hình có quán tính nhẹ, Ctrl + kéo trái = kéo khung chọn.
+ * - 'revit': Shift + kéo trái/giữa xoay quanh con trỏ/vùng chọn, kéo trái = kéo khung chọn.
+ * - 'classic': kéo trái xoay quanh con trỏ/vùng chọn.
+ */
+export type NavigationPreset = 'standard' | 'revit' | 'classic';
 
 export interface NavigationSettings {
-  preset: NavigationPreset;        // default 'revit'
+  preset: NavigationPreset;        // default 'standard'
   rotateSpeed: number;             // 0.1–1.0, default 0.4
   zoomSpeed: number;               // 0.3–2.0, default 1.0
   orbitAroundCursor: boolean;      // default true
@@ -84,7 +91,7 @@ export interface NavigationSettings {
 }
 
 export const DEFAULT_NAV: NavigationSettings = {
-  preset: 'revit',
+  preset: 'standard',
   rotateSpeed: 0.4,
   zoomSpeed: 1.0,
   orbitAroundCursor: true,
@@ -215,6 +222,8 @@ export interface ViewerAdapter {
   getCamera(): AdapterResult<CameraState>;
   setProjection(projection: CameraState['projection']): AdapterResult;
   setNavigationSettings?(s: NavigationSettings): AdapterResult;
+  /** Tự xoay chậm quanh trục đứng. Tương tác của người dùng chỉ tạm dừng, không tắt. */
+  setAutoRotate?(on: boolean): AdapterResult;
   /** Rotate camera around current pivot in radians. Used for ViewCube drag. */
   orbitBy?(deltaAzimuth: number, deltaPolar: number, animate?: boolean): AdapterResult;
   /** Prepare camera controls for an orbit gesture (e.g. ViewCube drag). Sets orbit point to selection center if active. */
