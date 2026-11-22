@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { useRevitPreset } from './helpers';
 
 async function openThatOpenArch(page: any) {
   await page.goto('/?debug=1');
@@ -75,6 +76,8 @@ test.describe('Mốc 5: Group H - Multi-select & Box Selection on ThatOpen', () 
   });
 
   test('H2: Window & Crossing box selection shows overlay and selects elements', async ({ page }) => {
+    // Kéo trái = kéo khung là hành vi preset Revit (Tiêu chuẩn dùng Ctrl + kéo, xem nav-v060.spec.ts)
+    await useRevitPreset(page);
     await openThatOpenArch(page);
 
     const canvas = page.getByTestId('viewer-canvas');

@@ -36,3 +36,25 @@ export const debugState = (page: Page) =>
 
 export const selection = (page: Page) =>
   page.evaluate(() => (window.__jnn!.getState() as { selection: string[] }).selection);
+
+/**
+ * v0.6.0: mặc định là preset 'standard'. Test viết cho hành vi Revit (Shift + kéo xoay,
+ * kéo trái = kéo khung, xoay quanh vùng chọn) gọi hàm này trước `page.goto`.
+ */
+export async function useRevitPreset(page: Page) {
+  await page.addInitScript(() => {
+    if (localStorage.getItem('jnn-nav-settings')) return;
+    localStorage.setItem(
+      'jnn-nav-settings',
+      JSON.stringify({
+        preset: 'revit',
+        rotateSpeed: 0.4,
+        zoomSpeed: 1.0,
+        orbitAroundCursor: true,
+        orbitAroundSelection: true,
+        showPivot: true,
+        version: 2,
+      }),
+    );
+  });
+}

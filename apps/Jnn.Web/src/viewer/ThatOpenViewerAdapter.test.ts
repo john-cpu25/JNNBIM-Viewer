@@ -281,6 +281,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
   it('F2: falls back to model center when plane point lands outside model bounds', () => {
     const adapter = new ThatOpenViewerAdapter();
+    // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+    (adapter as any).nav.preset = 'revit';
     let setPointCalledWith: any = null;
     const fakeControls = {
       setOrbitPoint: (x: number, y: number, z: number) => {
@@ -355,6 +357,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
   it('applies mouse mapping for revit and classic presets', () => {
     const adapter = new ThatOpenViewerAdapter();
+    // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+    (adapter as any).nav.preset = 'revit';
     const mouseButtons = { left: 0, middle: 0, right: 0, wheel: 0 };
     (adapter as any).world = {
       camera: {
@@ -399,6 +403,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
   it('Hotfix 2 - F1: onWindowKeyDown ignores repeat and does not re-anchor when already orbiting', () => {
     const adapter = new ThatOpenViewerAdapter();
+    // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+    (adapter as any).nav.preset = 'revit';
     let anchorCalled = false;
     adapter.anchorPivotAt = () => {
       anchorCalled = true;
@@ -432,6 +438,50 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
     adapter.dispose();
   });
 
+  it('v0.6.0: auto-rotate throttles fragments update and forces one update when it stops', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const updateSpy = vi.fn();
+    (adapter as any).fragments = { core: { update: updateSpy } };
+    const nowSpy = vi.spyOn(performance, 'now');
+
+    nowSpy.mockReturnValue(1000);
+    (adapter as any).setAutoRotateActive(true);
+    // 60 frames within 1 s: no per-frame update
+    for (let i = 0; i < 60; i++) {
+      nowSpy.mockReturnValue(1000 + i * 16);
+      (adapter as any).onControlsUpdate();
+    }
+    expect(updateSpy).not.toHaveBeenCalled();
+    // rest while rotating: no forced update either
+    (adapter as any).onControlsRest();
+    expect(updateSpy).not.toHaveBeenCalled();
+    // after 1 s: one throttled (non-forced) update
+    nowSpy.mockReturnValue(2100);
+    (adapter as any).onControlsUpdate();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenLastCalledWith();
+    // stop → forced update once
+    (adapter as any).setAutoRotateActive(false);
+    expect(updateSpy).toHaveBeenCalledTimes(2);
+    expect(updateSpy).toHaveBeenLastCalledWith(true);
+
+    nowSpy.mockRestore();
+    adapter.dispose();
+  });
+
+  it('v0.6.0: standard preset never anchors the pivot', () => {
+    const adapter = new ThatOpenViewerAdapter();
+    const setOrbitPoint = vi.fn();
+    (adapter as any).world = { camera: { controls: { setOrbitPoint } } };
+    (adapter as any).selectionCenter = { x: 1, y: 2, z: 3 };
+    expect((adapter as any).nav.preset).toBe('standard');
+    adapter.anchorPivotAt(10, 10);
+    adapter.beginOrbit();
+    expect(setOrbitPoint).not.toHaveBeenCalled();
+    expect((adapter as any).anchorRequestId).toBe(0);
+    adapter.dispose();
+  });
+
   it('Hotfix 2 - F2: skip forced fragments update on rest while user is still dragging', () => {
     const adapter = new ThatOpenViewerAdapter();
     const updateSpy = vi.fn();
@@ -457,6 +507,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
   it('Hotfix 2 - F3: avoids overlapping raycasts and buffers latest pending request', async () => {
     const adapter = new ThatOpenViewerAdapter();
+    // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+    (adapter as any).nav.preset = 'revit';
     let resolveFirstRaycast!: (value: any) => void;
     const firstPromise = new Promise((resolve) => {
       resolveFirstRaycast = resolve;
@@ -527,6 +579,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
   it('Hotfix 2 - M1: late raycast from request 1 does not overwrite pivot of request 2', async () => {
     const adapter = new ThatOpenViewerAdapter();
+    // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+    (adapter as any).nav.preset = 'revit';
     let resolveFirstRaycast!: (value: any) => void;
     const firstPromise = new Promise((resolve) => {
       resolveFirstRaycast = resolve;
@@ -593,6 +647,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
   it('beginOrbit sets orbit point to selectionCenter when orbitAroundSelection is true', () => {
     const adapter = new ThatOpenViewerAdapter();
+    // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+    (adapter as any).nav.preset = 'revit';
     const setOrbitPointSpy = vi.fn();
     const target = new THREE.Vector3(0, 0, 0);
 
@@ -745,6 +801,8 @@ describe('ThatOpenViewerAdapter unit & performance', () => {
 
     it('priority order: selectionCenter > hover cache > plane fallback', () => {
       const adapter = new ThatOpenViewerAdapter();
+      // Hành vi anchor pivot chỉ áp dụng cho preset Revit / Cổ điển (v0.6.0 mặc định 'standard').
+      (adapter as any).nav.preset = 'revit';
       const setOrbitPointSpy = vi.fn();
 
       const mockCaster = {

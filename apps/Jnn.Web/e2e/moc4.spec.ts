@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openViewer } from './helpers';
+import { openViewer, useRevitPreset } from './helpers';
 
 test.describe('Mốc 4: UI Polish, Revit Navigation, ViewCube, Section Box, i18n', () => {
   test.beforeEach(async ({ page }) => {
@@ -34,7 +34,7 @@ test.describe('Mốc 4: UI Polish, Revit Navigation, ViewCube, Section Box, i18n
 
     const presetSelect = page.getByTestId('nav-preset-select');
     await expect(presetSelect).toBeVisible();
-    await expect(presetSelect).toHaveValue('revit');
+    await expect(presetSelect).toHaveValue('standard');
 
     // Switch to Classic preset
     await presetSelect.selectOption('classic');
@@ -111,6 +111,11 @@ test.describe('Mốc 4: UI Polish, Revit Navigation, ViewCube, Section Box, i18n
 });
 
 test.describe('Mốc 4 ThatOpen Adapter: Revit navigation, section gizmo, projection', () => {
+  // Các test này kiểm hành vi preset Revit (v0.6.0 mặc định là 'standard').
+  test.beforeEach(async ({ page }) => {
+    await useRevitPreset(page);
+  });
+
   test('E2E with ThatOpen adapter: left drag hint, Shift+left orbit, gizmo Z-max drag, X min input, P toggle and middle pan', async ({ page }) => {
     test.setTimeout(75_000);
     await page.goto('/?debug=1');

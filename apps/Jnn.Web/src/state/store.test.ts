@@ -115,7 +115,7 @@ describe('reducer', () => {
 
   it('manages navigation settings and settings modal in store', () => {
     let s = init();
-    expect(s.navigation.preset).toBe('revit');
+    expect(s.navigation.preset).toBe('standard');
     expect(s.navigation.rotateSpeed).toBe(0.4);
     expect(s.settingsOpen).toBe(false);
 
@@ -127,7 +127,7 @@ describe('reducer', () => {
     expect(s.settingsOpen).toBe(true);
 
     s = reducer(s, { type: 'resetNavigation' });
-    expect(s.navigation.preset).toBe('revit');
+    expect(s.navigation.preset).toBe('standard');
     expect(s.navigation.rotateSpeed).toBe(0.4);
 
     // Preserved on setModel
@@ -161,5 +161,20 @@ describe('defaultPlane', () => {
     expect(defaultPlane('z', { min: [0, 0, -5.0], max: [10, 10, 15] }).offset).toBe(1.2);
     // Model starting at Z = 0 -> sets 1.2m
     expect(defaultPlane('z', { min: [0, 0, 0], max: [10, 10, 15] }).offset).toBe(1.2);
+  });
+});
+
+describe('auto-rotate state (v0.6.0)', () => {
+  it('toggles, persists to localStorage and survives setModel', () => {
+    let s = init();
+    s = reducer(s, { type: 'setAutoRotate', on: false });
+    expect(s.autoRotate).toBe(false);
+    expect(localStorage.getItem('jnn-auto-rotate')).toBe('off');
+    s = reducer(s, { type: 'setModel', model });
+    expect(s.autoRotate).toBe(false);
+    s = reducer(s, { type: 'setAutoRotate', on: true });
+    expect(localStorage.getItem('jnn-auto-rotate')).toBe('on');
+    expect(init().autoRotate).toBe(true);
+    localStorage.removeItem('jnn-auto-rotate');
   });
 });

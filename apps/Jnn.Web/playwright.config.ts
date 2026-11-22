@@ -16,6 +16,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'retain-on-failure',
+    // Tự xoay (v0.6.0) mặc định bật khi không giảm chuyển động. Test cũ cần camera đứng yên,
+    // nên mặc định giả lập giảm chuyển động → tự xoay tắt. Test tự xoay tự bật lại.
+    reducedMotion: 'reduce',
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
   },
   projects: [
