@@ -1,4 +1,4 @@
-# CẨM NANG HƯỚNG DẪN SỬ DỤNG — JNN BIM VIEWER (v0.4.0)
+# CẨM NANG HƯỚNG DẪN SỬ DỤNG — JNN BIM VIEWER (v0.6.0)
 
 Chào mừng bạn đến với **JNN BIM Viewer** — Trình xem và phân tích mô hình BIM thế hệ mới trên nền tảng Web & Desktop, được tối ưu hóa cho kỹ sư kết cấu, kiến trúc và điều phối BIM (BIM Coordinator).
 
@@ -26,11 +26,32 @@ Chào mừng bạn đến với **JNN BIM Viewer** — Trình xem và phân tíc
 
 ## 2. ĐIỀU HƯỚNG 3D & KHAI THÁC DỮ LIỆU MÔ HÌNH
 
-### 2.1. Thao tác Chuột & Sơ đồ Điều hướng Camera (Mốc 4)
+### 2.0. Điều hướng mặc định "Tiêu chuẩn" & Tự xoay (v0.6.0)
 
-JNN BIM Viewer hỗ trợ 2 sơ đồ điều khiển chuột linh hoạt: **Revit (Mặc định)** và **Cổ điển (Classic)**, có thể thay đổi dễ dàng trong cửa sổ **Cài đặt** (biểu tượng bánh răng trên TopBar).
+Từ v0.6.0, sơ đồ chuột mặc định là **Tiêu chuẩn**. Máy đã lưu sơ đồ Revit từ bản cũ sẽ được chuyển sang Tiêu chuẩn **một lần**. Muốn dùng lại kiểu cũ: **Cài đặt** → **Điều hướng** → chọn **Revit** hoặc **Cổ điển**.
 
-| Thao tác | Sơ đồ Revit (Mặc định) | Sơ đồ Cổ điển (Classic) | Phím tắt |
+| Thao tác | Sơ đồ Tiêu chuẩn (mặc định) |
+|---|---|
+| **Xoay** | Kéo chuột trái. Luôn xoay quanh **tâm màn hình** (không đổi tâm theo con trỏ hay cấu kiện đang chọn) |
+| **Di chuyển (Pan)** | Kéo chuột giữa **hoặc** kéo chuột phải |
+| **Phóng to / thu nhỏ** | Cuộn chuột, zoom vào **giữa màn hình**, có quán tính nhẹ khi thả |
+| **Chọn** | Click chuột trái |
+| **Thêm / bớt chọn** | `Ctrl` + click |
+| **Kéo khung chọn** | `Ctrl` + kéo trái (kéo trái → phải: chọn cấu kiện nằm trọn trong khung; phải → trái: chọn cả cấu kiện bị khung cắt qua). Kết quả được thêm vào vùng chọn hiện có |
+| **Đưa cấu kiện đang chọn vào giữa** | Phím `F` |
+
+**Tự xoay (chế độ 3D)**
+- Mô hình tự quay chậm quanh trục đứng (1 vòng / 60 giây).
+- Nút ở góc trên bên phải vùng mô hình (dưới ViewCube): ghi **"Dừng xoay"** khi đang quay. Bấm vào thì mô hình đứng yên và nút đổi thành **"Xoay"**. Trang nhớ lựa chọn, mở lại vẫn giữ.
+- Kéo hay cuộn chuột **không** tắt tự xoay. Trong lúc kéo, mô hình tạm ngừng quay; thả chuột ra là quay tiếp. Chỉ nút trên mới bật / tắt được.
+- Tự xoay cũng tạm ngừng khi: đang đo, đang kéo mặt cắt, chế độ đi bộ, camera đang chuyển góc nhìn (ViewCube, phím `1`–`6`, `F`, góc nhìn đã lưu), tab trình duyệt bị ẩn, hoặc đang ở hình chiếu trục đo nhìn thẳng từ trên / dưới.
+- Nếu hệ điều hành bật **giảm chuyển động** (Reduce motion) thì mặc định **không** tự xoay.
+
+### 2.1. Sơ đồ Revit & Cổ điển (Mốc 4, vẫn chọn được trong Cài đặt)
+
+JNN BIM Viewer vẫn giữ 2 sơ đồ cũ: **Revit** và **Cổ điển (Classic)**, chọn trong cửa sổ **Cài đặt** (biểu tượng bánh răng trên TopBar). Mục "Xoay quanh đối tượng đang chọn" / "Xoay quanh điểm dưới con trỏ" bên dưới chỉ áp dụng cho 2 sơ đồ này.
+
+| Thao tác | Sơ đồ Revit | Sơ đồ Cổ điển (Classic) | Phím tắt |
 |---|---|---|---|
 | **Xoay góc nhìn (Orbit)** | `Shift` + kéo chuột trái **HOẶC** `Shift` + kéo chuột giữa | Kéo chuột trái | — |
 | **Xoay quanh đối tượng chọn** | `Shift` + kéo chuột trái (khi đã chọn cấu kiện) | `Shift` + kéo chuột trái | — |
