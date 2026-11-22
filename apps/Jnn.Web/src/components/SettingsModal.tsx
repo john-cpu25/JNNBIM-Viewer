@@ -129,6 +129,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                   className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
                   data-testid="nav-preset-select"
                 >
+                  <option value="standard">{t('settings.standardOptionDesc')}</option>
                   <option value="revit">{t('settings.revitOptionDesc')}</option>
                   <option value="classic">{t('settings.classicOptionDesc')}</option>
                 </select>
@@ -180,52 +181,58 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 />
               </div>
 
-              {/* Checkboxes */}
-              <div className="space-y-1.5 pt-1">
-                <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
-                  <input
-                    type="checkbox"
-                    data-testid="orbit-around-selection-checkbox"
-                    checked={state.navigation.orbitAroundSelection}
-                    onChange={(e) =>
-                      dispatch({
-                        type: 'setNavigation',
-                        settings: { orbitAroundSelection: e.target.checked },
-                      })
-                    }
-                    className="rounded border-line accent-accent"
-                  />
-                  <span>{t('settings.orbitAroundSelection')}</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
-                  <input
-                    type="checkbox"
-                    checked={state.navigation.orbitAroundCursor}
-                    onChange={(e) =>
-                      dispatch({
-                        type: 'setNavigation',
-                        settings: { orbitAroundCursor: e.target.checked },
-                      })
-                    }
-                    className="rounded border-line accent-accent"
-                  />
-                  <span>{t('settings.orbitAroundCursor')}</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
-                  <input
-                    type="checkbox"
-                    checked={state.navigation.showPivot}
-                    onChange={(e) =>
-                      dispatch({
-                        type: 'setNavigation',
-                        settings: { showPivot: e.target.checked },
-                      })
-                    }
-                    className="rounded border-line accent-accent"
-                  />
-                  <span>{t('settings.showPivot')}</span>
-                </label>
-              </div>
+              {/* Checkboxes: tâm xoay theo con trỏ / vùng chọn chỉ dùng cho Revit / Cổ điển */}
+              {state.navigation.preset !== 'standard' ? (
+                <div className="space-y-1.5 pt-1">
+                  <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
+                    <input
+                      type="checkbox"
+                      data-testid="orbit-around-selection-checkbox"
+                      checked={state.navigation.orbitAroundSelection}
+                      onChange={(e) =>
+                        dispatch({
+                          type: 'setNavigation',
+                          settings: { orbitAroundSelection: e.target.checked },
+                        })
+                      }
+                      className="rounded border-line accent-accent"
+                    />
+                    <span>{t('settings.orbitAroundSelection')}</span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
+                    <input
+                      type="checkbox"
+                      checked={state.navigation.orbitAroundCursor}
+                      onChange={(e) =>
+                        dispatch({
+                          type: 'setNavigation',
+                          settings: { orbitAroundCursor: e.target.checked },
+                        })
+                      }
+                      className="rounded border-line accent-accent"
+                    />
+                    <span>{t('settings.orbitAroundCursor')}</span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-[11.5px] text-ink">
+                    <input
+                      type="checkbox"
+                      checked={state.navigation.showPivot}
+                      onChange={(e) =>
+                        dispatch({
+                          type: 'setNavigation',
+                          settings: { showPivot: e.target.checked },
+                        })
+                      }
+                      className="rounded border-line accent-accent"
+                    />
+                    <span>{t('settings.showPivot')}</span>
+                  </label>
+                </div>
+              ) : (
+                <p className="pt-1 text-[10.5px] text-muted" data-testid="nav-standard-note">
+                  {t('nav.standardPivotNote')}
+                </p>
+              )}
             </div>
           </div>
 

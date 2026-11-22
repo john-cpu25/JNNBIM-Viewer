@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen, Footprints, HelpCircle, Loader2 } from 'lucide-react';
+import { FolderOpen, Footprints, HelpCircle, Loader2, Pause, RotateCw } from 'lucide-react';
 import type { JnnModel } from '../domain/model';
 import { ThreeViewerAdapter } from '../viewer/ThreeViewerAdapter';
 import { ThatOpenViewerAdapter } from '../viewer/ThatOpenViewerAdapter';
@@ -204,6 +204,9 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
     viewer?.setNavigationSettings?.(state.navigation);
   }, [viewer, state.navigation]);
   useEffect(() => {
+    viewer?.setAutoRotate?.(state.autoRotate);
+  }, [viewer, state.autoRotate]);
+  useEffect(() => {
     if (!viewer) return;
     report(viewer.setMeasureTool?.(state.measureTool));
   }, [viewer, state.measureTool]);
@@ -338,6 +341,25 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
       {status === 'ready' && (
         <>
           {!compact && !isNarrow && <ViewCube />}
+          {!showEmptyState && viewer?.capabilities.has('autoRotate') && (
+            <button
+              type="button"
+              data-testid="auto-rotate-btn"
+              aria-pressed={state.autoRotate}
+              title={state.autoRotate ? t('viewport.autoRotateTitleOn') : t('viewport.autoRotateTitleOff')}
+              onClick={() => dispatch({ type: 'setAutoRotate', on: !state.autoRotate })}
+              className={cn(
+                'absolute right-3 z-20 flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-medium shadow-float backdrop-blur transition-colors',
+                !compact && !isNarrow ? 'top-[136px]' : 'top-3',
+                state.autoRotate
+                  ? 'border-accent/40 bg-accent/15 text-accent hover:bg-accent/25'
+                  : 'border-line bg-surface/95 text-ink hover:bg-surface-2',
+              )}
+            >
+              {state.autoRotate ? <Pause size={13} /> : <RotateCw size={13} />}
+              <span>{state.autoRotate ? t('viewport.autoRotateStop') : t('viewport.autoRotateStart')}</span>
+            </button>
+          )}
           {state.section && <SectionPanel compact={compact} />}
           {state.measurePanelOpen && <MeasurePanel compact={compact} />}
           {state.walkMode && (
@@ -397,16 +419,22 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                 <div className="mb-2 flex items-center justify-between border-b border-line pb-1.5 font-semibold text-ink">
                   <span>{t('nav.helpTitle')}</span>
                   <span className="rounded bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent font-medium">
-                    {state.navigation.preset === 'revit' ? t('nav.presetRevit') : t('nav.presetClassic')}
+                    {state.navigation.preset === 'standard'
+                      ? t('nav.presetStandard')
+                      : state.navigation.preset === 'revit'
+                        ? t('nav.presetRevit')
+                        : t('nav.presetClassic')}
                   </span>
                 </div>
                 <div className="space-y-1.5 text-muted text-[11px]">
                   <div className="flex justify-between">
                     <span className="text-ink font-medium">{t('nav.orbit')}</span>
                     <span>
-                      {state.navigation.preset === 'revit'
-                        ? t('nav.revitOrbitDesc')
-                        : t('nav.classicOrbitDesc')}
+                      {state.navigation.preset === 'standard'
+                        ? t('nav.standardOrbitDesc')
+                        : state.navigation.preset === 'revit'
+                          ? t('nav.revitOrbitDesc')
+                          : t('nav.classicOrbitDesc')}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -415,7 +443,19 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                   </div>
                   <div className="flex justify-between">
                     <span className="text-ink font-medium">{t('nav.zoom')}</span>
-                    <span>{t('nav.zoomDesc')}</span>
+                    <span>
+                      {state.navigation.preset === 'standard' ? t('nav.standardZoomDesc') : t('nav.zoomDesc')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink font-medium">{t('nav.boxSelect')}</span>
+                    <span>
+                      {state.navigation.preset === 'classic'
+                        ? t('nav.standardBoxSelectDesc')
+                        : state.navigation.preset === 'standard'
+                          ? t('nav.standardBoxSelectDesc')
+                          : t('nav.legacyBoxSelectDesc')}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-ink font-medium">{t('nav.fitAll')}</span>
@@ -427,7 +467,7 @@ export function Viewport({ model, onViewer, compact }: { model: JnnModel; onView
                   </div>
                 </div>
                 <div className="mt-2 pt-1.5 border-t border-line/60 text-[10px] text-muted leading-tight">
-                  {t('nav.pivotNote')}
+                  {state.navigation.preset === 'standard' ? t('nav.standardPivotNote') : t('nav.pivotNote')}
                 </div>
                 <div className="mt-2 pt-1.5 border-t border-line flex justify-end">
                   <button

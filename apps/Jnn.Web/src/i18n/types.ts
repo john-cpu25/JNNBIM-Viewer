@@ -68,6 +68,19 @@ export interface Translations {
   'measure.delete': string;
 
   // Navigation Help Popover
+  'nav.presetStandard': string;
+  'nav.standardOrbitDesc': string;
+  'nav.standardZoomDesc': string;
+  'nav.boxSelect': string;
+  'nav.standardBoxSelectDesc': string;
+  'nav.legacyBoxSelectDesc': string;
+  'nav.standardPivotNote': string;
+  'settings.standardOptionDesc': string;
+  'settings.pivotOptionsLegacyOnly': string;
+  'viewport.autoRotateStop': string;
+  'viewport.autoRotateStart': string;
+  'viewport.autoRotateTitleOn': string;
+  'viewport.autoRotateTitleOff': string;
   'nav.helpTitle': string;
   'nav.presetRevit': string;
   'nav.presetClassic': string;
